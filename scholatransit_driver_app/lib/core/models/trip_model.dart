@@ -1,0 +1,317 @@
+import 'package:geolocator/geolocator.dart';
+
+enum TripStatus { pending, inProgress, completed, cancelled, delayed }
+
+enum TripType { pickup, dropoff, scheduled, emergency }
+
+class Trip {
+  final int id;
+  final String tripId;
+  final int driverId;
+  final String? driverName;
+  final int? vehicleId;
+  final String? vehicleName;
+  final int? routeId;
+  final String? routeName;
+  final TripStatus status;
+  final TripType type;
+  final DateTime scheduledStart;
+  final DateTime scheduledEnd;
+  final DateTime? actualStart;
+  final DateTime? actualEnd;
+  final String? startLocation;
+  final String? endLocation;
+  final String? currentLocation;
+  final double? startLatitude;
+  final double? startLongitude;
+  final double? endLatitude;
+  final double? endLongitude;
+  final String? notes;
+  final String? delayReason;
+  final int? odometerReading;
+  final double? distance;
+  final double? averageSpeed;
+  final double? maxSpeed;
+  final int? duration;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  const Trip({
+    required this.id,
+    required this.tripId,
+    required this.driverId,
+    this.driverName,
+    this.vehicleId,
+    this.vehicleName,
+    this.routeId,
+    this.routeName,
+    required this.status,
+    required this.type,
+    required this.scheduledStart,
+    required this.scheduledEnd,
+    this.actualStart,
+    this.actualEnd,
+    this.startLocation,
+    this.endLocation,
+    this.currentLocation,
+    this.startLatitude,
+    this.startLongitude,
+    this.endLatitude,
+    this.endLongitude,
+    this.notes,
+    this.delayReason,
+    this.odometerReading,
+    this.distance,
+    this.averageSpeed,
+    this.maxSpeed,
+    this.duration,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  bool get isActive => status == TripStatus.inProgress;
+  bool get isCompleted => status == TripStatus.completed;
+  bool get isCancelled => status == TripStatus.cancelled;
+  bool get isDelayed => status == TripStatus.delayed;
+
+  Duration? get actualDuration {
+    if (actualStart != null && actualEnd != null) {
+      return actualEnd!.difference(actualStart!);
+    }
+    return null;
+  }
+
+  Duration get scheduledDuration {
+    return scheduledEnd.difference(scheduledStart);
+  }
+
+  bool get isOverdue {
+    if (isActive && actualStart != null) {
+      return DateTime.now().isAfter(scheduledEnd);
+    }
+    return false;
+  }
+
+  factory Trip.fromJson(Map<String, dynamic> json) {
+    return Trip(
+      id: json['id'] ?? 0,
+      tripId: json['trip_id'] ?? '',
+      driverId: json['driver'] ?? json['driver_id'] ?? 0,
+      driverName: json['driver_name'],
+      vehicleId: json['vehicle'] ?? json['vehicle_id'],
+      vehicleName: json['vehicle_name'],
+      routeId: json['route'] ?? json['route_id'],
+      routeName: json['route_name'],
+      status: _parseTripStatus(json['status']),
+      type: _parseTripType(json['trip_type']),
+      scheduledStart: DateTime.parse(json['scheduled_start']),
+      scheduledEnd: DateTime.parse(json['scheduled_end']),
+      actualStart: json['actual_start'] != null
+          ? DateTime.parse(json['actual_start'])
+          : null,
+      actualEnd: json['actual_end'] != null
+          ? DateTime.parse(json['actual_end'])
+          : null,
+      startLocation: json['start_location'],
+      endLocation: json['end_location'],
+      currentLocation: json['current_location'],
+      startLatitude: json['start_latitude']?.toDouble(),
+      startLongitude: json['start_longitude']?.toDouble(),
+      endLatitude: json['end_latitude']?.toDouble(),
+      endLongitude: json['end_longitude']?.toDouble(),
+      notes: json['notes'],
+      delayReason: json['delay_reason'],
+      odometerReading: json['odometer_reading'],
+      distance: json['total_distance']?.toDouble() ?? json['distance']?.toDouble(),
+      averageSpeed: json['average_speed']?.toDouble(),
+      maxSpeed: json['max_speed']?.toDouble(),
+      duration: json['duration'],
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
+    );
+  }
+
+  // Backend variant mapper to handle response keys from tracking endpoint
+  factory Trip.fromBackend(Map<String, dynamic> json) {
+    return Trip(
+      id: json['id'] ?? 0,
+      tripId: json['trip_id'] ?? '',
+      driverId: json['driver'] ?? json['driver_id'] ?? 0,
+      driverName: json['driver_name'],
+      vehicleId: json['vehicle'] ?? json['vehicle_id'],
+      vehicleName: json['vehicle_name'],
+      routeId: json['route'] ?? json['route_id'],
+      routeName: json['route_name'],
+      status: _parseTripStatus(json['status']),
+      type: _parseTripType(json['trip_type']),
+      scheduledStart: DateTime.parse(json['scheduled_start']),
+      scheduledEnd: DateTime.parse(json['scheduled_end']),
+      actualStart: json['actual_start'] != null
+          ? DateTime.parse(json['actual_start'])
+          : null,
+      actualEnd: json['actual_end'] != null
+          ? DateTime.parse(json['actual_end'])
+          : null,
+      startLocation: json['start_location'],
+      endLocation: json['end_location'],
+      currentLocation: json['current_location'],
+      startLatitude: json['start_latitude']?.toDouble(),
+      startLongitude: json['start_longitude']?.toDouble(),
+      endLatitude: json['end_latitude']?.toDouble(),
+      endLongitude: json['end_longitude']?.toDouble(),
+      notes: json['notes'],
+      delayReason: json['delay_reason'],
+      odometerReading: json['odometer_reading'],
+      distance: json['total_distance']?.toDouble() ?? json['distance']?.toDouble(),
+      averageSpeed: json['average_speed']?.toDouble(),
+      maxSpeed: json['max_speed']?.toDouble(),
+      duration: json['duration'],
+      createdAt: DateTime.parse(json['created_at']),
+      updatedAt: DateTime.parse(json['updated_at']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'trip_id': tripId,
+      'driver': driverId,
+      'driver_name': driverName,
+      'vehicle': vehicleId,
+      'vehicle_name': vehicleName,
+      'route': routeId,
+      'route_name': routeName,
+      'status': status.name,
+      'trip_type': type.name,
+      'scheduled_start': scheduledStart.toIso8601String(),
+      'scheduled_end': scheduledEnd.toIso8601String(),
+      'actual_start': actualStart?.toIso8601String(),
+      'actual_end': actualEnd?.toIso8601String(),
+      'start_location': startLocation,
+      'end_location': endLocation,
+      'current_location': currentLocation,
+      'start_latitude': startLatitude,
+      'start_longitude': startLongitude,
+      'end_latitude': endLatitude,
+      'end_longitude': endLongitude,
+      'notes': notes,
+      'delay_reason': delayReason,
+      'odometer_reading': odometerReading,
+      'total_distance': distance,
+      'average_speed': averageSpeed,
+      'max_speed': maxSpeed,
+      'duration': duration,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  static TripStatus _parseTripStatus(String? status) {
+    print('🔍 DEBUG: Parsing trip status: "$status"');
+    final parsedStatus = switch (status?.toLowerCase()) {
+      'pending' => TripStatus.pending,
+      'in_progress' || 'in-progress' || 'in progress' => TripStatus.inProgress,
+      'completed' => TripStatus.completed,
+      'cancelled' => TripStatus.cancelled,
+      'delayed' => TripStatus.delayed,
+      _ => TripStatus.pending,
+    };
+    print('🔍 DEBUG: Parsed status: $parsedStatus');
+    return parsedStatus;
+  }
+
+  static TripType _parseTripType(String? type) {
+    switch (type?.toLowerCase()) {
+      case 'pickup':
+        return TripType.pickup;
+      case 'dropoff':
+        return TripType.dropoff;
+      case 'scheduled':
+        return TripType.scheduled;
+      case 'emergency':
+        return TripType.emergency;
+      default:
+        return TripType.scheduled;
+    }
+  }
+
+  Trip copyWith({
+    int? id,
+    String? tripId,
+    int? driverId,
+    String? driverName,
+    int? vehicleId,
+    String? vehicleName,
+    int? routeId,
+    String? routeName,
+    TripStatus? status,
+    TripType? type,
+    DateTime? scheduledStart,
+    DateTime? scheduledEnd,
+    DateTime? actualStart,
+    DateTime? actualEnd,
+    String? startLocation,
+    String? endLocation,
+    String? currentLocation,
+    double? startLatitude,
+    double? startLongitude,
+    double? endLatitude,
+    double? endLongitude,
+    String? notes,
+    String? delayReason,
+    int? odometerReading,
+    double? distance,
+    double? averageSpeed,
+    double? maxSpeed,
+    int? duration,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Trip(
+      id: id ?? this.id,
+      tripId: tripId ?? this.tripId,
+      driverId: driverId ?? this.driverId,
+      driverName: driverName ?? this.driverName,
+      vehicleId: vehicleId ?? this.vehicleId,
+      vehicleName: vehicleName ?? this.vehicleName,
+      routeId: routeId ?? this.routeId,
+      routeName: routeName ?? this.routeName,
+      status: status ?? this.status,
+      type: type ?? this.type,
+      scheduledStart: scheduledStart ?? this.scheduledStart,
+      scheduledEnd: scheduledEnd ?? this.scheduledEnd,
+      actualStart: actualStart ?? this.actualStart,
+      actualEnd: actualEnd ?? this.actualEnd,
+      startLocation: startLocation ?? this.startLocation,
+      endLocation: endLocation ?? this.endLocation,
+      currentLocation: currentLocation ?? this.currentLocation,
+      startLatitude: startLatitude ?? this.startLatitude,
+      startLongitude: startLongitude ?? this.startLongitude,
+      endLatitude: endLatitude ?? this.endLatitude,
+      endLongitude: endLongitude ?? this.endLongitude,
+      notes: notes ?? this.notes,
+      delayReason: delayReason ?? this.delayReason,
+      odometerReading: odometerReading ?? this.odometerReading,
+      distance: distance ?? this.distance,
+      averageSpeed: averageSpeed ?? this.averageSpeed,
+      maxSpeed: maxSpeed ?? this.maxSpeed,
+      duration: duration ?? this.duration,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Trip && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
+
+  @override
+  String toString() {
+    return 'Trip(id: $id, tripId: $tripId, status: $status, type: $type)';
+  }
+}

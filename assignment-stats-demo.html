@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignment Stats Display</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .stats-card-green {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .stats-card-yellow {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        .stats-card-blue {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        .stats-card-purple {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        }
+        .stats-card-indigo {
+            background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">📊 Assignment Statistics</h1>
+            <p class="text-gray-600">Overview of route assignment statistics and status breakdown</p>
+        </div>
+
+        <!-- Main Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div class="stats-card rounded-lg p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">Total Assignments</p>
+                        <p class="text-3xl font-bold">9</p>
+                    </div>
+                    <div class="text-4xl opacity-80">📈</div>
+                </div>
+            </div>
+
+            <div class="stats-card-green rounded-lg p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">Active Assignments</p>
+                        <p class="text-3xl font-bold">0</p>
+                    </div>
+                    <div class="text-4xl opacity-80">🟢</div>
+                </div>
+            </div>
+
+            <div class="stats-card-yellow rounded-lg p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">Pending Assignments</p>
+                        <p class="text-3xl font-bold">9</p>
+                    </div>
+                    <div class="text-4xl opacity-80">🟡</div>
+                </div>
+            </div>
+
+            <div class="stats-card-blue rounded-lg p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">Completed Assignments</p>
+                        <p class="text-3xl font-bold">0</p>
+                    </div>
+                    <div class="text-4xl opacity-80">✅</div>
+                </div>
+            </div>
+
+            <div class="stats-card-purple rounded-lg p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">Current Active</p>
+                        <p class="text-3xl font-bold">0</p>
+                    </div>
+                    <div class="text-4xl opacity-80">🔄</div>
+                </div>
+            </div>
+
+            <div class="stats-card-indigo rounded-lg p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm opacity-90">Recent Assignments</p>
+                        <p class="text-3xl font-bold">9</p>
+                    </div>
+                    <div class="text-4xl opacity-80">📅</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Breakdown -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">📊 Assignments by Status</h2>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-2xl">🟡</span>
+                        <span class="font-medium text-gray-700">PENDING</span>
+                        <span class="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-sm font-medium">9</span>
+                    </div>
+                    <span class="text-sm text-gray-600">100.0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3">
+                    <div class="bg-yellow-500 h-3 rounded-full" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">📋 Summary</h2>
+            <div class="space-y-3">
+                <p class="text-gray-700">
+                    You have <span class="font-semibold text-blue-600">9</span> total assignments
+                </p>
+                <p class="text-gray-700">
+                    <span class="font-semibold text-green-600">0</span> are currently active
+                </p>
+                <p class="text-gray-700">
+                    <span class="font-semibold text-yellow-600">9</span> are pending approval
+                </p>
+                <p class="text-gray-700">
+                    <span class="font-semibold text-blue-600">0</span> have been completed
+                </p>
+
+                <div class="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div class="flex items-center">
+                        <span class="text-yellow-600 mr-2 text-xl">⚠️</span>
+                        <span class="text-yellow-800 font-medium">
+                            You have 9 pending assignments that need attention
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="flex items-center">
+                        <span class="text-blue-600 mr-2 text-xl">💡</span>
+                        <span class="text-blue-800 font-medium">
+                            Consider activating some pending assignments
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Information -->
+        <div class="mt-8 bg-gray-50 rounded-lg p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">🔗 API Information</h3>
+            <div class="space-y-2 text-sm">
+                <p><strong>Endpoint:</strong> <code class="bg-gray-200 px-2 py-1 rounded">GET /api/v1/routes/assignments/stats/</code></p>
+                <p><strong>Response Format:</strong> JSON with assignment statistics</p>
+                <p><strong>Usage:</strong> <code class="bg-gray-200 px-2 py-1 rounded">routesAPI.getAssignmentStats()</code></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
