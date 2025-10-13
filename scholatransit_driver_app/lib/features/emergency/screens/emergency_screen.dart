@@ -15,203 +15,478 @@ class EmergencyScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Emergency'),
-        backgroundColor: AppTheme.errorColor,
-        foregroundColor: Colors.white,
-      ),
-      body: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Column(
-          children: [
-            // Emergency Alert Card
-            Card(
-              elevation: 8,
-              shadowColor: AppTheme.errorColor.withOpacity(0.3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12.r),
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: CustomScrollView(
+        slivers: [
+          // Modern App Bar with gradient
+          SliverAppBar(
+            expandedHeight: 200.h,
+            floating: false,
+            pinned: true,
+            backgroundColor: Colors.transparent,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      AppTheme.errorColor,
-                      AppTheme.errorColor.withOpacity(0.8),
-                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFEF4444),
+                      Color(0xFFDC2626),
+                    ],
                   ),
                 ),
-                child: Padding(
-                  padding: EdgeInsets.all(20.w),
+                child: SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.w),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(12.w),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.emergency,
+                                color: Colors.white,
+                                size: 24.w,
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Emergency Center',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24.sp,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Quick access to emergency services',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontSize: 14.sp,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Content
+          SliverPadding(
+            padding: EdgeInsets.all(20.w),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // Emergency Alert Card with glassmorphism
+                _buildGlassmorphismCard(
                   child: Column(
                     children: [
-                      Icon(Icons.emergency, size: 48.w, color: Colors.white),
-                      SizedBox(height: 16.h),
-                      Text(
-                        'Emergency Alert',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      SizedBox(height: 8.h),
-                      Text(
-                        'Use this in case of emergency situations',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withOpacity(0.9),
+                      Container(
+                        padding: EdgeInsets.all(20.w),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16.r),
                         ),
-                        textAlign: TextAlign.center,
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.emergency,
+                              size: 48.w,
+                              color: Colors.white,
+                            ),
+                            SizedBox(height: 16.h),
+                            Text(
+                              'Emergency Alert',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            Text(
+                              'Use this in case of emergency situations',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 14.sp,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
+
+                SizedBox(height: 24.h),
+
+                // Emergency Actions Grid
+                _buildEmergencyActionsGrid(context, ref),
+
+                SizedBox(height: 32.h),
+
+                // Create Custom Alert Button
+                _buildModernButton(
+                  onPressed: () => context.go('/emergency/create-alert'),
+                  icon: Icons.add_alert,
+                  label: 'Create Custom Alert',
+                  color: AppTheme.primaryColor,
+                ),
+
+                SizedBox(height: 32.h),
+
+                // Emergency Contacts
+                _buildEmergencyContacts(context),
+              ]),
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            SizedBox(height: 24.h),
+  Widget _buildGlassmorphismCard({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20.r),
+        child: child,
+      ),
+    );
+  }
 
-            // Emergency Actions
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      _showEmergencyDialog(context, ref, 'Medical Emergency');
-                    },
-                    icon: const Icon(Icons.medical_services),
-                    label: const Text('Medical'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.errorColor,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 16.h),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      _showEmergencyDialog(context, ref, 'Vehicle Breakdown');
-                    },
-                    icon: const Icon(Icons.car_repair),
-                    label: const Text('Breakdown'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.warningColor,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 16.h),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+  Widget _buildEmergencyActionsGrid(BuildContext context, WidgetRef ref) {
+    final actions = [
+      {
+        'type': 'Medical Emergency',
+        'icon': Icons.medical_services,
+        'color': const Color(0xFFEF4444),
+        'gradient': [const Color(0xFFEF4444), const Color(0xFFDC2626)],
+      },
+      {
+        'type': 'Vehicle Breakdown',
+        'icon': Icons.car_repair,
+        'color': const Color(0xFFF59E0B),
+        'gradient': [const Color(0xFFF59E0B), const Color(0xFFD97706)],
+      },
+      {
+        'type': 'Student Emergency',
+        'icon': Icons.school,
+        'color': const Color(0xFF3B82F6),
+        'gradient': [const Color(0xFF3B82F6), const Color(0xFF2563EB)],
+      },
+      {
+        'type': 'Other Emergency',
+        'icon': Icons.warning,
+        'color': const Color(0xFF6B7280),
+        'gradient': [const Color(0xFF6B7280), const Color(0xFF4B5563)],
+      },
+    ];
 
-            SizedBox(height: 12.h),
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16.w,
+        mainAxisSpacing: 16.h,
+        childAspectRatio: 1.2,
+      ),
+      itemCount: actions.length,
+      itemBuilder: (context, index) {
+        final action = actions[index];
+        return _buildActionCard(
+          context: context,
+          ref: ref,
+          type: action['type'] as String,
+          icon: action['icon'] as IconData,
+          gradient: action['gradient'] as List<Color>,
+        );
+      },
+    );
+  }
 
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      _showEmergencyDialog(context, ref, 'Student Emergency');
-                    },
-                    icon: const Icon(Icons.school),
-                    label: const Text('Student'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.infoColor,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 16.h),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      _showEmergencyDialog(context, ref, 'Other Emergency');
-                    },
-                    icon: const Icon(Icons.warning),
-                    label: const Text('Other'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.textSecondary,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 16.h),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            SizedBox(height: 24.h),
-
-            // Create Custom Alert Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => context.go('/emergency/create-alert'),
-                icon: const Icon(Icons.add_alert),
-                label: const Text('Create Custom Alert'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryColor,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 16.h),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                ),
-              ),
-            ),
-
-            SizedBox(height: 32.h),
-
-            // Emergency Contacts
-            Card(
-              child: Padding(
-                padding: EdgeInsets.all(16.w),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Emergency Contacts',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 16.h),
-                    _EmergencyContactItem(
-                      icon: Icons.phone,
-                      label: 'Emergency Hotline',
-                      number: '911',
-                      onTap: () {
-                        // TODO: Make phone call
-                      },
-                    ),
-                    SizedBox(height: 12.h),
-                    _EmergencyContactItem(
-                      icon: Icons.school,
-                      label: 'School Office',
-                      number: '+254 700 000 000',
-                      onTap: () {
-                        // TODO: Make phone call
-                      },
-                    ),
-                    SizedBox(height: 12.h),
-                    _EmergencyContactItem(
-                      icon: Icons.local_police,
-                      label: 'Police',
-                      number: '999',
-                      onTap: () {
-                        // TODO: Make phone call
-                      },
-                    ),
-                  ],
-                ),
-              ),
+  Widget _buildActionCard({
+    required BuildContext context,
+    required WidgetRef ref,
+    required String type,
+    required IconData icon,
+    required List<Color> gradient,
+  }) {
+    return GestureDetector(
+      onTap: () => _showEmergencyDialog(context, ref, type),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: gradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16.r),
+          boxShadow: [
+            BoxShadow(
+              color: gradient[0].withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
           ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16.r),
+            onTap: () => _showEmergencyDialog(context, ref, type),
+            child: Padding(
+              padding: EdgeInsets.all(16.w),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: Colors.white,
+                      size: 28.w,
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                  Text(
+                    type.split(' ')[0], // First word only
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
+    return Container(
+      width: double.infinity,
+      height: 56.h,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [color, color.withOpacity(0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16.r),
+          onTap: onPressed,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24.w),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, color: Colors.white, size: 20.w),
+                SizedBox(width: 12.w),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmergencyContacts(BuildContext context) {
+    final contacts = [
+      {
+        'icon': Icons.phone,
+        'label': 'Emergency Hotline',
+        'number': '911',
+        'color': const Color(0xFFEF4444),
+      },
+      {
+        'icon': Icons.school,
+        'label': 'School Office',
+        'number': '+254 700 000 000',
+        'color': const Color(0xFF3B82F6),
+      },
+      {
+        'icon': Icons.local_police,
+        'label': 'Police',
+        'number': '999',
+        'color': const Color(0xFF6B7280),
+      },
+    ];
+
+    return _buildGlassmorphismCard(
+      child: Padding(
+        padding: EdgeInsets.all(20.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.contacts, color: AppTheme.primaryColor, size: 24.w),
+                SizedBox(width: 12.w),
+                Text(
+                  'Emergency Contacts',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 20.h),
+            ...contacts.map((contact) => _buildContactItem(
+              icon: contact['icon'] as IconData,
+              label: contact['label'] as String,
+              number: contact['number'] as String,
+              color: contact['color'] as Color,
+            )).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactItem({
+    required IconData icon,
+    required String label,
+    required String number,
+    required Color color,
+  }) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12.r),
+          onTap: () {
+            // TODO: Make phone call
+          },
+          child: Container(
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12.r),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8.w),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Icon(icon, color: color, size: 20.w),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        number,
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.phone,
+                  color: AppTheme.primaryColor,
+                  size: 20.w,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

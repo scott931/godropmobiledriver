@@ -95,229 +95,669 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
     final locationState = ref.watch(locationProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Create Alert'),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: CustomScrollView(
+        slivers: [
+          // Modern App Bar
+          SliverAppBar(
+            expandedHeight: 120.h,
+            floating: false,
+            pinned: true,
+            backgroundColor: Colors.transparent,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF2563EB),
+                      Color(0xFF1D4ED8),
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.all(20.w),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(8.w),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => context.pop(),
+                          ),
+                        ),
+                        SizedBox(width: 16.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Create Alert',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20.sp,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Report an issue or emergency',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: 12.sp,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Form Content
+          SliverPadding(
+            padding: EdgeInsets.all(20.w),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Alert Type Selection
+                      _buildModernSection(
+                        title: 'Alert Type',
+                        icon: Icons.category,
+                        child: _buildModernAlertTypeSelector(),
+                      ),
+
+                      SizedBox(height: 24.h),
+
+                      // Severity Level
+                      _buildModernSection(
+                        title: 'Severity Level',
+                        icon: Icons.priority_high,
+                        child: _buildModernSeveritySelector(),
+                      ),
+
+                      SizedBox(height: 24.h),
+
+                      // Title Field
+                      _buildModernSection(
+                        title: 'Alert Title',
+                        icon: Icons.title,
+                        child: _buildModernTextField(
+                          controller: _titleController,
+                          hintText: 'Enter alert title',
+                          icon: Icons.title,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter an alert title';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+
+                      SizedBox(height: 24.h),
+
+                      // Description Field
+                      _buildModernSection(
+                        title: 'Description',
+                        icon: Icons.description,
+                        child: _buildModernTextField(
+                          controller: _descriptionController,
+                          hintText: 'Describe the issue in detail',
+                          icon: Icons.description,
+                          maxLines: 4,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a description';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+
+                      SizedBox(height: 24.h),
+
+                      // Location Information
+                      _buildModernSection(
+                        title: 'Location Information',
+                        icon: Icons.location_on,
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildModernTextField(
+                                    controller: _locationController,
+                                    hintText: 'Latitude, Longitude',
+                                    icon: Icons.location_on,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Please enter location coordinates';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 12.w),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primaryColor,
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppTheme.primaryColor.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: IconButton(
+                                    onPressed: () => _getCurrentLocation(),
+                                    icon: const Icon(Icons.my_location, color: Colors.white),
+                                    tooltip: 'Use current location',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16.h),
+                            _buildModernTextField(
+                              controller: _addressController,
+                              hintText: 'Address or location description',
+                              icon: Icons.place,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter an address';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: 24.h),
+
+                      // Trip Information
+                      if (tripState.currentTrip != null) ...[
+                        _buildModernSection(
+                          title: 'Trip Information',
+                          icon: Icons.directions_bus,
+                          child: _buildModernTripInfoCard(tripState),
+                        ),
+                        SizedBox(height: 24.h),
+                      ],
+
+                      // Affected Students
+                      if (tripState.students.isNotEmpty) ...[
+                        _buildModernSection(
+                          title: 'Affected Students',
+                          icon: Icons.people,
+                          child: _buildModernStudentsSelector(tripState),
+                        ),
+                        SizedBox(height: 24.h),
+                      ],
+
+                      // Impact Assessment
+                      _buildModernSection(
+                        title: 'Impact Assessment',
+                        icon: Icons.assessment,
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildModernTextField(
+                                    initialValue: _affectedStudentsCount?.toString() ?? '',
+                                    hintText: 'Affected students count',
+                                    icon: Icons.people,
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (value) {
+                                      _affectedStudentsCount = int.tryParse(value);
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 16.w),
+                                Expanded(
+                                  child: _buildModernTextField(
+                                    initialValue: _estimatedDelayMinutes?.toString() ?? '',
+                                    hintText: 'Delay (minutes)',
+                                    icon: Icons.timer,
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (value) {
+                                      _estimatedDelayMinutes = int.tryParse(value);
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16.h),
+                            _buildModernTextField(
+                              controller: _estimatedResolutionController,
+                              hintText: 'Estimated resolution time',
+                              icon: Icons.schedule,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: 32.h),
+
+                      // Submit Button
+                      _buildModernSubmitButton(emergencyState.isLoading),
+                    ],
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernSection({
+    required String title,
+    required IconData icon,
+    required Widget child,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(20.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8.w),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppTheme.primaryColor,
+                    size: 20.w,
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16.h),
+            child,
+          ],
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  Widget _buildModernTextField({
+    TextEditingController? controller,
+    String? initialValue,
+    required String hintText,
+    required IconData icon,
+    int maxLines = 1,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+    void Function(String)? onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+          width: 1,
+        ),
+      ),
+      child: TextFormField(
+        controller: controller,
+        initialValue: initialValue,
+        maxLines: maxLines,
+        keyboardType: keyboardType,
+        validator: validator,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 14.sp,
+          ),
+          prefixIcon: Icon(icon, color: AppTheme.primaryColor, size: 20.w),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+        ),
+        style: TextStyle(
+          fontSize: 14.sp,
+          color: AppTheme.textPrimary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernAlertTypeSelector() {
+    return Container(
+      height: 120.h,
+      child: GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 12.w,
+          mainAxisSpacing: 12.h,
+          childAspectRatio: 1.2,
+        ),
+        itemCount: _alertTypes.length,
+        itemBuilder: (context, index) {
+          final alertType = _alertTypes[index];
+          final isSelected = _selectedAlertType == alertType['value'];
+
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedAlertType = alertType['value'];
+              });
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: isSelected ? AppTheme.primaryColor : Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(
+                  color: isSelected ? AppTheme.primaryColor : const Color(0xFFE5E7EB),
+                  width: 2,
+                ),
+                boxShadow: isSelected ? [
+                  BoxShadow(
+                    color: AppTheme.primaryColor.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ] : null,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    alertType['icon'],
+                    color: isSelected ? Colors.white : AppTheme.textSecondary,
+                    size: 24.w,
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    alertType['label'],
+                    style: TextStyle(
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : AppTheme.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildModernSeveritySelector() {
+    return Row(
+      children: _severityLevels.map((severity) {
+        final isSelected = _selectedSeverity == severity['value'];
+        return Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedSeverity = severity['value'];
+              });
+            },
+            child: Container(
+              margin: EdgeInsets.symmetric(horizontal: 4.w),
+              padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 8.w),
+              decoration: BoxDecoration(
+                color: isSelected ? severity['color'] : Colors.white,
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(
+                  color: isSelected ? severity['color'] : const Color(0xFFE5E7EB),
+                  width: 2,
+                ),
+                boxShadow: isSelected ? [
+                  BoxShadow(
+                    color: (severity['color'] as Color).withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ] : null,
+              ),
+              child: Text(
+                severity['label'],
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppTheme.textSecondary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12.sp,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildModernTripInfoCard(TripState tripState) {
+    final trip = tripState.currentTrip!;
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              // Alert Type Selection
-              _buildSectionTitle('Alert Type'),
-              SizedBox(height: 8.h),
-              _buildAlertTypeSelector(),
-              SizedBox(height: 24.h),
-
-              // Severity Level
-              _buildSectionTitle('Severity Level'),
-              SizedBox(height: 8.h),
-              _buildSeveritySelector(),
-              SizedBox(height: 24.h),
-
-              // Title Field
-              _buildSectionTitle('Alert Title'),
-              SizedBox(height: 8.h),
-              TextFormField(
-                controller: _titleController,
-                decoration: InputDecoration(
-                  hintText: 'Enter alert title',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  prefixIcon: const Icon(Icons.title),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an alert title';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 16.h),
-
-              // Description Field
-              _buildSectionTitle('Description'),
-              SizedBox(height: 8.h),
-              TextFormField(
-                controller: _descriptionController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'Describe the issue in detail',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  prefixIcon: const Icon(Icons.description),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a description';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 24.h),
-
-              // Location Information
-              _buildSectionTitle('Location Information'),
-              SizedBox(height: 8.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _locationController,
-                      decoration: InputDecoration(
-                        hintText: 'Latitude, Longitude',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                        prefixIcon: const Icon(Icons.location_on),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter location coordinates';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  SizedBox(width: 8.w),
-                  IconButton(
-                    onPressed: () => _getCurrentLocation(),
-                    icon: const Icon(Icons.my_location),
-                    tooltip: 'Use current location',
-                  ),
-                ],
-              ),
-              SizedBox(height: 16.h),
-              TextFormField(
-                controller: _addressController,
-                decoration: InputDecoration(
-                  hintText: 'Address or location description',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  prefixIcon: const Icon(Icons.place),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an address';
-                  }
-                  return null;
-                },
-              ),
-              SizedBox(height: 24.h),
-
-              // Trip Information
-              if (tripState.currentTrip != null) ...[
-                _buildSectionTitle('Trip Information'),
-                SizedBox(height: 8.h),
-                _buildTripInfoCard(tripState),
-                SizedBox(height: 24.h),
-              ],
-
-              // Affected Students
-              if (tripState.students.isNotEmpty) ...[
-                _buildSectionTitle('Affected Students'),
-                SizedBox(height: 8.h),
-                _buildStudentsSelector(tripState),
-                SizedBox(height: 24.h),
-              ],
-
-              // Impact Assessment
-              _buildSectionTitle('Impact Assessment'),
-              SizedBox(height: 8.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      initialValue: _affectedStudentsCount?.toString() ?? '',
-                      decoration: InputDecoration(
-                        hintText: 'Affected students count',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                        prefixIcon: const Icon(Icons.people),
-                      ),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        _affectedStudentsCount = int.tryParse(value);
-                      },
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: TextFormField(
-                      initialValue: _estimatedDelayMinutes?.toString() ?? '',
-                      decoration: InputDecoration(
-                        hintText: 'Delay (minutes)',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8.r),
-                        ),
-                        prefixIcon: const Icon(Icons.timer),
-                      ),
-                      keyboardType: TextInputType.number,
-                      onChanged: (value) {
-                        _estimatedDelayMinutes = int.tryParse(value);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 16.h),
-              TextFormField(
-                controller: _estimatedResolutionController,
-                decoration: InputDecoration(
-                  hintText: 'Estimated resolution time',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  prefixIcon: const Icon(Icons.schedule),
-                ),
-              ),
-              SizedBox(height: 32.h),
-
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: emergencyState.isLoading ? null : _submitAlert,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryColor,
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(vertical: 16.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                  ),
-                  child: emergencyState.isLoading
-                      ? SizedBox(
-                          height: 20.h,
-                          width: 20.w,
-                          child: const CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          'Create Alert',
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+              Icon(Icons.directions_bus, color: AppTheme.primaryColor, size: 20.w),
+              SizedBox(width: 8.w),
+              Text(
+                'Current Trip',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
                 ),
               ),
             ],
+          ),
+          SizedBox(height: 12.h),
+          _buildInfoRow('Trip ID', trip.tripId),
+          _buildInfoRow('Route', trip.routeName ?? 'N/A'),
+          _buildInfoRow('Vehicle', trip.vehicleName ?? 'N/A'),
+          _buildInfoRow('Status', trip.status.name),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 4.h),
+      child: Row(
+        children: [
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 12.sp,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernStudentsSelector(TripState tripState) {
+    return Container(
+      height: 200.h,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: const Color(0xFFE5E7EB),
+          width: 1,
+        ),
+      ),
+      child: ListView.builder(
+        itemCount: tripState.students.length,
+        itemBuilder: (context, index) {
+          final student = tripState.students[index];
+          final isSelected = _selectedStudentIds.contains(student.id);
+
+          return Container(
+            decoration: BoxDecoration(
+              color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : Colors.transparent,
+              border: Border(
+                bottom: BorderSide(
+                  color: const Color(0xFFE5E7EB),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: CheckboxListTile(
+              title: Text(
+                '${student.firstName} ${student.lastName}',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              subtitle: Text(
+                'ID: ${student.studentId}',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              value: isSelected,
+              onChanged: (value) {
+                setState(() {
+                  if (value == true) {
+                    _selectedStudentIds.add(student.id);
+                  } else {
+                    _selectedStudentIds.remove(student.id);
+                  }
+                });
+              },
+              activeColor: AppTheme.primaryColor,
+              checkColor: Colors.white,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildModernSubmitButton(bool isLoading) {
+    return Container(
+      width: double.infinity,
+      height: 56.h,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppTheme.primaryColor, AppTheme.primaryColor.withOpacity(0.8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.primaryColor.withOpacity(0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16.r),
+          onTap: isLoading ? null : _submitAlert,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24.w),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (isLoading) ...[
+                  SizedBox(
+                    height: 20.h,
+                    width: 20.w,
+                    child: const CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                ] else ...[
+                  Icon(Icons.send, color: Colors.white, size: 20.w),
+                  SizedBox(width: 12.w),
+                ],
+                Text(
+                  isLoading ? 'Creating Alert...' : 'Create Alert',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

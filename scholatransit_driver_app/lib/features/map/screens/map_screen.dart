@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import '../../../core/theme/app_theme.dart';
@@ -97,26 +98,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     });
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Live Map'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.my_location),
-            onPressed: () {
-              _centerMapOnCurrentLocation();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.layers),
-            onPressed: () {
-              _showMapLayers();
-            },
-          ),
-        ],
-      ),
+      backgroundColor: const Color(0xFFF3F4F6),
       body: Stack(
         children: [
+          // Map
           _currentLocation == null
               ? const Center(
                   child: CircularProgressIndicator(),
@@ -140,37 +125,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 _addTripMarkers();
               },
             ),
+
           // Trip Details Card
           Positioned(
-            top: 16,
-            left: 16,
-            right: 16,
+            top: 50.h,
+            left: 16.w,
+            right: 16.w,
             child: _TripDetailsCard(
               tripState: tripState,
               currentLocation: _currentLocation,
             ),
           ),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: () {
-              _refreshMapData();
-            },
-            child: const Icon(Icons.refresh),
-            backgroundColor: AppTheme.secondaryColor,
-            heroTag: "refresh",
-          ),
-          SizedBox(height: 8.h),
-          FloatingActionButton(
-            onPressed: () {
-              _updateCurrentLocation();
-            },
-            child: const Icon(Icons.location_on),
-            backgroundColor: AppTheme.primaryColor,
-            heroTag: "location",
+
+          // Current Location Button
+          Positioned(
+            bottom: 30.h,
+            right: 16.w,
+            child: _CurrentLocationButton(
+              onPressed: _centerMapOnCurrentLocation,
+            ),
           ),
         ],
       ),
@@ -465,7 +438,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 }
 
-class _TripDetailsCard extends StatelessWidget {
+// Modern Trip Details Card with Dropdown
+
+class _TripDetailsCard extends StatefulWidget {
   final TripState tripState;
   final Point? currentLocation;
 
@@ -475,167 +450,191 @@ class _TripDetailsCard extends StatelessWidget {
   });
 
   @override
+  State<_TripDetailsCard> createState() => _TripDetailsCardState();
+}
+
+class _TripDetailsCardState extends State<_TripDetailsCard> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final currentTrip = widget.tripState.currentTrip;
+
     return Container(
-      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // Header
-          Row(
-            children: [
-              Icon(
-                Icons.directions_bus,
-                color: AppTheme.primaryColor,
-                size: 20.w,
-              ),
-              SizedBox(width: 8.w),
-              Text(
-                'Trip Details',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16.sp,
-                  color: AppTheme.primaryColor,
-                ),
-              ),
-              const Spacer(),
-              if (tripState.isLoading)
-                SizedBox(
-                  width: 16.w,
-                  height: 16.w,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                  ),
-                ),
-            ],
-          ),
-
-          SizedBox(height: 12.h),
-
-          // Trip Information
-          if (tripState.currentTrip != null) ...[
-            _TripInfoRow(
-              icon: Icons.confirmation_number,
-              label: 'Trip ID',
-              value: tripState.currentTrip!.tripId,
-            ),
-            SizedBox(height: 8.h),
-            _TripInfoRow(
-              icon: Icons.route,
-              label: 'Route',
-              value: tripState.currentTrip!.routeName ?? 'Unknown',
-            ),
-            SizedBox(height: 8.h),
-            _TripInfoRow(
-              icon: Icons.directions_car,
-              label: 'Vehicle',
-              value: tripState.currentTrip!.vehicleName ?? 'Unknown',
-            ),
-            SizedBox(height: 8.h),
-            _TripInfoRow(
-              icon: Icons.person,
-              label: 'Driver',
-              value: tripState.currentTrip!.driverName ?? 'Unknown',
-            ),
-            SizedBox(height: 8.h),
-            Row(
+          // Main Trip Info (Always Visible)
+          Padding(
+            padding: EdgeInsets.all(20.w),
+            child: Column(
               children: [
-                Icon(
-                  Icons.flag,
-                  size: 16.w,
-                  color: AppTheme.successColor,
-                ),
-                SizedBox(width: 8.w),
-                Text(
-                  'Status: ',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(tripState.currentTrip!.status),
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                  child: Text(
-                    _getStatusText(tripState.currentTrip!.status),
-                    style: TextStyle(
-                      fontSize: 10.sp,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                // Trip Header
+                Row(
+                  children: [
+                    Container(
+                      width: 12.w,
+                      height: 12.w,
+                      decoration: BoxDecoration(
+                        color: currentTrip != null ? const Color(0xFF667EEA) : Colors.grey[400],
+                        shape: BoxShape.circle,
+                      ),
                     ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currentTrip != null ? 'Active Trip' : 'No Active Trip',
+                            style: GoogleFonts.poppins(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
+                            ),
+                          ),
+                          SizedBox(height: 2.h),
+                          Text(
+                            currentTrip?.tripId ?? 'Start a trip to see details',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.sp,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (currentTrip != null)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isExpanded = !_isExpanded;
+                          });
+                        },
+                        child: Container(
+                          padding: EdgeInsets.all(8.w),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: Icon(
+                            _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                            color: Colors.grey[600],
+                            size: 20.w,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                if (currentTrip != null) ...[
+                  SizedBox(height: 16.h),
+
+                  // Trip Status
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(currentTrip.status).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        child: Text(
+                          _getStatusText(currentTrip.status),
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                            color: _getStatusColor(currentTrip.status),
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${_formatTime(currentTrip.actualStart)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12.sp,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-
-            if (tripState.currentTrip!.startLatitude != null && tripState.currentTrip!.startLongitude != null) ...[
-              SizedBox(height: 8.h),
-              _TripInfoRow(
-                icon: Icons.location_on,
-                label: 'Start Location',
-                value: '${tripState.currentTrip!.startLatitude!.toStringAsFixed(4)}, ${tripState.currentTrip!.startLongitude!.toStringAsFixed(4)}',
-              ),
-            ],
-
-            if (tripState.currentTrip!.endLatitude != null && tripState.currentTrip!.endLongitude != null) ...[
-              SizedBox(height: 8.h),
-              _TripInfoRow(
-                icon: Icons.flag,
-                label: 'End Location',
-                value: '${tripState.currentTrip!.endLatitude!.toStringAsFixed(4)}, ${tripState.currentTrip!.endLongitude!.toStringAsFixed(4)}',
-              ),
-            ],
-          ] else ...[
-            _EmptyState(),
-          ],
-
-          SizedBox(height: 12.h),
-
-          // Summary
-          Container(
-            padding: EdgeInsets.all(8.w),
-            decoration: BoxDecoration(
-              color: AppTheme.backgroundColor,
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _SummaryItem(
-                  icon: Icons.list_alt,
-                  label: 'Total',
-                  value: tripState.trips.length.toString(),
-                ),
-                _SummaryItem(
-                  icon: Icons.play_circle,
-                  label: 'Active',
-                  value: tripState.trips.where((t) => t.isActive).length.toString(),
-                ),
-                if (currentLocation != null)
-                  _SummaryItem(
-                    icon: Icons.my_location,
-                    label: 'Current',
-                    value: '${currentLocation!.coordinates.lat.toStringAsFixed(2)}, ${currentLocation!.coordinates.lng.toStringAsFixed(2)}',
-                  ),
+                ],
               ],
             ),
           ),
+
+          // Expanded Trip Details (Dropdown)
+          if (_isExpanded && currentTrip != null)
+            Container(
+              padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 20.w),
+              child: Column(
+                children: [
+                  Container(
+                    height: 1.h,
+                    color: Colors.grey[200],
+                  ),
+                  SizedBox(height: 16.h),
+
+                  // Trip Details
+                  _TripDetailRow(
+                    icon: Icons.route,
+                    label: 'Route',
+                    value: currentTrip.routeName ?? 'Unknown',
+                  ),
+                  SizedBox(height: 12.h),
+
+                  _TripDetailRow(
+                    icon: Icons.directions_bus,
+                    label: 'Vehicle',
+                    value: currentTrip.vehicleName ?? 'Unknown',
+                  ),
+                  SizedBox(height: 12.h),
+
+                  _TripDetailRow(
+                    icon: Icons.person,
+                    label: 'Driver',
+                    value: currentTrip.driverName ?? 'Unknown',
+                  ),
+                  SizedBox(height: 12.h),
+
+                  if (currentTrip.startLocation != null)
+                    _TripDetailRow(
+                      icon: Icons.location_on,
+                      label: 'Start Location',
+                      value: currentTrip.startLocation!,
+                    ),
+
+                  if (currentTrip.startLocation != null)
+                    SizedBox(height: 12.h),
+
+                  if (currentTrip.endLocation != null)
+                    _TripDetailRow(
+                      icon: Icons.flag,
+                      label: 'End Location',
+                      value: currentTrip.endLocation!,
+                    ),
+
+                  if (currentTrip.endLocation != null)
+                    SizedBox(height: 12.h),
+
+                  _TripDetailRow(
+                    icon: Icons.schedule,
+                    label: 'Duration',
+                    value: currentTrip.duration != null ? '${currentTrip.duration} minutes' : 'Not available',
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -644,15 +643,15 @@ class _TripDetailsCard extends StatelessWidget {
   Color _getStatusColor(TripStatus status) {
     switch (status) {
       case TripStatus.pending:
-        return AppTheme.tripPending;
+        return Colors.orange;
       case TripStatus.inProgress:
-        return AppTheme.tripActive;
+        return Colors.green;
       case TripStatus.completed:
-        return AppTheme.tripCompleted;
+        return Colors.blue;
       case TripStatus.cancelled:
-        return AppTheme.tripCancelled;
+        return Colors.red;
       case TripStatus.delayed:
-        return AppTheme.tripDelayed;
+        return Colors.amber;
     }
   }
 
@@ -661,7 +660,7 @@ class _TripDetailsCard extends StatelessWidget {
       case TripStatus.pending:
         return 'PENDING';
       case TripStatus.inProgress:
-        return 'ACTIVE';
+        return 'IN PROGRESS';
       case TripStatus.completed:
         return 'COMPLETED';
       case TripStatus.cancelled:
@@ -670,14 +669,19 @@ class _TripDetailsCard extends StatelessWidget {
         return 'DELAYED';
     }
   }
+
+  String _formatTime(DateTime? time) {
+    if (time == null) return 'Not started';
+    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
 }
 
-class _TripInfoRow extends StatelessWidget {
+class _TripDetailRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
 
-  const _TripInfoRow({
+  const _TripDetailRow({
     required this.icon,
     required this.label,
     required this.value,
@@ -690,24 +694,25 @@ class _TripInfoRow extends StatelessWidget {
         Icon(
           icon,
           size: 16.w,
-          color: AppTheme.textSecondary,
+          color: Colors.grey[600],
         ),
-        SizedBox(width: 8.w),
+        SizedBox(width: 12.w),
         Text(
-          '$label: ',
-          style: TextStyle(
+          '$label:',
+          style: GoogleFonts.poppins(
             fontSize: 12.sp,
-            color: AppTheme.textSecondary,
+            color: Colors.grey[600],
             fontWeight: FontWeight.w500,
           ),
         ),
+        SizedBox(width: 8.w),
         Expanded(
           child: Text(
             value,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               fontSize: 12.sp,
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w600,
+              color: Colors.black,
+              fontWeight: FontWeight.w500,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -718,80 +723,35 @@ class _TripInfoRow extends StatelessWidget {
   }
 }
 
-class _SummaryItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
+class _CurrentLocationButton extends StatelessWidget {
+  final VoidCallback onPressed;
 
-  const _SummaryItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
+  const _CurrentLocationButton({required this.onPressed});
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(
-          icon,
-          size: 16.w,
-          color: AppTheme.primaryColor,
-        ),
-        SizedBox(height: 4.h),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10.sp,
-            color: AppTheme.textSecondary,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 12.sp,
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 32.w,
-            color: AppTheme.textSecondary,
-          ),
-          SizedBox(height: 8.h),
-          Text(
-            'No Active Trip',
-            style: TextStyle(
-              fontSize: 14.sp,
-              color: AppTheme.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            'Start a trip to see details here',
-            style: TextStyle(
-              fontSize: 12.sp,
-              color: AppTheme.textSecondary,
-            ),
+      width: 50.w,
+      height: 50.w,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
+      ),
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(
+          Icons.my_location,
+          color: Colors.grey[700],
+          size: 24.w,
+        ),
       ),
     );
   }
 }
-
-

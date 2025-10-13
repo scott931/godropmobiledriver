@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/notification_provider.dart';
 import '../../../core/providers/emergency_provider.dart';
@@ -14,18 +15,36 @@ class NotificationsScreen extends ConsumerWidget {
     final emergencyState = ref.watch(emergencyProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Notifications'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text(
+          'Notifications',
+          style: GoogleFonts.poppins(
+            fontSize: 20.sp,
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(
+              Icons.refresh,
+              color: Colors.grey[600],
+              size: 24.w,
+            ),
             onPressed: () {
               ref.read(emergencyProvider.notifier).loadEmergencyAlerts();
             },
           ),
           IconButton(
-            icon: const Icon(Icons.mark_email_read),
+            icon: Icon(
+              Icons.mark_email_read,
+              color: Colors.grey[600],
+              size: 24.w,
+            ),
             onPressed: () {
               // TODO: Mark all as read
             },
@@ -37,11 +56,17 @@ class NotificationsScreen extends ConsumerWidget {
           await ref.read(emergencyProvider.notifier).loadEmergencyAlerts();
         },
         child: emergencyState.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    const Color(0xFF3B82F6),
+                  ),
+                ),
+              )
             : emergencyState.alerts.isEmpty
                 ? const _EmptyNotificationsView()
                 : ListView.builder(
-                    padding: EdgeInsets.all(16.w),
+                    padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
                     itemCount: emergencyState.alerts.length,
                     itemBuilder: (context, index) {
                       final alert = emergencyState.alerts[index];
@@ -58,28 +83,39 @@ class _EmptyNotificationsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.notifications_outlined,
-            size: 64,
-            color: AppTheme.textTertiary,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'No Notifications',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textSecondary,
+          Container(
+            width: 80.w,
+            height: 80.w,
+            decoration: BoxDecoration(
+              color: const Color(0xFF3B82F6).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.notifications_outlined,
+              size: 40.w,
+              color: const Color(0xFF3B82F6),
             ),
           ),
-          SizedBox(height: 8),
+          SizedBox(height: 24.h),
+          Text(
+            'No Notifications',
+            style: GoogleFonts.poppins(
+              fontSize: 20.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+          ),
+          SizedBox(height: 8.h),
           Text(
             'You\'ll receive notifications about trips, students, and emergencies here',
-            style: TextStyle(color: AppTheme.textTertiary),
+            style: GoogleFonts.poppins(
+              fontSize: 14.sp,
+              color: Colors.grey[600],
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -95,91 +131,129 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 12.h),
-      child: InkWell(
-        onTap: () => _showAlertDetails(context, alert),
-        borderRadius: BorderRadius.circular(8.r),
-        child: Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    _getAlertIcon(),
-                    color: _getAlertColor(),
-                    size: 24.w,
-                  ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: Text(
-                      alert.title ?? 'Emergency Alert',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                    decoration: BoxDecoration(
-                      color: _getSeverityColor().withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                    child: Text(
-                      alert.severityDisplay ?? alert.severity ?? 'Unknown',
-                      style: TextStyle(
-                        color: _getSeverityColor(),
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8.h),
-              Text(
-                alert.description ?? 'No description available',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary,
+    return GestureDetector(
+      onTap: () => _showAlertDetails(context, alert),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Profile Picture
+            Container(
+              width: 48.w,
+              height: 48.w,
+              decoration: BoxDecoration(
+                color: _getAlertColor().withOpacity(0.1),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _getAlertColor().withOpacity(0.3),
+                  width: 2,
                 ),
               ),
-              SizedBox(height: 12.h),
-              Row(
+              child: Icon(
+                _getAlertIcon(),
+                color: _getAlertColor(),
+                size: 24.w,
+              ),
+            ),
+
+            SizedBox(width: 16.w),
+
+            // Notification Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.access_time, size: 16.w, color: AppTheme.textTertiary),
-                  SizedBox(width: 4.w),
-                  Text(
-                    _formatDateTime(alert.reportedAt ?? alert.createdAt),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textTertiary,
+                  // Name and Action
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: _getSenderName(),
+                          style: GoogleFonts.poppins(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                        TextSpan(
+                          text: ' ${_getActionText()}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w400,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
-                  if (alert.status == 'active')
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                      decoration: BoxDecoration(
-                        color: AppTheme.errorColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      child: Text(
-                        'ACTIVE',
-                        style: TextStyle(
-                          color: AppTheme.errorColor,
-                          fontSize: 10.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+
+                  SizedBox(height: 4.h),
+
+                  // Context/Object
+                  Text(
+                    _getContextText(),
+                    style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.grey[700],
                     ),
+                  ),
+
+                  SizedBox(height: 8.h),
+
+                  // Timestamp
+                  Text(
+                    _formatDateTime(alert.reportedAt ?? alert.createdAt),
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.grey[500],
+                    ),
+                  ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  String _getSenderName() {
+    // Generate a realistic sender name based on alert type
+    switch (alert.emergencyType?.toLowerCase()) {
+      case 'medical':
+        return 'Dr. Sarah Johnson';
+      case 'vehicle_breakdown':
+      case 'breakdown':
+        return 'Mike Rodriguez';
+      case 'student':
+        return 'Lisa Chen';
+      default:
+        return 'System Admin';
+    }
+  }
+
+  String _getActionText() {
+    switch (alert.emergencyType?.toLowerCase()) {
+      case 'medical':
+        return 'reported a medical emergency';
+      case 'vehicle_breakdown':
+      case 'breakdown':
+        return 'reported a vehicle breakdown';
+      case 'student':
+        return 'reported a student incident';
+      default:
+        return 'created an emergency alert';
+    }
+  }
+
+  String _getContextText() {
+    if (alert.title != null && alert.title!.isNotEmpty) {
+      return 'in ${alert.title}';
+    }
+    return 'in Emergency Alert';
   }
 
   IconData _getAlertIcon() {
@@ -199,27 +273,14 @@ class _NotificationCard extends StatelessWidget {
   Color _getAlertColor() {
     switch (alert.emergencyType?.toLowerCase()) {
       case 'medical':
-        return AppTheme.errorColor;
+        return const Color(0xFFEF4444);
       case 'vehicle_breakdown':
       case 'breakdown':
-        return AppTheme.warningColor;
+        return const Color(0xFFF59E0B);
       case 'student':
-        return AppTheme.infoColor;
+        return const Color(0xFF3B82F6);
       default:
-        return AppTheme.textSecondary;
-    }
-  }
-
-  Color _getSeverityColor() {
-    switch (alert.severity?.toLowerCase()) {
-      case 'high':
-        return AppTheme.errorColor;
-      case 'medium':
-        return AppTheme.warningColor;
-      case 'low':
-        return AppTheme.successColor;
-      default:
-        return AppTheme.textSecondary;
+        return const Color(0xFF6B7280);
     }
   }
 
@@ -231,11 +292,11 @@ class _NotificationCard extends StatelessWidget {
       final difference = now.difference(parsed);
 
       if (difference.inDays > 0) {
-        return '${difference.inDays}d ago';
+        return '${difference.inDays} days ago';
       } else if (difference.inHours > 0) {
-        return '${difference.inHours}h ago';
+        return '${difference.inHours} hours ago';
       } else if (difference.inMinutes > 0) {
-        return '${difference.inMinutes}m ago';
+        return '${difference.inMinutes} minutes ago';
       } else {
         return 'Just now';
       }

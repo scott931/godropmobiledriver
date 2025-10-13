@@ -1,149 +1,261 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/providers/auth_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: EdgeInsets.all(16.w),
-        children: [
-          // Notifications Section
-          _SettingsSection(
-            title: 'Notifications',
-            children: [
-              _SettingsTile(
-                icon: Icons.notifications,
-                title: 'Push Notifications',
-                subtitle: 'Receive notifications about trips and emergencies',
-                trailing: Switch(
-                  value: true,
-                  onChanged: (value) {
-                    // TODO: Update notification settings
-                  },
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header with Title
+            Padding(
+              padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 0),
+              child: Row(
+                children: [
+                  Text(
+                    'Settings',
+                    style: GoogleFonts.poppins(
+                      fontSize: 28.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 24.h),
+
+            // User Profile Section
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.w),
+              child: Row(
+                children: [
+                  // Profile Picture
+                  Container(
+                    width: 60.w,
+                    height: 60.w,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.person,
+                      color: Colors.grey[600],
+                      size: 30.w,
+                    ),
+                  ),
+
+                  SizedBox(width: 16.w),
+
+                  // Welcome Message
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Welcome',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        SizedBox(height: 2.h),
+                        Text(
+                          authState.driver?.fullName ?? 'Mr. John Doe',
+                          style: GoogleFonts.poppins(
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Logout Button
+                  GestureDetector(
+                    onTap: () {
+                      _showLogoutDialog(context, ref);
+                    },
+                    child: Container(
+                      width: 40.w,
+                      height: 40.w,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      child: Icon(
+                        Icons.logout,
+                        color: Colors.grey[700],
+                        size: 20.w,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 32.h),
+
+            // Settings Menu
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w),
+                child: Column(
+                  children: [
+                    // User Profile
+                    _SettingsMenuItem(
+                      icon: Icons.person_outline,
+                      title: 'User Profile',
+                      onTap: () {
+                        // TODO: Navigate to user profile
+                      },
+                    ),
+
+                    SizedBox(height: 16.h),
+
+                    // Change Password
+                    _SettingsMenuItem(
+                      icon: Icons.lock_outline,
+                      title: 'Change Password',
+                      onTap: () {
+                        // TODO: Navigate to change password
+                      },
+                    ),
+
+                    SizedBox(height: 16.h),
+
+                    // FAQs
+                    _SettingsMenuItem(
+                      icon: Icons.help_outline,
+                      title: 'FAQs',
+                      onTap: () {
+                        // TODO: Navigate to FAQs
+                      },
+                    ),
+
+                    SizedBox(height: 16.h),
+
+                    // Push Notification with Toggle
+                    _SettingsMenuItemWithToggle(
+                      icon: Icons.notifications_outlined,
+                      title: 'Push Notification',
+                      value: true,
+                      onChanged: (value) {
+                        // TODO: Update notification settings
+                      },
+                    ),
+                  ],
                 ),
               ),
-              _SettingsTile(
-                icon: Icons.emergency,
-                title: 'Emergency Alerts',
-                subtitle: 'Get notified about emergency situations',
-                trailing: Switch(
-                  value: true,
-                  onChanged: (value) {
-                    // TODO: Update emergency alert settings
-                  },
+            ),
+
+            // Contact Information
+            Padding(
+              padding: EdgeInsets.fromLTRB(24.w, 0, 24.w, 32.h),
+              child: Container(
+                padding: EdgeInsets.all(20.w),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'If you have any other query you can reach out to us.',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.sp,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w400,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 12.h),
+                    GestureDetector(
+                      onTap: () {
+                        // TODO: Open WhatsApp
+                      },
+                      child: Text(
+                        'WhatsApp Us',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          color: Colors.blue,
+                          fontWeight: FontWeight.w500,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-
-          SizedBox(height: 24.h),
-
-          // Location Section
-          _SettingsSection(
-            title: 'Location',
-            children: [
-              _SettingsTile(
-                icon: Icons.location_on,
-                title: 'Location Tracking',
-                subtitle: 'Allow location tracking for trip monitoring',
-                trailing: Switch(
-                  value: true,
-                  onChanged: (value) {
-                    // TODO: Update location tracking settings
-                  },
-                ),
-              ),
-              _SettingsTile(
-                icon: Icons.my_location,
-                title: 'Background Location',
-                subtitle: 'Track location even when app is in background',
-                trailing: Switch(
-                  value: true,
-                  onChanged: (value) {
-                    // TODO: Update background location settings
-                  },
-                ),
-              ),
-            ],
-          ),
-
-          SizedBox(height: 24.h),
-
-          // App Section
-          _SettingsSection(
-            title: 'App',
-            children: [
-              _SettingsTile(
-                icon: Icons.dark_mode,
-                title: 'Dark Mode',
-                subtitle: 'Use dark theme',
-                trailing: Switch(
-                  value: false,
-                  onChanged: (value) {
-                    // TODO: Update theme
-                  },
-                ),
-              ),
-              _SettingsTile(
-                icon: Icons.language,
-                title: 'Language',
-                subtitle: 'English',
-                onTap: () {
-                  // TODO: Show language selection
-                },
-              ),
-              _SettingsTile(
-                icon: Icons.info,
-                title: 'About',
-                subtitle: 'App version 1.0.0',
-                onTap: () {
-                  _showAboutDialog(context);
-                },
-              ),
-            ],
-          ),
-
-          SizedBox(height: 24.h),
-
-          // Support Section
-          _SettingsSection(
-            title: 'Support',
-            children: [
-              _SettingsTile(
-                icon: Icons.help,
-                title: 'Help & Support',
-                subtitle: 'Get help with using the app',
-                onTap: () {
-                  // TODO: Show help
-                },
-              ),
-              _SettingsTile(
-                icon: Icons.bug_report,
-                title: 'Report Bug',
-                subtitle: 'Report issues or bugs',
-                onTap: () {
-                  // TODO: Show bug report
-                },
-              ),
-              _SettingsTile(
-                icon: Icons.privacy_tip,
-                title: 'Privacy Policy',
-                subtitle: 'Read our privacy policy',
-                onTap: () {
-                  // TODO: Show privacy policy
-                },
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          title: Text(
+            'Logout',
+            style: GoogleFonts.poppins(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to logout?',
+            style: GoogleFonts.poppins(
+              fontSize: 14.sp,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                ref.read(authProvider.notifier).logout();
+                context.go('/login');
+              },
+              child: Text(
+                'Logout',
+                style: GoogleFonts.poppins(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -166,55 +278,110 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-class _SettingsSection extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
+// Modern Settings Menu Items
 
-  const _SettingsSection({required this.title, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppTheme.primaryColor,
-          ),
-        ),
-        SizedBox(height: 12.h),
-        Card(child: Column(children: children)),
-      ],
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
+class _SettingsMenuItem extends StatelessWidget {
   final IconData icon;
   final String title;
-  final String subtitle;
-  final Widget? trailing;
   final VoidCallback? onTap;
 
-  const _SettingsTile({
+  const _SettingsMenuItem({
     required this.icon,
     required this.title,
-    required this.subtitle,
-    this.trailing,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: AppTheme.primaryColor),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing:
-          trailing ?? (onTap != null ? const Icon(Icons.chevron_right) : null),
+    return GestureDetector(
       onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 20.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: Colors.grey[200]!),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: Colors.grey[600],
+              size: 24.w,
+            ),
+            SizedBox(width: 16.w),
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.grey[400],
+              size: 20.w,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsMenuItemWithToggle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  const _SettingsMenuItemWithToggle({
+    required this.icon,
+    required this.title,
+    required this.value,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 20.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: Colors.grey[600],
+            size: 24.w,
+          ),
+          SizedBox(width: 16.w),
+          Expanded(
+            child: Text(
+              title,
+              style: GoogleFonts.poppins(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w500,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: Colors.green,
+            activeTrackColor: Colors.green.withOpacity(0.3),
+            inactiveThumbColor: Colors.grey[300],
+            inactiveTrackColor: Colors.grey[200],
+          ),
+        ],
+      ),
     );
   }
 }

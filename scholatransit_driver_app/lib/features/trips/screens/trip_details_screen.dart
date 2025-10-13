@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/providers/location_provider.dart';
 import '../../../core/models/trip_model.dart';
@@ -38,12 +39,34 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.backgroundColor,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text('Trip ${trip.tripId}'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: Icon(
+            Icons.close,
+            color: Colors.grey[700],
+            size: 24.w,
+          ),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(
+          '${trip.startLocation ?? "Unknown"} to ${trip.endLocation ?? "Unknown"}',
+          style: GoogleFonts.poppins(
+            fontSize: 18.sp,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF1E3A8A),
+          ),
+        ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(
+              Icons.refresh,
+              color: Colors.grey[600],
+              size: 24.w,
+            ),
             onPressed: () {
               ref.read(tripProvider.notifier).loadTripDetails(widget.tripId);
             },
@@ -51,64 +74,87 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.w),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Trip Status Card
-            _buildStatusCard(trip),
-            SizedBox(height: 16.h),
+            // Trip Date Header
+            _buildTripDateHeader(trip),
+            SizedBox(height: 24.h),
 
-            // Trip Information
-            _buildInfoCard(trip),
-            SizedBox(height: 16.h),
-
-            // Route Information
+            // Trip Route Card
             _buildRouteCard(trip),
-            SizedBox(height: 16.h),
+            SizedBox(height: 24.h),
 
-            // Students List
+            // Trip Information Card
+            _buildInfoCard(trip),
+            SizedBox(height: 24.h),
+
+            // Students List Card
             _buildStudentsCard(),
-            SizedBox(height: 16.h),
+            SizedBox(height: 24.h),
 
-            // Trip Actions
+            // Trip Actions Card
             _buildActionsCard(trip),
+            SizedBox(height: 20.h),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatusCard(Trip trip) {
+  Widget _buildTripDateHeader(Trip trip) {
     return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(20.w),
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: _getStatusGradient(trip.status),
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16.r),
+        color: const Color(0xFF1E3A8A),
+        borderRadius: BorderRadius.circular(12.r),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Icon(_getStatusIcon(trip.status), size: 48.w, color: Colors.white),
-          SizedBox(height: 12.h),
-          Text(
-            _getStatusText(trip.status),
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+          Icon(
+            Icons.directions_bus,
+            color: Colors.white,
+            size: 24.w,
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _formatDate(trip.scheduledStart),
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  'Trip ID: ${trip.tripId}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+                ),
+              ],
             ),
           ),
-          SizedBox(height: 4.h),
-          Text(
-            _getStatusDescription(trip.status),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withOpacity(0.9),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16.r),
             ),
-            textAlign: TextAlign.center,
+            child: Text(
+              _getStatusText(trip.status),
+              style: GoogleFonts.poppins(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),
@@ -118,46 +164,130 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
   Widget _buildInfoCard(Trip trip) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Trip Information',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          // Trip Information Header
+          Row(
+            children: [
+              Container(
+                width: 4.w,
+                height: 24.h,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E3A8A),
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Text(
+                'Trip Information',
+                style: GoogleFonts.poppins(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+            ],
           ),
+          SizedBox(height: 24.h),
+
+          // Trip Details Grid
+          Row(
+            children: [
+              Expanded(
+                child: _buildInfoItem(
+                  icon: Icons.directions_bus,
+                  label: 'Vehicle',
+                  value: trip.vehicleName ?? 'Unknown',
+                  color: const Color(0xFF1E3A8A),
+                ),
+              ),
+              SizedBox(width: 16.w),
+              Expanded(
+                child: _buildInfoItem(
+                  icon: Icons.person,
+                  label: 'Driver',
+                  value: trip.driverName ?? 'Unknown',
+                  color: const Color(0xFF059669),
+                ),
+              ),
+            ],
+          ),
+
           SizedBox(height: 16.h),
-          _buildInfoRow('Trip ID', trip.tripId),
-          _buildInfoRow('Type', _getTripTypeText(trip.type)),
-          _buildInfoRow(
-            'Scheduled Start',
-            _formatDateTime(trip.scheduledStart),
+
+          Row(
+            children: [
+              Expanded(
+                child: _buildInfoItem(
+                  icon: Icons.schedule,
+                  label: 'Duration',
+                  value: trip.duration != null ? _formatDuration(trip.duration!) : 'N/A',
+                  color: const Color(0xFFDC2626),
+                ),
+              ),
+              SizedBox(width: 16.w),
+              Expanded(
+                child: _buildInfoItem(
+                  icon: Icons.straighten,
+                  label: 'Distance',
+                  value: trip.distance != null ? '${trip.distance!.toStringAsFixed(1)} km' : 'N/A',
+                  color: const Color(0xFF7C3AED),
+                ),
+              ),
+            ],
           ),
-          _buildInfoRow('Scheduled End', _formatDateTime(trip.scheduledEnd)),
-          if (trip.actualStart != null)
-            _buildInfoRow('Actual Start', _formatDateTime(trip.actualStart!)),
-          if (trip.actualEnd != null)
-            _buildInfoRow('Actual End', _formatDateTime(trip.actualEnd!)),
-          if (trip.distance != null)
-            _buildInfoRow(
-              'Distance',
-              '${trip.distance!.toStringAsFixed(1)} km',
+
+          SizedBox(height: 16.h),
+
+          // Trip Type
+          Container(
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12.r),
+              border: Border.all(color: Colors.grey[200]!),
             ),
-          if (trip.duration != null)
-            _buildInfoRow('Duration', _formatDuration(trip.duration!)),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.category,
+                  color: Colors.grey[600],
+                  size: 20.w,
+                ),
+                SizedBox(width: 12.w),
+                Text(
+                  'Trip Type:',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  _getTripTypeText(trip.type),
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    color: Colors.black,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -166,53 +296,101 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
   Widget _buildRouteCard(Trip trip) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Route Information',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          // Route Header
+          Row(
+            children: [
+              Container(
+                width: 4.w,
+                height: 24.h,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E3A8A),
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Text(
+                'Route Details',
+                style: GoogleFonts.poppins(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 16.h),
-          if (trip.startLocation != null)
-            _buildLocationRow(
-              'Start Location',
-              trip.startLocation!,
-              Icons.location_on,
-              AppTheme.primaryColor,
-            ),
-          if (trip.endLocation != null)
-            _buildLocationRow(
-              'End Location',
-              trip.endLocation!,
-              Icons.location_off,
-              AppTheme.successColor,
-            ),
+          SizedBox(height: 24.h),
+
+          // Departure Information
+          _buildLocationSection(
+            icon: Icons.directions_bus,
+            time: _formatTime(trip.scheduledStart),
+            location: trip.startLocation ?? 'Unknown',
+            label: 'Departure',
+            color: const Color(0xFF1E3A8A),
+          ),
+
+          SizedBox(height: 20.h),
+
+          // Route Line with Details
+          _buildRouteLine(trip),
+
+          SizedBox(height: 20.h),
+
+          // Arrival Information
+          _buildLocationSection(
+            icon: Icons.bus_alert,
+            time: _formatTime(trip.scheduledEnd),
+            location: trip.endLocation ?? 'Unknown',
+            label: 'Arrival',
+            color: const Color(0xFF059669),
+          ),
+
           if (trip.notes != null && trip.notes!.isNotEmpty) ...[
-            SizedBox(height: 12.h),
-            Text(
-              'Notes',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textSecondary,
+            SizedBox(height: 24.h),
+            Container(
+              padding: EdgeInsets.all(16.w),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Notes',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    trip.notes!,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: 4.h),
-            Text(trip.notes!, style: Theme.of(context).textTheme.bodyMedium),
           ],
         ],
       ),
@@ -225,52 +403,88 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Students Header
           Row(
             children: [
+              Container(
+                width: 4.w,
+                height: 24.h,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E3A8A),
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
+              ),
+              SizedBox(width: 12.w),
               Text(
                 'Students (${students.length})',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: GoogleFonts.poppins(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
+                ),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: () => context.go('/students'),
-                icon: const Icon(Icons.arrow_forward, size: 16),
-                label: const Text('View All'),
+              GestureDetector(
+                onTap: () => context.go('/students'),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E3A8A).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    'View All',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1E3A8A),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          SizedBox(height: 16.h),
+          SizedBox(height: 20.h),
+
           if (students.isEmpty)
             Center(
               child: Column(
                 children: [
-                  Icon(
-                    Icons.school_outlined,
-                    size: 48.w,
-                    color: AppTheme.textTertiary,
+                  Container(
+                    width: 60.w,
+                    height: 60.w,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.school_outlined,
+                      size: 30.w,
+                      color: Colors.grey[400],
+                    ),
                   ),
-                  SizedBox(height: 8.h),
+                  SizedBox(height: 12.h),
                   Text(
                     'No students assigned',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textTertiary,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -281,7 +495,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                 .take(3)
                 .map(
                   (student) => Padding(
-                    padding: EdgeInsets.only(bottom: 8.h),
+                    padding: EdgeInsets.only(bottom: 12.h),
                     child: _buildStudentRow(student),
                   ),
                 ),
@@ -293,72 +507,90 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
   Widget _buildActionsCard(Trip trip) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(16.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Actions',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 16.h),
+          // Actions Header
           Row(
             children: [
-              if (trip.status == TripStatus.pending)
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _startTrip(trip),
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Start Trip'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.successColor,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
-                    ),
-                  ),
+              Container(
+                width: 4.w,
+                height: 24.h,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E3A8A),
+                  borderRadius: BorderRadius.circular(2.r),
                 ),
-              if (trip.status == TripStatus.inProgress) ...[
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => context.go('/map'),
-                    icon: const Icon(Icons.map),
-                    label: const Text('Track Location'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
-                    ),
-                  ),
+              ),
+              SizedBox(width: 12.w),
+              Text(
+                'Trip Actions',
+                style: GoogleFonts.poppins(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
                 ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _endTrip(trip),
-                    icon: const Icon(Icons.stop),
-                    label: const Text('End Trip'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.errorColor,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ],
           ),
+          SizedBox(height: 20.h),
+
+          // Action Buttons
+          if (trip.status == TripStatus.pending)
+            _buildActionButton(
+              icon: Icons.play_arrow,
+              label: 'Start Trip',
+              description: 'Begin the scheduled trip',
+              color: const Color(0xFF059669),
+              onTap: () => _startTrip(trip),
+            ),
+
+          if (trip.status == TripStatus.inProgress) ...[
+            _buildActionButton(
+              icon: Icons.map,
+              label: 'Track Location',
+              description: 'View real-time location tracking',
+              color: const Color(0xFF1E3A8A),
+              onTap: () => context.go('/map'),
+            ),
+            SizedBox(height: 12.h),
+            _buildActionButton(
+              icon: Icons.stop,
+              label: 'End Trip',
+              description: 'Complete the current trip',
+              color: const Color(0xFFDC2626),
+              onTap: () => _endTrip(trip),
+            ),
+          ],
+
+          if (trip.status == TripStatus.completed)
+            _buildActionButton(
+              icon: Icons.check_circle,
+              label: 'Trip Completed',
+              description: 'This trip has been completed successfully',
+              color: const Color(0xFF059669),
+              onTap: null,
+            ),
+
+          if (trip.status == TripStatus.cancelled)
+            _buildActionButton(
+              icon: Icons.cancel,
+              label: 'Trip Cancelled',
+              description: 'This trip has been cancelled',
+              color: const Color(0xFFDC2626),
+              onTap: null,
+            ),
         ],
       ),
     );
@@ -422,23 +654,33 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
 
   Widget _buildStudentRow(dynamic student) {
     return Container(
-      padding: EdgeInsets.all(12.w),
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundColor,
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: AppTheme.borderColor),
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.grey[200]!),
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20.r,
-            backgroundColor: AppTheme.primaryColor,
-            child: Text(
-              student.firstName[0].toUpperCase(),
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16.sp,
+          Container(
+            width: 40.w,
+            height: 40.w,
+            decoration: BoxDecoration(
+              color: _getStudentStatusColor(student.status).withOpacity(0.1),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: _getStudentStatusColor(student.status).withOpacity(0.3),
+                width: 2,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                student.firstName[0].toUpperCase(),
+                style: GoogleFonts.poppins(
+                  color: _getStudentStatusColor(student.status),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16.sp,
+                ),
               ),
             ),
           ),
@@ -449,31 +691,38 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
               children: [
                 Text(
                   '${student.firstName} ${student.lastName}',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
                 ),
+                SizedBox(height: 2.h),
                 Text(
                   'ID: ${student.studentId}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.textSecondary,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12.sp,
+                    color: Colors.grey[600],
                   ),
                 ),
               ],
             ),
           ),
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
             decoration: BoxDecoration(
-              color: _getStudentStatusColor(student.status),
-              borderRadius: BorderRadius.circular(12.r),
+              color: _getStudentStatusColor(student.status).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(
+                color: _getStudentStatusColor(student.status).withOpacity(0.3),
+              ),
             ),
             child: Text(
               _getStudentStatusText(student.status),
-              style: TextStyle(
-                color: Colors.white,
+              style: GoogleFonts.poppins(
+                color: _getStudentStatusColor(student.status),
                 fontSize: 12.sp,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -600,6 +849,239 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
       default:
         return 'Unknown';
     }
+  }
+
+  Widget _buildLocationSection({
+    required IconData icon,
+    required String time,
+    required String location,
+    required String label,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: 20.w,
+        ),
+        SizedBox(width: 12.w),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$time - $location',
+                style: GoogleFonts.poppins(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+              ),
+              SizedBox(height: 2.h),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRouteLine(Trip trip) {
+    return Row(
+      children: [
+        SizedBox(width: 10.w),
+        Container(
+          width: 2.w,
+          height: 40.h,
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(1.r),
+          ),
+        ),
+        SizedBox(width: 20.w),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_formatDuration(trip.duration ?? 0)} trip',
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                '${trip.routeName ?? 'Unknown Route'}',
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                'Vehicle: ${trip.vehicleName ?? 'Unknown'}',
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                icon,
+                color: color,
+                size: 16.w,
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required String description,
+    required Color color,
+    required VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: onTap != null ? color.withOpacity(0.1) : Colors.grey[100],
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+            color: onTap != null ? color.withOpacity(0.3) : Colors.grey[300]!,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: onTap != null ? color : Colors.grey[400],
+                borderRadius: BorderRadius.circular(8.r),
+              ),
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: 20.w,
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: onTap != null ? color : Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    description,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12.sp,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (onTap != null)
+              Icon(
+                Icons.arrow_forward_ios,
+                color: color,
+                size: 16.w,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime dateTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final date = DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+    if (date == today) {
+      return 'Today, ${_getDayName(dateTime.weekday)}';
+    } else if (date == today.add(const Duration(days: 1))) {
+      return 'Tomorrow, ${_getDayName(dateTime.weekday)}';
+    } else {
+      return '${_getDayName(dateTime.weekday)}, ${_getMonthName(dateTime.month)} ${dateTime.day}';
+    }
+  }
+
+  String _formatTime(DateTime dateTime) {
+    return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _getDayName(int weekday) {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return days[weekday - 1];
+  }
+
+  String _getMonthName(int month) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return months[month - 1];
   }
 
   Future<void> _startTrip(Trip trip) async {

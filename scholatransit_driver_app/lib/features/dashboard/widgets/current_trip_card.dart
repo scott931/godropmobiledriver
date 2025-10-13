@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/models/trip_model.dart';
 import '../../../core/theme/app_theme.dart';
 
@@ -11,137 +12,181 @@ class CurrentTripCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 6,
-      shadowColor: AppTheme.primaryColor.withOpacity(0.3),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12.r),
-          gradient: LinearGradient(
-            colors: [
-              AppTheme.primaryColor.withOpacity(0.1),
-              AppTheme.primaryVariant.withOpacity(0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20.r),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(8.w),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    child: Icon(
-                      Icons.directions_bus,
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF667EEA).withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(24.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Icon(
+                    Icons.directions_bus,
+                    color: Colors.white,
+                    size: 24.w,
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Active Trip',
+                        style: GoogleFonts.poppins(
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        trip.tripId,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          color: Colors.white.withOpacity(0.8),
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 6.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
+                  child: Text(
+                    'IN PROGRESS',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12.sp,
                       color: Colors.white,
-                      size: 20.w,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Active Trip',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryColor,
-                              ),
-                        ),
-                        Text(
-                          trip.tripId,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+
+            SizedBox(height: 16.h),
+
+            Row(
+              children: [
+                Expanded(
+                  child: _TripInfoItem(
+                    icon: Icons.schedule,
+                    label: 'Started',
+                    value: _formatTime(trip.actualStart),
+                  ),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: _TripInfoItem(
+                    icon: Icons.location_on,
+                    label: 'Location',
+                    value: trip.startLocation ?? 'Unknown',
+                  ),
+                ),
+              ],
+            ),
+
+            SizedBox(height: 16.h),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8.w,
-                      vertical: 4.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.successColor,
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                    child: Text(
-                      'IN PROGRESS',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 16.h),
-
-              Row(
-                children: [
-                  Expanded(
-                    child: _TripInfoItem(
-                      icon: Icons.schedule,
-                      label: 'Started',
-                      value: _formatTime(trip.actualStart),
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: _TripInfoItem(
-                      icon: Icons.location_on,
-                      label: 'Location',
-                      value: trip.startLocation ?? 'Unknown',
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 16.h),
-
-              Row(
-                children: [
-                  Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => context.go('/map'),
-                      icon: const Icon(Icons.map),
-                      label: const Text('View Map'),
+                      icon: const Icon(Icons.map, color: Color(0xFF667EEA)),
+                      label: Text(
+                        'View Map',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF667EEA),
+                        ),
+                      ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF667EEA),
+                        padding: EdgeInsets.symmetric(vertical: 14.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        elevation: 0,
                       ),
                     ),
                   ),
-                  SizedBox(width: 12.w),
-                  Expanded(
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    ),
                     child: OutlinedButton.icon(
                       onPressed: () => context.go('/trips/details/${trip.id}'),
-                      icon: const Icon(Icons.info_outline),
-                      label: const Text('Details'),
+                      icon: const Icon(Icons.info_outline, color: Colors.white),
+                      label: Text(
+                        'Details',
+                        style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.primaryColor,
-                        side: BorderSide(color: AppTheme.primaryColor),
-                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        foregroundColor: Colors.white,
+                        side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                        padding: EdgeInsets.symmetric(vertical: 14.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -171,22 +216,25 @@ class _TripInfoItem extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, size: 16.w, color: AppTheme.textSecondary),
-            SizedBox(width: 4.w),
+            Icon(icon, size: 16.w, color: Colors.white.withOpacity(0.8)),
+            SizedBox(width: 6.w),
             Text(
               label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+              style: GoogleFonts.poppins(
+                fontSize: 12.sp,
+                color: Colors.white.withOpacity(0.8),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
-        SizedBox(height: 4.h),
+        SizedBox(height: 6.h),
         Text(
           value,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          style: GoogleFonts.poppins(
+            fontSize: 14.sp,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: Colors.white,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -195,5 +243,3 @@ class _TripInfoItem extends StatelessWidget {
     );
   }
 }
-
-
