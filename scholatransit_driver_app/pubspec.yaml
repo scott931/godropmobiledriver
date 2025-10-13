@@ -1,5 +1,5 @@
-name: scholatransit_driver_app
-description: "ScholaTransit Driver Mobile App - A comprehensive mobile application for school bus drivers to manage trips, track students, and handle transportation operations."
+name: go_drop
+description: "Go Drop - A comprehensive mobile application for school bus drivers to manage trips, track students, and handle transportation operations."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -50,6 +50,7 @@ dependencies:
   flutter_screenutil: ^5.9.3
   cached_network_image: ^3.3.1
   shimmer: ^3.0.0
+  google_fonts: ^6.2.1
 
   # Charts and Analytics
   fl_chart: ^0.69.0

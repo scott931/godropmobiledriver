@@ -150,7 +150,7 @@ class SettingsScreen extends ConsumerWidget {
   void _showAboutDialog(BuildContext context) {
     showAboutDialog(
       context: context,
-      applicationName: 'ScholaTransit Driver',
+      applicationName: 'Go Drop',
       applicationVersion: '1.0.0',
       applicationIcon: Icon(
         Icons.directions_bus,

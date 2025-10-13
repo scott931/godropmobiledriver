@@ -106,6 +106,55 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> register(String name, String email, String password) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final response = await ApiService.post<Map<String, dynamic>>(
+        AppConfig.registerEndpoint,
+        data: {
+          'name': name,
+          'email': email,
+          'password': password,
+          'source': 'mobile',
+          'device_info': {
+            'user_agent': 'Flutter (${Platform.operatingSystem})',
+            'device_type': 'mobile',
+          },
+        },
+      );
+
+      if (response.success && response.data != null) {
+        // For OTP flow, capture otp_id for the verification step and proceed to OTP screen.
+        final data = response.data!;
+        int? otpId;
+        if (data['otp_id'] is int) {
+          otpId = data['otp_id'] as int;
+        } else {
+          // Fallback if nested in delivery_methods
+          final delivery = data['delivery_methods'];
+          if (delivery is Map && delivery['email'] is Map) {
+            final emailMethod = delivery['email'] as Map;
+            if (emailMethod['otp_id'] is int) {
+              otpId = emailMethod['otp_id'] as int;
+            }
+          }
+        }
+        state = state.copyWith(isLoading: false, otpId: otpId);
+        return true;
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: response.error ?? 'Registration failed',
+        );
+        return false;
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: 'Registration failed: $e');
+      return false;
+    }
+  }
+
   Future<void> _loadDriverProfile() async {
     try {
       final response = await ApiService.get<Map<String, dynamic>>(

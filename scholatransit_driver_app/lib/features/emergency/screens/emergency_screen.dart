@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/emergency_provider.dart';
 import '../../../core/providers/notification_provider.dart';
@@ -142,6 +143,26 @@ class EmergencyScreen extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+
+            SizedBox(height: 24.h),
+
+            // Create Custom Alert Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => context.go('/emergency/create-alert'),
+                icon: const Icon(Icons.add_alert),
+                label: const Text('Create Custom Alert'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 16.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                ),
+              ),
             ),
 
             SizedBox(height: 32.h),

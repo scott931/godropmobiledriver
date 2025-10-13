@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../features/splash/screens/splash_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/register_screen.dart';
 import '../../features/auth/screens/otp_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/trips/screens/trips_screen.dart';
@@ -13,17 +15,29 @@ import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/driver_profile_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/emergency/screens/emergency_screen.dart';
+import '../../features/emergency/screens/create_alert_screen.dart';
 import '../../features/map/screens/map_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     routes: [
+      // Splash route
+      GoRoute(
+        path: '/splash',
+        name: 'splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       // Auth routes
       GoRoute(
         path: '/login',
         name: 'login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) => const RegisterScreen(),
       ),
       GoRoute(
         path: '/otp',
@@ -77,6 +91,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/emergency',
             name: 'emergency',
             builder: (context, state) => const EmergencyScreen(),
+          ),
+          GoRoute(
+            path: '/emergency/create-alert',
+            name: 'create-alert',
+            builder: (context, state) => const CreateAlertScreen(),
           ),
           GoRoute(
             path: '/profile',

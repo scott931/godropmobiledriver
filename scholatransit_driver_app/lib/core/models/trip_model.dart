@@ -133,6 +133,12 @@ class Trip {
 
   // Backend variant mapper to handle response keys from tracking endpoint
   factory Trip.fromBackend(Map<String, dynamic> json) {
+    // Parse WKT coordinates from start_location, end_location, and current_location
+    final startCoords = _parseWktCoordinates(json['start_location']);
+    final endCoords = _parseWktCoordinates(json['end_location']);
+    // Note: currentCoords is parsed but not used in this model
+    _parseWktCoordinates(json['current_location']);
+
     return Trip(
       id: json['id'] ?? 0,
       tripId: json['trip_id'] ?? '',
@@ -155,10 +161,10 @@ class Trip {
       startLocation: json['start_location'],
       endLocation: json['end_location'],
       currentLocation: json['current_location'],
-      startLatitude: json['start_latitude']?.toDouble(),
-      startLongitude: json['start_longitude']?.toDouble(),
-      endLatitude: json['end_latitude']?.toDouble(),
-      endLongitude: json['end_longitude']?.toDouble(),
+      startLatitude: startCoords?['latitude'],
+      startLongitude: startCoords?['longitude'],
+      endLatitude: endCoords?['latitude'],
+      endLongitude: endCoords?['longitude'],
       notes: json['notes'],
       delayReason: json['delay_reason'],
       odometerReading: json['odometer_reading'],
@@ -232,6 +238,43 @@ class Trip {
         return TripType.emergency;
       default:
         return TripType.scheduled;
+    }
+  }
+
+  // Helper method to parse WKT coordinates
+  // Example: "SRID=4326;POINT (36.82858656398285 -1.2917814999850434)"
+  static Map<String, double>? _parseWktCoordinates(String? wktString) {
+    if (wktString == null || wktString.isEmpty) return null;
+
+    try {
+      // Extract coordinates from WKT format
+      // Pattern: SRID=4326;POINT (longitude latitude)
+      final regex = RegExp(r'POINT\s*\(([^)]+)\)');
+      final match = regex.firstMatch(wktString);
+
+      if (match != null) {
+        final coordsString = match.group(1);
+        final coords = coordsString?.split(' ') ?? [];
+
+        if (coords.length >= 2) {
+          final longitude = double.tryParse(coords[0]);
+          final latitude = double.tryParse(coords[1]);
+
+          if (longitude != null && latitude != null) {
+            print('🔍 DEBUG: Parsed WKT coordinates - Lat: $latitude, Lng: $longitude');
+            return {
+              'latitude': latitude,
+              'longitude': longitude,
+            };
+          }
+        }
+      }
+
+      print('❌ DEBUG: Failed to parse WKT: $wktString');
+      return null;
+    } catch (e) {
+      print('❌ DEBUG: Error parsing WKT coordinates: $e');
+      return null;
     }
   }
 

@@ -113,7 +113,16 @@ class TripNotifier extends StateNotifier<TripState> {
                 .toList() ??
             [];
 
-        state = state.copyWith(isLoading: false, trips: tripsList, error: null);
+        // Set the first active trip as current trip if available
+        final activeTrips = tripsList.where((trip) => trip.isActive).toList();
+        final currentTrip = activeTrips.isNotEmpty ? activeTrips.first : null;
+
+        state = state.copyWith(
+          isLoading: false,
+          trips: tripsList,
+          currentTrip: currentTrip,
+          error: null
+        );
       } else {
         state = state.copyWith(
           isLoading: false,

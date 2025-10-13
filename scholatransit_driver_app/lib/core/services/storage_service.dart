@@ -8,7 +8,7 @@ class StorageService {
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
-    _box = await Hive.openBox('scholatransit_driver');
+    _box = await Hive.openBox('go_drop');
   }
 
   // SharedPreferences methods

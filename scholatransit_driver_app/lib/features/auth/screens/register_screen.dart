@@ -5,22 +5,24 @@ import 'package:go_router/go_router.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _rememberMe = false;
+  bool _agreeToTerms = false;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -30,7 +32,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
 
-    // Listen for errors only; OTP screen will handle post-verification navigation
+    // Listen for errors
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -77,7 +79,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
               // Title and Description
               Text(
-                'Welcome back!',
+                'Register your account!',
                 style: TextStyle(
                   fontSize: 28.sp,
                   fontWeight: FontWeight.bold,
@@ -86,7 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               SizedBox(height: 8.h),
               Text(
-                'Hello, you must login first to be able to use the application and enjoy all the features in Go Drop',
+                'Create your account to start using Go Drop and enjoy all the features for school transit management',
                 style: TextStyle(
                   fontSize: 14.sp,
                   color: Colors.black87,
@@ -102,6 +104,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 key: _formKey,
                 child: Column(
                   children: [
+                    // Name Field
+                    _buildInputField(
+                      controller: _nameController,
+                      label: 'Name',
+                      icon: Icons.person_outline,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your name';
+                        }
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: 16.h),
+
                     // Email Field
                     _buildInputField(
                       controller: _emailController,
@@ -150,41 +166,35 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     SizedBox(height: 16.h),
 
-                    // Remember me and Forgot password
+                    // Terms and Conditions
                     Row(
                       children: [
                         Checkbox(
-                          value: _rememberMe,
+                          value: _agreeToTerms,
                           onChanged: (value) {
                             setState(() {
-                              _rememberMe = value ?? false;
+                              _agreeToTerms = value ?? false;
                             });
                           },
                           activeColor: AppTheme.primaryColor,
                         ),
-                        Text(
-                          'Remember me',
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () {
-                            // TODO: Implement forgot password
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Forgot password feature coming soon'),
+                        Expanded(
+                          child: RichText(
+                            text: TextSpan(
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                color: Colors.grey[600],
                               ),
-                            );
-                          },
-                          child: Text(
-                            'Forgot Password?',
-                            style: TextStyle(
-                              color: AppTheme.primaryColor,
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w500,
+                              children: [
+                                const TextSpan(text: 'By Creating an account, you agree to our '),
+                                TextSpan(
+                                  text: 'Terms and Condition',
+                                  style: TextStyle(
+                                    color: AppTheme.primaryColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -193,12 +203,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     SizedBox(height: 24.h),
 
-                    // Sign In Button
+                    // Sign Up Button
                     SizedBox(
                       width: double.infinity,
                       height: 50.h,
                       child: ElevatedButton(
-                        onPressed: authState.isLoading ? null : _handleLogin,
+                        onPressed: authState.isLoading ? null : _handleRegister,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
@@ -217,7 +227,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               )
                             : Text(
-                                'Sign in',
+                                'Sign up',
                                 style: TextStyle(
                                   fontSize: 16.sp,
                                   fontWeight: FontWeight.w600,
@@ -241,9 +251,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             const TextSpan(text: "Don't have an account? "),
                             WidgetSpan(
                               child: GestureDetector(
-                                onTap: () => context.go('/register'),
+                                onTap: () => context.go('/login'),
                                 child: Text(
-                                  'Sign up',
+                                  'Sign in',
                                   style: TextStyle(
                                     color: AppTheme.primaryColor,
                                     fontWeight: FontWeight.w500,
@@ -318,9 +328,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleRegister() async {
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please agree to the terms and conditions'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
-      final success = await ref.read(authProvider.notifier).login(
+      final success = await ref.read(authProvider.notifier).register(
+        _nameController.text.trim(),
         _emailController.text.trim(),
         _passwordController.text,
       );
@@ -328,12 +349,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         if (success) {
           context.go('/otp');
-        } else {
-          // Error is handled by the listener above
         }
       }
     }
   }
 }
-
-

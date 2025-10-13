@@ -7,6 +7,7 @@ class AppConfig {
 
   // API Endpoints
   static const String loginEndpoint = '/users/login/';
+  static const String registerEndpoint = '/users/register/';
   static const String logoutEndpoint = '/users/logout/';
   static const String refreshTokenEndpoint = '/users/refresh-token/';
   static const String profileEndpoint = '/users/me/';
@@ -64,7 +65,7 @@ class AppConfig {
   static const String emergencyUpdatesEndpoint = '/emergency/alerts/';
 
   // App Configuration
-  static const String appName = 'ScholaTransit Driver';
+  static const String appName = 'Go Drop';
   static const String appVersion = '1.0.0';
 
   // Location Configuration
@@ -78,9 +79,9 @@ class AppConfig {
   static const int maxStudentsPerTrip = 50;
 
   // Notification Configuration
-  static const String notificationChannelId = 'scholatransit_driver_channel';
+  static const String notificationChannelId = 'go_drop_channel';
   static const String notificationChannelName =
-      'ScholaTransit Driver Notifications';
+      'Go Drop Notifications';
   static const String notificationChannelDescription =
       'Notifications for drivers about trips, students, and emergencies';
 

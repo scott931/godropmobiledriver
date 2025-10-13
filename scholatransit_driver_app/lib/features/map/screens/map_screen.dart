@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/providers/location_provider.dart';
 import '../../../core/providers/trip_provider.dart';
+import '../../../core/models/trip_model.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -130,51 +131,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               onMapCreated: (MapboxMap mapboxMap) async {
                 _mapboxMap = mapboxMap;
                 _pointAnnotationManager = await mapboxMap.annotations.createPointAnnotationManager();
+                _addTestMarker();
                 _addCurrentLocationMarker();
+
+                // Force load active trips and then add markers
+                await ref.read(tripProvider.notifier).loadActiveTrips();
                 _loadTripRoute();
+                _addTripMarkers();
               },
             ),
-          // Debug info panel
+          // Trip Details Card
           Positioned(
             top: 16,
             left: 16,
             right: 16,
-            child: Container(
-              padding: EdgeInsets.all(12.w),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(8.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Trip Status',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14.sp,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  if (tripState.currentTrip != null) ...[
-                    Text('Active Trip: ${tripState.currentTrip!.tripId}'),
-                    Text('Status: ${tripState.currentTrip!.status.name}'),
-                    Text('Route: ${tripState.currentTrip!.routeName ?? 'Unknown'}'),
-                  ] else ...[
-                    Text('No active trip'),
-                  ],
-                  Text('Total Trips: ${tripState.trips.length}'),
-                  Text('Active Trips: ${tripState.trips.where((t) => t.isActive).length}'),
-                ],
-              ),
+            child: _TripDetailsCard(
+              tripState: tripState,
+              currentLocation: _currentLocation,
             ),
           ),
         ],
@@ -204,10 +177,36 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     );
   }
 
-  void _addCurrentLocationMarker() async {
-    if (_mapboxMap == null || _currentLocation == null || _pointAnnotationManager == null) return;
+  void _addTestMarker() async {
+    if (_mapboxMap == null || _pointAnnotationManager == null) return;
 
     try {
+      // Add a test marker at a known location (Nairobi, Kenya)
+      final testPoint = Point(
+        coordinates: Position(36.817223, -1.286389), // Nairobi coordinates
+      );
+
+      final testMarker = PointAnnotationOptions(
+        geometry: testPoint,
+        image: await _createMarkerImage(Colors.purple, '🧪'),
+      );
+
+      await _pointAnnotationManager!.create(testMarker);
+      print('✅ Test marker added at Nairobi coordinates');
+    } catch (e) {
+      print('❌ Error adding test marker: $e');
+    }
+  }
+
+  void _addCurrentLocationMarker() async {
+    if (_mapboxMap == null || _currentLocation == null || _pointAnnotationManager == null) {
+      print('❌ Cannot add current location marker - missing dependencies');
+      return;
+    }
+
+    try {
+      print('🔍 DEBUG: Adding current location marker at: ${_currentLocation!.coordinates.lat}, ${_currentLocation!.coordinates.lng}');
+
       // Remove existing current location marker
       if (_currentLocationAnnotation != null) {
         await _pointAnnotationManager!.delete(_currentLocationAnnotation!);
@@ -220,17 +219,25 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       );
 
       _currentLocationAnnotation = await _pointAnnotationManager!.create(currentLocationMarker);
-      print('✅ Current location marker added to map');
+      print('✅ Current location marker added to map at: ${_currentLocation!.coordinates.lat}, ${_currentLocation!.coordinates.lng}');
     } catch (e) {
       print('❌ Error adding current location marker: $e');
     }
   }
 
   void _loadTripRoute() async {
-    if (_mapboxMap == null || _pointAnnotationManager == null) return;
+    if (_mapboxMap == null || _pointAnnotationManager == null) {
+      print('❌ Map or annotation manager not ready for trip route');
+      return;
+    }
 
     final tripState = ref.read(tripProvider);
     final currentTrip = tripState.currentTrip;
+
+    print('🔍 DEBUG: Current trip: ${currentTrip?.tripId}');
+    print('🔍 DEBUG: Current trip status: ${currentTrip?.status.name}');
+    print('🔍 DEBUG: Current trip start coords: ${currentTrip?.startLatitude}, ${currentTrip?.startLongitude}');
+    print('🔍 DEBUG: Current trip end coords: ${currentTrip?.endLatitude}, ${currentTrip?.endLongitude}');
 
     if (currentTrip == null) {
       print('ℹ️ No active trip to display route for');
@@ -291,10 +298,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _addTripMarkers() async {
-    if (_mapboxMap == null || _pointAnnotationManager == null) return;
+    if (_mapboxMap == null || _pointAnnotationManager == null) {
+      print('❌ Map or annotation manager not ready');
+      return;
+    }
 
     final tripState = ref.read(tripProvider);
+    print('🔍 DEBUG: Total trips loaded: ${tripState.trips.length}');
+    print('🔍 DEBUG: Trip states: ${tripState.trips.map((t) => '${t.tripId}: ${t.status.name}').join(', ')}');
+
     final activeTrips = tripState.trips.where((trip) => trip.isActive).toList();
+    print('🔍 DEBUG: Active trips found: ${activeTrips.length}');
 
     if (activeTrips.isEmpty) {
       print('ℹ️ No active trips to display markers for');
@@ -304,6 +318,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     try {
       print('🚌 Adding markers for ${activeTrips.length} active trips:');
       for (final trip in activeTrips) {
+        print('🔍 DEBUG: Trip ${trip.tripId} - Start: ${trip.startLatitude}, ${trip.startLongitude}');
+        print('🔍 DEBUG: Trip ${trip.tripId} - End: ${trip.endLatitude}, ${trip.endLongitude}');
+        print('🔍 DEBUG: Trip ${trip.tripId} - Status: ${trip.status.name}');
+
         if (trip.startLatitude != null && trip.startLongitude != null) {
           final tripPoint = Point(
             coordinates: Position(
@@ -319,6 +337,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
           await _pointAnnotationManager!.create(tripMarker);
           print('  ✅ Trip ${trip.tripId} marker added at: ${trip.startLatitude}, ${trip.startLongitude}');
+        } else {
+          print('  ❌ Trip ${trip.tripId} has no valid coordinates');
         }
       }
       print('✅ All trip markers added to map');
@@ -405,8 +425,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _refreshMapData() async {
     print('🔄 Refreshing map data...');
 
-    // Refresh trip data
-    await ref.read(tripProvider.notifier).loadTrips();
+    // Refresh active trip data
+    await ref.read(tripProvider.notifier).loadActiveTrips();
 
     // Update map with new data
     if (_mapboxMap != null) {
@@ -442,6 +462,335 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
 
     return byteData!.buffer.asUint8List();
+  }
+}
+
+class _TripDetailsCard extends StatelessWidget {
+  final TripState tripState;
+  final Point? currentLocation;
+
+  const _TripDetailsCard({
+    required this.tripState,
+    this.currentLocation,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Row(
+            children: [
+              Icon(
+                Icons.directions_bus,
+                color: AppTheme.primaryColor,
+                size: 20.w,
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                'Trip Details',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16.sp,
+                  color: AppTheme.primaryColor,
+                ),
+              ),
+              const Spacer(),
+              if (tripState.isLoading)
+                SizedBox(
+                  width: 16.w,
+                  height: 16.w,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                  ),
+                ),
+            ],
+          ),
+
+          SizedBox(height: 12.h),
+
+          // Trip Information
+          if (tripState.currentTrip != null) ...[
+            _TripInfoRow(
+              icon: Icons.confirmation_number,
+              label: 'Trip ID',
+              value: tripState.currentTrip!.tripId,
+            ),
+            SizedBox(height: 8.h),
+            _TripInfoRow(
+              icon: Icons.route,
+              label: 'Route',
+              value: tripState.currentTrip!.routeName ?? 'Unknown',
+            ),
+            SizedBox(height: 8.h),
+            _TripInfoRow(
+              icon: Icons.directions_car,
+              label: 'Vehicle',
+              value: tripState.currentTrip!.vehicleName ?? 'Unknown',
+            ),
+            SizedBox(height: 8.h),
+            _TripInfoRow(
+              icon: Icons.person,
+              label: 'Driver',
+              value: tripState.currentTrip!.driverName ?? 'Unknown',
+            ),
+            SizedBox(height: 8.h),
+            Row(
+              children: [
+                Icon(
+                  Icons.flag,
+                  size: 16.w,
+                  color: AppTheme.successColor,
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  'Status: ',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(tripState.currentTrip!.status),
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Text(
+                    _getStatusText(tripState.currentTrip!.status),
+                    style: TextStyle(
+                      fontSize: 10.sp,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            if (tripState.currentTrip!.startLatitude != null && tripState.currentTrip!.startLongitude != null) ...[
+              SizedBox(height: 8.h),
+              _TripInfoRow(
+                icon: Icons.location_on,
+                label: 'Start Location',
+                value: '${tripState.currentTrip!.startLatitude!.toStringAsFixed(4)}, ${tripState.currentTrip!.startLongitude!.toStringAsFixed(4)}',
+              ),
+            ],
+
+            if (tripState.currentTrip!.endLatitude != null && tripState.currentTrip!.endLongitude != null) ...[
+              SizedBox(height: 8.h),
+              _TripInfoRow(
+                icon: Icons.flag,
+                label: 'End Location',
+                value: '${tripState.currentTrip!.endLatitude!.toStringAsFixed(4)}, ${tripState.currentTrip!.endLongitude!.toStringAsFixed(4)}',
+              ),
+            ],
+          ] else ...[
+            _EmptyState(),
+          ],
+
+          SizedBox(height: 12.h),
+
+          // Summary
+          Container(
+            padding: EdgeInsets.all(8.w),
+            decoration: BoxDecoration(
+              color: AppTheme.backgroundColor,
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _SummaryItem(
+                  icon: Icons.list_alt,
+                  label: 'Total',
+                  value: tripState.trips.length.toString(),
+                ),
+                _SummaryItem(
+                  icon: Icons.play_circle,
+                  label: 'Active',
+                  value: tripState.trips.where((t) => t.isActive).length.toString(),
+                ),
+                if (currentLocation != null)
+                  _SummaryItem(
+                    icon: Icons.my_location,
+                    label: 'Current',
+                    value: '${currentLocation!.coordinates.lat.toStringAsFixed(2)}, ${currentLocation!.coordinates.lng.toStringAsFixed(2)}',
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getStatusColor(TripStatus status) {
+    switch (status) {
+      case TripStatus.pending:
+        return AppTheme.tripPending;
+      case TripStatus.inProgress:
+        return AppTheme.tripActive;
+      case TripStatus.completed:
+        return AppTheme.tripCompleted;
+      case TripStatus.cancelled:
+        return AppTheme.tripCancelled;
+      case TripStatus.delayed:
+        return AppTheme.tripDelayed;
+    }
+  }
+
+  String _getStatusText(TripStatus status) {
+    switch (status) {
+      case TripStatus.pending:
+        return 'PENDING';
+      case TripStatus.inProgress:
+        return 'ACTIVE';
+      case TripStatus.completed:
+        return 'COMPLETED';
+      case TripStatus.cancelled:
+        return 'CANCELLED';
+      case TripStatus.delayed:
+        return 'DELAYED';
+    }
+  }
+}
+
+class _TripInfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _TripInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 16.w,
+          color: AppTheme.textSecondary,
+        ),
+        SizedBox(width: 8.w),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            fontSize: 12.sp,
+            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SummaryItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _SummaryItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          size: 16.w,
+          color: AppTheme.primaryColor,
+        ),
+        SizedBox(height: 4.h),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.sp,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12.sp,
+            color: AppTheme.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      child: Column(
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 32.w,
+            color: AppTheme.textSecondary,
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'No Active Trip',
+            style: TextStyle(
+              fontSize: 14.sp,
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            'Start a trip to see details here',
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

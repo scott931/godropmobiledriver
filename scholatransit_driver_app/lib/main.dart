@@ -21,7 +21,7 @@ void main() async {
   // Request permissions
   await _requestPermissions();
 
-  runApp(const ProviderScope(child: ScholaTransitDriverApp()));
+  runApp(const ProviderScope(child: GoDropApp()));
 }
 
 Future<void> _initializeServices() async {
@@ -43,8 +43,8 @@ Future<void> _requestPermissions() async {
   await Permission.camera.request();
 }
 
-class ScholaTransitDriverApp extends ConsumerWidget {
-  const ScholaTransitDriverApp({super.key});
+class GoDropApp extends ConsumerWidget {
+  const GoDropApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

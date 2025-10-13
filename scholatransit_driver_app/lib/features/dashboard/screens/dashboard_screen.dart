@@ -23,7 +23,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     super.initState();
     // Load dashboard data
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(tripProvider.notifier).loadTrips();
+      ref.read(tripProvider.notifier).loadActiveTrips();
     });
   }
 
@@ -37,7 +37,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (next.isAuthenticated && previous?.isAuthenticated != next.isAuthenticated) {
         // User just logged in, reload trips
         print('🔄 DEBUG: User logged in, reloading trips...');
-        ref.read(tripProvider.notifier).loadTrips();
+        ref.read(tripProvider.notifier).loadActiveTrips();
       } else if (!next.isAuthenticated && previous?.isAuthenticated == true) {
         // User just logged out, reset trip state
         print('🔄 DEBUG: User logged out, resetting trip state...');

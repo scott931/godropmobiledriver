@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Color Scheme
@@ -46,6 +47,7 @@ class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
+      fontFamily: GoogleFonts.poppins().fontFamily,
       colorScheme: const ColorScheme.light(
         primary: primaryColor,
         primaryContainer: primaryVariant,
@@ -89,7 +91,7 @@ class AppTheme {
       // Button Themes
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
+          backgroundColor: Colors.black,
           foregroundColor: Colors.white,
           elevation: 2,
           padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
@@ -102,8 +104,8 @@ class AppTheme {
 
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: primaryColor,
-          side: const BorderSide(color: primaryColor),
+          foregroundColor: Colors.black,
+          side: const BorderSide(color: Colors.black),
           padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 12.h),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8.r),
@@ -114,7 +116,7 @@ class AppTheme {
 
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: primaryColor,
+          foregroundColor: Colors.black,
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
           textStyle: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600),
         ),
@@ -146,78 +148,78 @@ class AppTheme {
       ),
 
       // Text Theme
-      textTheme: TextTheme(
-        displayLarge: TextStyle(
+      textTheme: GoogleFonts.poppinsTextTheme().copyWith(
+        displayLarge: GoogleFonts.poppins(
           fontSize: 32.sp,
           fontWeight: FontWeight.bold,
           color: textPrimary,
         ),
-        displayMedium: TextStyle(
+        displayMedium: GoogleFonts.poppins(
           fontSize: 28.sp,
           fontWeight: FontWeight.bold,
           color: textPrimary,
         ),
-        displaySmall: TextStyle(
+        displaySmall: GoogleFonts.poppins(
           fontSize: 24.sp,
           fontWeight: FontWeight.bold,
           color: textPrimary,
         ),
-        headlineLarge: TextStyle(
+        headlineLarge: GoogleFonts.poppins(
           fontSize: 22.sp,
           fontWeight: FontWeight.w600,
           color: textPrimary,
         ),
-        headlineMedium: TextStyle(
+        headlineMedium: GoogleFonts.poppins(
           fontSize: 20.sp,
           fontWeight: FontWeight.w600,
           color: textPrimary,
         ),
-        headlineSmall: TextStyle(
+        headlineSmall: GoogleFonts.poppins(
           fontSize: 18.sp,
           fontWeight: FontWeight.w600,
           color: textPrimary,
         ),
-        titleLarge: TextStyle(
+        titleLarge: GoogleFonts.poppins(
           fontSize: 16.sp,
           fontWeight: FontWeight.w600,
           color: textPrimary,
         ),
-        titleMedium: TextStyle(
+        titleMedium: GoogleFonts.poppins(
           fontSize: 14.sp,
           fontWeight: FontWeight.w600,
           color: textPrimary,
         ),
-        titleSmall: TextStyle(
+        titleSmall: GoogleFonts.poppins(
           fontSize: 12.sp,
           fontWeight: FontWeight.w600,
           color: textPrimary,
         ),
-        bodyLarge: TextStyle(
+        bodyLarge: GoogleFonts.poppins(
           fontSize: 16.sp,
           fontWeight: FontWeight.normal,
           color: textPrimary,
         ),
-        bodyMedium: TextStyle(
+        bodyMedium: GoogleFonts.poppins(
           fontSize: 14.sp,
           fontWeight: FontWeight.normal,
           color: textPrimary,
         ),
-        bodySmall: TextStyle(
+        bodySmall: GoogleFonts.poppins(
           fontSize: 12.sp,
           fontWeight: FontWeight.normal,
           color: textSecondary,
         ),
-        labelLarge: TextStyle(
+        labelLarge: GoogleFonts.poppins(
           fontSize: 14.sp,
           fontWeight: FontWeight.w500,
           color: textPrimary,
         ),
-        labelMedium: TextStyle(
+        labelMedium: GoogleFonts.poppins(
           fontSize: 12.sp,
           fontWeight: FontWeight.w500,
           color: textSecondary,
         ),
-        labelSmall: TextStyle(
+        labelSmall: GoogleFonts.poppins(
           fontSize: 10.sp,
           fontWeight: FontWeight.w500,
           color: textTertiary,

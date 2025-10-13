@@ -25,7 +25,7 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(tripProvider.notifier).loadTrips();
+      ref.read(tripProvider.notifier).loadActiveTrips();
     });
   }
 
@@ -38,7 +38,7 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
       if (next.isAuthenticated && previous?.isAuthenticated != next.isAuthenticated) {
         // User just logged in, reload trips
         print('🔄 DEBUG: User logged in, reloading trips...');
-        ref.read(tripProvider.notifier).loadTrips();
+        ref.read(tripProvider.notifier).loadActiveTrips();
       } else if (!next.isAuthenticated && previous?.isAuthenticated == true) {
         // User just logged out, reset trip state
         print('🔄 DEBUG: User logged out, resetting trip state...');
@@ -136,7 +136,7 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
                 ? _EmptyState()
                 : RefreshIndicator(
                     onRefresh: () async {
-                      await ref.read(tripProvider.notifier).loadTrips();
+                      await ref.read(tripProvider.notifier).loadActiveTrips();
                     },
                     child: ListView.builder(
                       padding: EdgeInsets.symmetric(horizontal: 16.w),
