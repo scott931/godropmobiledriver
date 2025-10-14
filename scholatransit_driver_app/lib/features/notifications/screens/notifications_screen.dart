@@ -277,9 +277,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             ),
           ],
         ),
-        trailing: isRead
-            ? null
-            : Container(
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!isRead)
+              Container(
                 width: 8.w,
                 height: 8.w,
                 decoration: BoxDecoration(
@@ -287,6 +289,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   borderRadius: BorderRadius.circular(4.r),
                 ),
               ),
+            SizedBox(width: 8.w),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: AppTheme.textSecondary,
+              size: 16.w,
+            ),
+          ],
+        ),
         onTap: () {
           _showAlertDetails(alert);
         },
@@ -338,6 +348,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   void _showAlertDetails(Map<String, dynamic> alert) {
+    // Debug: Print alert data to understand the structure
+    print('🚨 DEBUG: Alert details data: $alert');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -348,7 +360,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           children: [
             Icon(
               Icons.warning,
-              color: _getSeverityColor(alert['severity']),
+              color: _getSeverityColor(alert['severity'] ?? ''),
               size: 24.w,
             ),
             SizedBox(width: 12.w),
@@ -372,17 +384,20 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               SizedBox(height: 16.h),
               _buildDetailRow(
                 'Status',
-                alert['status_display'] ?? alert['status'],
+                alert['status_display'] ?? alert['status'] ?? 'Unknown',
               ),
               _buildDetailRow(
                 'Severity',
-                alert['severity_display'] ?? alert['severity'],
+                alert['severity_display'] ?? alert['severity'] ?? 'Unknown',
               ),
               _buildDetailRow(
                 'Type',
-                alert['emergency_type_display'] ?? alert['emergency_type'],
+                alert['emergency_type_display'] ??
+                    alert['emergency_type'] ??
+                    'Unknown',
               ),
-              if (alert['address'] != null)
+              if (alert['address'] != null &&
+                  alert['address'].toString().isNotEmpty)
                 _buildDetailRow('Location', alert['address']),
               if (alert['affected_students_count'] != null)
                 _buildDetailRow(
@@ -394,10 +409,29 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   'Estimated Delay',
                   '${alert['estimated_delay_minutes']} minutes',
                 ),
-              _buildDetailRow(
-                'Reported At',
-                _formatTimestamp(DateTime.parse(alert['reported_at'])),
-              ),
+              if (alert['reported_at'] != null)
+                _buildDetailRow(
+                  'Reported At',
+                  _formatTimestamp(DateTime.parse(alert['reported_at'])),
+                ),
+              if (alert['estimated_resolution'] != null)
+                _buildDetailRow(
+                  'Estimated Resolution',
+                  _formatTimestamp(
+                    DateTime.parse(alert['estimated_resolution']),
+                  ),
+                ),
+              if (alert['vehicle'] != null)
+                _buildDetailRow(
+                  'Vehicle',
+                  alert['vehicle']['name'] ??
+                      'Vehicle ${alert['vehicle']['id']}',
+                ),
+              if (alert['route'] != null)
+                _buildDetailRow(
+                  'Route',
+                  alert['route']['name'] ?? 'Route ${alert['route']['id']}',
+                ),
             ],
           ),
         ),

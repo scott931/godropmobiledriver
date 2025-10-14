@@ -71,6 +71,13 @@ class ETAService {
           ? _getDelayReason(estimatedArrival, trip.scheduledEnd)
           : null;
 
+      // Calculate destination arrival duration
+      final arrivalDurationInfo = _calculateDestinationArrivalDuration(
+        trip: trip,
+        distance: distance,
+        trafficMultiplier: trafficMultiplier,
+      );
+
       final etaInfo = ETAInfo(
         estimatedArrival: estimatedArrival,
         distance: distance,
@@ -79,6 +86,9 @@ class ETAService {
         delayReason: delayReason,
         calculatedAt: DateTime.now(),
         trafficMultiplier: trafficMultiplier,
+        destinationArrivalDuration: arrivalDurationInfo['duration'],
+        estimatedDepartureFromDestination: arrivalDurationInfo['departureTime'],
+        arrivalProcessDescription: arrivalDurationInfo['description'],
       );
 
       print(
@@ -229,6 +239,182 @@ class ETAService {
     }
   }
 
+  /// Calculate destination arrival duration based on trip type and characteristics
+  static Map<String, dynamic> _calculateDestinationArrivalDuration({
+    required Trip trip,
+    required double distance,
+    required double trafficMultiplier,
+  }) {
+    try {
+      print(
+        '🕐 ETA Service: Calculating destination arrival duration for trip ${trip.tripId}',
+      );
+
+      // Base arrival duration in minutes
+      double baseArrivalDuration = 0;
+
+      // Trip type specific durations
+      switch (trip.type) {
+        case TripType.pickup:
+          baseArrivalDuration = _calculatePickupArrivalDuration(trip, distance);
+          break;
+        case TripType.dropoff:
+          baseArrivalDuration = _calculateDropoffArrivalDuration(
+            trip,
+            distance,
+          );
+          break;
+        case TripType.emergency:
+          baseArrivalDuration = _calculateEmergencyArrivalDuration(
+            trip,
+            distance,
+          );
+          break;
+        case TripType.scheduled:
+          baseArrivalDuration = _calculateScheduledArrivalDuration(
+            trip,
+            distance,
+          );
+          break;
+      }
+
+      // Apply traffic multiplier to arrival duration
+      final adjustedDuration = baseArrivalDuration * trafficMultiplier;
+
+      // Add time-of-day adjustments
+      final timeOfDayMultiplier = _getTimeOfDayArrivalMultiplier();
+      final finalDuration = adjustedDuration * timeOfDayMultiplier;
+
+      // Calculate departure time
+      final arrivalTime = DateTime.now().add(
+        Duration(minutes: finalDuration.round()),
+      );
+      final departureTime = arrivalTime.add(
+        Duration(minutes: finalDuration.round()),
+      );
+
+      // Generate description
+      final description = _generateArrivalProcessDescription(
+        trip,
+        finalDuration,
+      );
+
+      print(
+        '✅ ETA Service: Arrival duration calculated: ${finalDuration.toStringAsFixed(1)} minutes',
+      );
+      print('📝 ETA Service: Process description: $description');
+
+      return {
+        'duration': Duration(minutes: finalDuration.round()),
+        'departureTime': departureTime,
+        'description': description,
+      };
+    } catch (e) {
+      print('❌ ETA Service: Error calculating arrival duration: $e');
+      return {
+        'duration': Duration(minutes: 15), // Default 15 minutes
+        'departureTime': DateTime.now().add(Duration(minutes: 30)),
+        'description': 'Standard arrival process',
+      };
+    }
+  }
+
+  /// Calculate pickup arrival duration
+  static double _calculatePickupArrivalDuration(Trip trip, double distance) {
+    double duration = 20; // Base 20 minutes for pickup
+
+    // Distance-based adjustments
+    final distanceKm = distance / 1000;
+    if (distanceKm > 10) {
+      duration += 5; // Extra time for longer distances
+    }
+
+    // Add time for student boarding process
+    duration += 10; // 10 minutes for student boarding
+
+    // Add time for safety checks
+    duration += 5; // 5 minutes for safety checks
+
+    return duration;
+  }
+
+  /// Calculate dropoff arrival duration
+  static double _calculateDropoffArrivalDuration(Trip trip, double distance) {
+    double duration = 15; // Base 15 minutes for dropoff
+
+    // Distance-based adjustments
+    final distanceKm = distance / 1000;
+    if (distanceKm > 10) {
+      duration += 3; // Extra time for longer distances
+    }
+
+    // Add time for student disembarking process
+    duration += 8; // 8 minutes for student disembarking
+
+    // Add time for safety checks
+    duration += 3; // 3 minutes for safety checks
+
+    return duration;
+  }
+
+  /// Calculate emergency arrival duration
+  static double _calculateEmergencyArrivalDuration(Trip trip, double distance) {
+    double duration = 5; // Base 5 minutes for emergency (minimal process)
+
+    // Emergency trips have minimal arrival process
+    duration += 2; // 2 minutes for emergency procedures
+
+    return duration;
+  }
+
+  /// Calculate scheduled arrival duration
+  static double _calculateScheduledArrivalDuration(Trip trip, double distance) {
+    double duration = 12; // Base 12 minutes for scheduled trips
+
+    // Distance-based adjustments
+    final distanceKm = distance / 1000;
+    if (distanceKm > 10) {
+      duration += 4; // Extra time for longer distances
+    }
+
+    // Add time for standard procedures
+    duration += 6; // 6 minutes for standard procedures
+
+    return duration;
+  }
+
+  /// Get time-of-day multiplier for arrival duration
+  static double _getTimeOfDayArrivalMultiplier() {
+    final hour = DateTime.now().hour;
+
+    // Rush hour adjustments
+    if (hour >= 7 && hour <= 9) {
+      return 1.3; // 30% longer during morning rush
+    } else if (hour >= 15 && hour <= 17) {
+      return 1.2; // 20% longer during afternoon rush
+    } else if (hour >= 22 || hour <= 6) {
+      return 0.8; // 20% shorter during night hours
+    }
+
+    return 1.0; // Normal duration
+  }
+
+  /// Generate arrival process description
+  static String _generateArrivalProcessDescription(Trip trip, double duration) {
+    final durationMinutes = duration.round();
+
+    switch (trip.type) {
+      case TripType.pickup:
+        return 'Student pickup process: Arrival, boarding, safety checks (${durationMinutes}min)';
+      case TripType.dropoff:
+        return 'Student dropoff process: Arrival, disembarking, safety checks (${durationMinutes}min)';
+      case TripType.emergency:
+        return 'Emergency arrival process: Quick arrival and emergency procedures (${durationMinutes}min)';
+      case TripType.scheduled:
+        return 'Scheduled arrival process: Standard arrival and procedures (${durationMinutes}min)';
+    }
+  }
+
   /// Calculate ETA for multiple waypoints (useful for multi-stop trips)
   static Future<List<ETACalculationResult>> calculateMultiStopETA({
     required double currentLat,
@@ -334,5 +520,32 @@ class ETAService {
     } else {
       return '${duration.inMinutes}m';
     }
+  }
+
+  /// Format enhanced ETA with arrival duration information
+  static String formatEnhancedETA(ETAInfo etaInfo) {
+    final basicETA = formatETA(etaInfo);
+    final arrivalDuration = etaInfo.formattedArrivalDuration;
+    final departureTime = etaInfo.formattedDepartureTime;
+
+    return '$basicETA (Arrival: $arrivalDuration, Departure: $departureTime)';
+  }
+
+  /// Get comprehensive ETA summary
+  static Map<String, dynamic> getETASummary(ETAInfo etaInfo) {
+    return {
+      'estimated_arrival': etaInfo.estimatedArrival.toIso8601String(),
+      'time_to_arrival': etaInfo.formattedTimeToArrival,
+      'distance': etaInfo.formattedDistance,
+      'arrival_duration': etaInfo.formattedArrivalDuration,
+      'departure_time': etaInfo.formattedDepartureTime,
+      'total_trip_duration': etaInfo.totalTripDuration.inMinutes,
+      'arrival_process': etaInfo.arrivalProcessDescription,
+      'is_delayed': etaInfo.isDelayed,
+      'delay_reason': etaInfo.delayReason,
+      'traffic_conditions': etaInfo.trafficMultiplier != null
+          ? 'Traffic multiplier: ${etaInfo.trafficMultiplier!.toStringAsFixed(2)}'
+          : 'Traffic data unavailable',
+    };
   }
 }

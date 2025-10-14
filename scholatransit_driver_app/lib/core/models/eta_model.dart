@@ -1,4 +1,3 @@
-
 class ETAInfo {
   final DateTime estimatedArrival;
   final double distance; // in meters
@@ -7,6 +6,11 @@ class ETAInfo {
   final String? delayReason;
   final DateTime calculatedAt;
   final double? trafficMultiplier;
+  final Duration?
+  destinationArrivalDuration; // Duration to complete arrival process
+  final DateTime?
+  estimatedDepartureFromDestination; // When bus will leave destination
+  final String? arrivalProcessDescription; // Description of arrival process
 
   const ETAInfo({
     required this.estimatedArrival,
@@ -16,6 +20,9 @@ class ETAInfo {
     this.delayReason,
     required this.calculatedAt,
     this.trafficMultiplier,
+    this.destinationArrivalDuration,
+    this.estimatedDepartureFromDestination,
+    this.arrivalProcessDescription,
   });
 
   Duration get timeToArrival {
@@ -41,6 +48,35 @@ class ETAInfo {
 
   bool get isRunningLate => isDelayed;
 
+  /// Get formatted destination arrival duration
+  String get formattedArrivalDuration {
+    if (destinationArrivalDuration == null) return 'Not calculated';
+
+    final duration = destinationArrivalDuration!;
+    if (duration.inHours > 0) {
+      return '${duration.inHours}h ${duration.inMinutes % 60}m';
+    } else {
+      return '${duration.inMinutes}m';
+    }
+  }
+
+  /// Get formatted departure time from destination
+  String get formattedDepartureTime {
+    if (estimatedDepartureFromDestination == null) return 'Not calculated';
+
+    final departure = estimatedDepartureFromDestination!;
+    final hour = departure.hour.toString().padLeft(2, '0');
+    final minute = departure.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+
+  /// Get total trip duration including arrival process
+  Duration get totalTripDuration {
+    final arrivalTime = estimatedArrival;
+    final departureTime = estimatedDepartureFromDestination ?? estimatedArrival;
+    return departureTime.difference(arrivalTime);
+  }
+
   ETAInfo copyWith({
     DateTime? estimatedArrival,
     double? distance,
@@ -49,6 +85,9 @@ class ETAInfo {
     String? delayReason,
     DateTime? calculatedAt,
     double? trafficMultiplier,
+    Duration? destinationArrivalDuration,
+    DateTime? estimatedDepartureFromDestination,
+    String? arrivalProcessDescription,
   }) {
     return ETAInfo(
       estimatedArrival: estimatedArrival ?? this.estimatedArrival,
@@ -58,6 +97,13 @@ class ETAInfo {
       delayReason: delayReason ?? this.delayReason,
       calculatedAt: calculatedAt ?? this.calculatedAt,
       trafficMultiplier: trafficMultiplier ?? this.trafficMultiplier,
+      destinationArrivalDuration:
+          destinationArrivalDuration ?? this.destinationArrivalDuration,
+      estimatedDepartureFromDestination:
+          estimatedDepartureFromDestination ??
+          this.estimatedDepartureFromDestination,
+      arrivalProcessDescription:
+          arrivalProcessDescription ?? this.arrivalProcessDescription,
     );
   }
 
@@ -70,6 +116,14 @@ class ETAInfo {
       delayReason: json['delay_reason'],
       calculatedAt: DateTime.parse(json['calculated_at']),
       trafficMultiplier: json['traffic_multiplier']?.toDouble(),
+      destinationArrivalDuration: json['destination_arrival_duration'] != null
+          ? Duration(minutes: json['destination_arrival_duration'])
+          : null,
+      estimatedDepartureFromDestination:
+          json['estimated_departure_from_destination'] != null
+          ? DateTime.parse(json['estimated_departure_from_destination'])
+          : null,
+      arrivalProcessDescription: json['arrival_process_description'],
     );
   }
 
@@ -82,6 +136,10 @@ class ETAInfo {
       'delay_reason': delayReason,
       'calculated_at': calculatedAt.toIso8601String(),
       'traffic_multiplier': trafficMultiplier,
+      'destination_arrival_duration': destinationArrivalDuration?.inMinutes,
+      'estimated_departure_from_destination': estimatedDepartureFromDestination
+          ?.toIso8601String(),
+      'arrival_process_description': arrivalProcessDescription,
     };
   }
 
@@ -144,7 +202,10 @@ class ETACalculationResult {
     this.metadata,
   });
 
-  factory ETACalculationResult.success(ETAInfo etaInfo, {Map<String, dynamic>? metadata}) {
+  factory ETACalculationResult.success(
+    ETAInfo etaInfo, {
+    Map<String, dynamic>? metadata,
+  }) {
     return ETACalculationResult(
       etaInfo: etaInfo,
       success: true,
