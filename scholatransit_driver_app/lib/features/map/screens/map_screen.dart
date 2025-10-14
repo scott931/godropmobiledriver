@@ -9,6 +9,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/providers/location_provider.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/models/trip_model.dart';
+import '../../../core/services/routing_service.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -24,6 +25,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   PointAnnotation? _currentLocationAnnotation;
   PointAnnotation? _startLocationAnnotation;
   PointAnnotation? _endLocationAnnotation;
+  PolylineAnnotationManager? _polylineAnnotationManager;
+  PolylineAnnotation? _routePolyline;
 
   @override
   void initState() {
@@ -99,6 +102,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         print('🔄 DEBUG: Triggering marker updates...');
         _loadTripRoute();
         _addTripMarkers();
+      } else if (_mapboxMap != null && next.currentTrip == null) {
+        print('🔄 DEBUG: No active trip - clearing route polyline...');
+        _clearRoutePolyline();
       } else {
         print(
           '🔄 DEBUG: Skipping marker updates - map: ${_mapboxMap != null}, trip: ${next.currentTrip != null}',
@@ -125,7 +131,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     _mapboxMap = mapboxMap;
                     _pointAnnotationManager = await mapboxMap.annotations
                         .createPointAnnotationManager();
+                    _polylineAnnotationManager = await mapboxMap.annotations
+                        .createPolylineAnnotationManager();
                     print('🗺️ DEBUG: Point annotation manager created');
+                    print('🗺️ DEBUG: Polyline annotation manager created');
 
                     _addTestMarker();
                     _addCurrentLocationMarker();
@@ -184,6 +193,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               child: _ZoomToStartButton(
                 onPressed: () => _zoomToTripRoute(tripState.currentTrip!),
               ),
+            ),
+
+          // Toggle Route Visibility Button
+          if (tripState.currentTrip != null)
+            Positioned(
+              bottom: 270.h,
+              right: 16.w,
+              child: _ToggleRouteButton(onPressed: _toggleRouteVisibility),
             ),
         ],
       ),
@@ -348,11 +365,114 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         );
       }
 
+      // Draw route polyline if both start and end coordinates are available
+      await _drawRoutePolyline(currentTrip);
+
       print(
         '✅ Trip route markers added to map for trip: ${currentTrip.tripId}',
       );
     } catch (e) {
       print('❌ Error adding trip route markers: $e');
+    }
+  }
+
+  Future<void> _drawRoutePolyline(Trip trip) async {
+    if (_polylineAnnotationManager == null) {
+      print('❌ Polyline annotation manager not ready');
+      return;
+    }
+
+    if (trip.startLatitude == null ||
+        trip.startLongitude == null ||
+        trip.endLatitude == null ||
+        trip.endLongitude == null) {
+      print('❌ Cannot draw route polyline - missing coordinates');
+      return;
+    }
+
+    try {
+      // Remove existing route polyline
+      if (_routePolyline != null) {
+        await _polylineAnnotationManager!.delete(_routePolyline!);
+        _routePolyline = null;
+      }
+
+      print('🗺️ Getting road-based route from routing service...');
+
+      // Get route coordinates from routing service (road-based)
+      final routeInfo = await RoutingService.getRouteInfo(
+        startLat: trip.startLatitude!,
+        startLng: trip.startLongitude!,
+        endLat: trip.endLatitude!,
+        endLng: trip.endLongitude!,
+      );
+
+      List<Position> routeCoordinates;
+
+      if (routeInfo != null && routeInfo.coordinates.isNotEmpty) {
+        // Use road-based route coordinates
+        routeCoordinates = routeInfo.coordinates
+            .map((coord) => Position(coord['longitude']!, coord['latitude']!))
+            .toList();
+        print(
+          '✅ Using road-based route with ${routeCoordinates.length} points',
+        );
+        print(
+          '📏 Route distance: ${(routeInfo.distance / 1000).toStringAsFixed(2)} km',
+        );
+        print(
+          '⏱️ Route duration: ${(routeInfo.duration / 60).toStringAsFixed(1)} min',
+        );
+      } else {
+        // Fallback to straight line if routing fails
+        print('⚠️ Routing service failed, using straight line as fallback');
+        routeCoordinates = [
+          Position(trip.startLongitude!, trip.startLatitude!), // Start point
+          Position(trip.endLongitude!, trip.endLatitude!), // End point
+        ];
+      }
+
+      // Create route line coordinates
+      final routeLine = LineString(coordinates: routeCoordinates);
+
+      // Determine route color based on trip status
+      Color routeColor;
+      switch (trip.status) {
+        case TripStatus.inProgress:
+          routeColor = Colors.blue;
+          break;
+        case TripStatus.pending:
+          routeColor = Colors.orange;
+          break;
+        case TripStatus.delayed:
+          routeColor = Colors.red;
+          break;
+        case TripStatus.completed:
+          routeColor = Colors.green;
+          break;
+        case TripStatus.cancelled:
+          routeColor = Colors.grey;
+          break;
+      }
+
+      // Create polyline annotation
+      final polylineOptions = PolylineAnnotationOptions(
+        geometry: routeLine,
+        lineColor: routeColor.value,
+        lineWidth: 4.0,
+        lineOpacity: 0.8,
+      );
+
+      _routePolyline = await _polylineAnnotationManager!.create(
+        polylineOptions,
+      );
+
+      print(
+        '✅ Route polyline drawn from ${trip.startLatitude}, ${trip.startLongitude} to ${trip.endLatitude}, ${trip.endLongitude}',
+      );
+      print('✅ Route color: ${routeColor.toString()} (${trip.status.name})');
+    } catch (e) {
+      print('❌ Error drawing route polyline: $e');
     }
   }
 
@@ -450,6 +570,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  Future<void> _clearRoutePolyline() async {
+    if (_polylineAnnotationManager != null && _routePolyline != null) {
+      try {
+        await _polylineAnnotationManager!.delete(_routePolyline!);
+        _routePolyline = null;
+        print('✅ Route polyline cleared');
+      } catch (e) {
+        print('❌ Error clearing route polyline: $e');
+      }
+    }
+  }
+
   void _refreshMapData() async {
     if (!mounted) return;
 
@@ -463,6 +595,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _addCurrentLocationMarker();
       _loadTripRoute();
       _addTripMarkers();
+    }
+  }
+
+  void _toggleRouteVisibility() async {
+    if (_routePolyline == null) {
+      // Route is not visible, show it
+      final tripState = ref.read(tripProvider);
+      if (tripState.currentTrip != null) {
+        await _drawRoutePolyline(tripState.currentTrip!);
+        print('✅ Route polyline shown');
+      }
+    } else {
+      // Route is visible, hide it
+      await _clearRoutePolyline();
+      print('✅ Route polyline hidden');
     }
   }
 
@@ -1048,6 +1195,35 @@ class _ZoomToStartButton extends StatelessWidget {
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(Icons.navigation, color: Colors.white, size: 24.w),
+      ),
+    );
+  }
+}
+
+class _ToggleRouteButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _ToggleRouteButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 50.w,
+      height: 50.w,
+      decoration: BoxDecoration(
+        color: Colors.purple,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(Icons.route, color: Colors.white, size: 24.w),
       ),
     );
   }

@@ -46,6 +46,11 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
         );
 
     _slideController.forward();
+
+    // Load emergency alerts when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(emergencyProvider.notifier).loadEmergencyAlerts();
+    });
   }
 
   @override
@@ -252,11 +257,10 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
                 SizedBox(height: 32.h),
 
                 // Emergency History (if any)
-                if (emergencyState.alerts.isNotEmpty)
-                  SlideTransition(
-                    position: _slideAnimation,
-                    child: _buildEmergencyHistory(emergencyState),
-                  ),
+                SlideTransition(
+                  position: _slideAnimation,
+                  child: _buildEmergencyHistory(emergencyState),
+                ),
               ]),
             ),
           ),
@@ -967,13 +971,72 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
                     color: AppTheme.textPrimary,
                   ),
                 ),
+                const Spacer(),
+                IconButton(
+                  onPressed: () {
+                    ref.read(emergencyProvider.notifier).loadEmergencyAlerts();
+                  },
+                  icon: Icon(
+                    Icons.refresh,
+                    color: AppTheme.primaryColor,
+                    size: 20.w,
+                  ),
+                  tooltip: 'Refresh alerts',
+                ),
               ],
             ),
             SizedBox(height: 16.h),
-            ...emergencyState.alerts
-                .take(3)
-                .map((alert) => _buildAlertHistoryItem(alert))
-                .toList(),
+            if (emergencyState.isLoading)
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20.w),
+                  child: CircularProgressIndicator(
+                    color: AppTheme.primaryColor,
+                    strokeWidth: 2,
+                  ),
+                ),
+              )
+            else if (emergencyState.alerts.isEmpty)
+              Container(
+                padding: EdgeInsets.all(20.w),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.inbox,
+                      color: AppTheme.textSecondary,
+                      size: 48.w,
+                    ),
+                    SizedBox(height: 12.h),
+                    Text(
+                      'No alerts found',
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    Text(
+                      'No emergency alerts have been reported yet',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: AppTheme.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...emergencyState.alerts
+                  .take(3)
+                  .map((alert) => _buildAlertHistoryItem(alert))
+                  .toList(),
           ],
         ),
       ),

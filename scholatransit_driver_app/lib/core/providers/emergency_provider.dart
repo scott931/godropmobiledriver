@@ -297,9 +297,21 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
+      print(
+        '🚨 DEBUG: Loading emergency alerts from ${AppConfig.emergencyAlertsEndpoint}',
+      );
+
       final response = await ApiService.get<Map<String, dynamic>>(
         AppConfig.emergencyAlertsEndpoint,
       );
+
+      print(
+        '🚨 DEBUG: Emergency alerts API Response - Success: ${response.success}',
+      );
+      print(
+        '🚨 DEBUG: Emergency alerts API Response - Error: ${response.error}',
+      );
+      print('🚨 DEBUG: Emergency alerts API Response - Data: ${response.data}');
 
       if (response.success && response.data != null) {
         final data = response.data!;
@@ -309,18 +321,23 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
                 .toList() ??
             [];
 
+        print('🚨 DEBUG: Parsed ${alertsList.length} emergency alerts');
+
         state = state.copyWith(
           isLoading: false,
           alerts: alertsList,
           error: null,
         );
+        print('🚨 DEBUG: Emergency alerts loaded successfully');
       } else {
+        print('🚨 DEBUG: Failed to load emergency alerts: ${response.error}');
         state = state.copyWith(
           isLoading: false,
           error: response.error ?? 'Failed to load emergency alerts',
         );
       }
     } catch (e) {
+      print('🚨 DEBUG: Exception loading emergency alerts: $e');
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to load emergency alerts: $e',

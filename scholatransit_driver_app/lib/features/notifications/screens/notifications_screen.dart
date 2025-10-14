@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/notification_provider.dart';
+import '../../../core/providers/emergency_provider.dart';
 import '../../../core/widgets/notification_item_card.dart';
+import '../../../core/theme/app_theme.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -17,15 +19,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    // Load notifications when the screen initializes
+    // Load notifications and emergency alerts when the screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(notificationProvider.notifier).loadNotifications();
+      ref.read(emergencyProvider.notifier).loadEmergencyAlerts();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final notificationState = ref.watch(notificationProvider);
+    final emergencyState = ref.watch(emergencyProvider);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -46,6 +50,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             icon: Icon(Icons.refresh, color: Colors.grey[600], size: 24.w),
             onPressed: () async {
               await ref.read(notificationProvider.notifier).loadNotifications();
+              await ref.read(emergencyProvider.notifier).loadEmergencyAlerts();
             },
           ),
           IconButton(
@@ -63,6 +68,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       body: RefreshIndicator(
         onRefresh: () async {
           await ref.read(notificationProvider.notifier).loadNotifications();
+          await ref.read(emergencyProvider.notifier).loadEmergencyAlerts();
         },
         child: notificationState.isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -103,16 +109,332 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   ],
                 ),
               )
-            : notificationState.notifications.isEmpty
-            ? const _EmptyNotificationsView()
-            : ListView.builder(
-                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
-                itemCount: notificationState.notifications.length,
-                itemBuilder: (context, index) {
-                  final notification = notificationState.notifications[index];
-                  return NotificationItemCard(notification: notification);
-                },
+            : _buildNotificationsContent(notificationState, emergencyState),
+      ),
+    );
+  }
+
+  Widget _buildNotificationsContent(
+    NotificationState notificationState,
+    EmergencyState emergencyState,
+  ) {
+    final allItems = <Map<String, dynamic>>[];
+
+    // Add regular notifications
+    for (final notification in notificationState.notifications) {
+      allItems.add({...notification, 'itemType': 'notification'});
+    }
+
+    // Add emergency alerts as notifications
+    for (final alert in emergencyState.alerts) {
+      allItems.add({
+        'id': 'alert_${alert.id}',
+        'title': alert.title,
+        'body': alert.description,
+        'type': 'emergency',
+        'timestamp': alert.reportedAt,
+        'isRead': false,
+        'itemType': 'alert',
+        'alertData': alert.toJson(),
+      });
+    }
+
+    // Sort by timestamp (newest first)
+    allItems.sort((a, b) {
+      final aTime = DateTime.parse(a['timestamp']);
+      final bTime = DateTime.parse(b['timestamp']);
+      return bTime.compareTo(aTime);
+    });
+
+    if (allItems.isEmpty) {
+      return const _EmptyNotificationsView();
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+      itemCount: allItems.length,
+      itemBuilder: (context, index) {
+        final item = allItems[index];
+        if (item['itemType'] == 'alert') {
+          return _buildEmergencyAlertCard(item, emergencyState);
+        } else {
+          return NotificationItemCard(notification: item);
+        }
+      },
+    );
+  }
+
+  Widget _buildEmergencyAlertCard(
+    Map<String, dynamic> alertData,
+    EmergencyState emergencyState,
+  ) {
+    final alert = alertData['alertData'] as Map<String, dynamic>;
+    final isRead = alertData['isRead'] as bool;
+    final title = alertData['title'] as String;
+    final body = alertData['body'] as String;
+    final timestamp = DateTime.parse(alertData['timestamp'] as String);
+    final status = alert['status'] as String;
+    final severity = alert['severity'] as String;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      decoration: BoxDecoration(
+        color: isRead ? Colors.white : const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: isRead ? const Color(0xFFE5E7EB) : _getSeverityColor(severity),
+          width: isRead ? 1 : 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: EdgeInsets.all(16.w),
+        leading: Container(
+          padding: EdgeInsets.all(8.w),
+          decoration: BoxDecoration(
+            color: _getSeverityColor(severity).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+          child: Icon(
+            Icons.warning,
+            color: _getSeverityColor(severity),
+            size: 20.w,
+          ),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontWeight: isRead ? FontWeight.w500 : FontWeight.bold,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 4.h),
+            Text(
+              body,
+              style: TextStyle(fontSize: 14.sp, color: AppTheme.textSecondary),
+            ),
+            SizedBox(height: 8.h),
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: _getStatusColor(status).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    status.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.bold,
+                      color: _getStatusColor(status),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: _getSeverityColor(severity).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: _getSeverityColor(severity).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    severity.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.bold,
+                      color: _getSeverityColor(severity),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  _formatTimestamp(timestamp),
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: isRead
+            ? null
+            : Container(
+                width: 8.w,
+                height: 8.w,
+                decoration: BoxDecoration(
+                  color: _getSeverityColor(severity),
+                  borderRadius: BorderRadius.circular(4.r),
+                ),
               ),
+        onTap: () {
+          _showAlertDetails(alert);
+        },
+      ),
+    );
+  }
+
+  Color _getSeverityColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'critical':
+        return Colors.purple;
+      case 'high':
+        return Colors.red;
+      case 'medium':
+        return Colors.orange;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return Colors.red;
+      case 'resolved':
+        return Colors.green;
+      case 'pending':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
+  }
+
+  void _showAlertDetails(Map<String, dynamic> alert) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning,
+              color: _getSeverityColor(alert['severity']),
+              size: 24.w,
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(
+                alert['title'] ?? 'Emergency Alert',
+                style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                alert['description'] ?? 'No description available',
+                style: TextStyle(fontSize: 14.sp),
+              ),
+              SizedBox(height: 16.h),
+              _buildDetailRow(
+                'Status',
+                alert['status_display'] ?? alert['status'],
+              ),
+              _buildDetailRow(
+                'Severity',
+                alert['severity_display'] ?? alert['severity'],
+              ),
+              _buildDetailRow(
+                'Type',
+                alert['emergency_type_display'] ?? alert['emergency_type'],
+              ),
+              if (alert['address'] != null)
+                _buildDetailRow('Location', alert['address']),
+              if (alert['affected_students_count'] != null)
+                _buildDetailRow(
+                  'Affected Students',
+                  alert['affected_students_count'].toString(),
+                ),
+              if (alert['estimated_delay_minutes'] != null)
+                _buildDetailRow(
+                  'Estimated Delay',
+                  '${alert['estimated_delay_minutes']} minutes',
+                ),
+              _buildDetailRow(
+                'Reported At',
+                _formatTimestamp(DateTime.parse(alert['reported_at'])),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120.w,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 12.sp, color: AppTheme.textPrimary),
+            ),
+          ),
+        ],
       ),
     );
   }
