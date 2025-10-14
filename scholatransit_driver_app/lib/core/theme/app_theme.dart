@@ -25,12 +25,22 @@ class AppTheme {
   static const Color borderColor = Color(0xFFE5E7EB);
   static const Color dividerColor = Color(0xFFF3F4F6);
 
-  // Trip Status Colors
-  static const Color tripPending = Color(0xFF6B7280);
-  static const Color tripActive = Color(0xFF3B82F6);
-  static const Color tripCompleted = Color(0xFF10B981);
-  static const Color tripCancelled = Color(0xFFEF4444);
-  static const Color tripDelayed = Color(0xFFF59E0B);
+  // Trip Status Colors (Updated to match traffic light system)
+  static const Color tripPending = Color(
+    0xFF9AA0A6,
+  ); // Grey - Inactive, No Data
+  static const Color tripActive = Color(
+    0xFF4285F4,
+  ); // Vibrant Blue - Active/Current
+  static const Color tripCompleted = Color(
+    0xFF34A853,
+  ); // Green - On Time, Good Service
+  static const Color tripCancelled = Color(
+    0xFFEA4335,
+  ); // Red - Cancelled, Bad Service
+  static const Color tripDelayed = Color(
+    0xFFFBBC05,
+  ); // Yellow/Amber - Delay, Minor Disruption
 
   // Student Status Colors
   static const Color studentWaiting = Color(0xFF6B7280);
@@ -42,6 +52,57 @@ class AppTheme {
   static const Color emergencyHigh = Color(0xFFEF4444);
   static const Color emergencyMedium = Color(0xFFF59E0B);
   static const Color emergencyLow = Color(0xFF3B82F6);
+
+  // Map UI Colors - Vehicle/Current Location Markers
+  static const Color vehicleMarkerPrimary = Color(
+    0xFF4285F4,
+  ); // Vibrant Blue - primary choice
+  static const Color vehicleMarkerAlt = Color(
+    0xFF34A853,
+  ); // Bright Green - excellent alternative
+  static const Color vehicleMarkerSecondary = Color(
+    0xFF3366CC,
+  ); // Darker blue variant
+
+  // Map UI Colors - Route & Path Colors
+  static const Color routePrimary = Color(
+    0xFF4285F4,
+  ); // Bold Blue for primary route
+  static const Color routeSecondary = Color(
+    0xFFAECBFA,
+  ); // Lighter blue for route fill
+  static const Color routeBorder = Color(0xFF4285F4); // Blue border for route
+  static const Color routeAlt = Color(0xFF8A2BE2); // Purple alternative
+  static const Color routeAltDark = Color(0xFF6A0DAD); // Dark purple variant
+
+  // Map UI Colors - Multiple Route Colors (for different bus/train lines)
+  static const Color routeRed = Color(0xFFEA4335); // Red Line
+  static const Color routeBlue = Color(0xFF4285F4); // Blue Line
+  static const Color routeGreen = Color(0xFF34A853); // Green Line
+  static const Color routeYellow = Color(0xFFFBBC05); // Yellow Line
+  static const Color routePurple = Color(0xFF8A2BE2); // Purple Line
+  static const Color routeOrange = Color(0xFFFF6D01); // Orange Line
+
+  // Map UI Colors - Status & Alert Colors (Traffic Light System)
+  static const Color statusOnTime = Color(
+    0xFF34A853,
+  ); // Green - On Time, Good Service
+  static const Color statusDelay = Color(
+    0xFFFBBC05,
+  ); // Yellow/Amber - Delay, Minor Disruption
+  static const Color statusCancelled = Color(
+    0xFFEA4335,
+  ); // Red - Significant Delay, Cancellation
+  static const Color statusInactive = Color(
+    0xFF9AA0A6,
+  ); // Grey - Inactive, No Data, Completed
+
+  // Map UI Colors - Background and UI
+  static const Color mapBackgroundLight = Color(0xFFFFFFFF);
+  static const Color mapBackgroundDark = Color(0xFF1F2937);
+  static const Color mapTextPrimary = Color(0xFF1F2937);
+  static const Color mapTextSecondary = Color(0xFF6B7280);
+  static const Color mapBorder = Color(0xFFE5E7EB);
 
   // Light Theme
   static ThemeData get lightTheme {
@@ -292,5 +353,3 @@ class AppTheme {
     );
   }
 }
-
-

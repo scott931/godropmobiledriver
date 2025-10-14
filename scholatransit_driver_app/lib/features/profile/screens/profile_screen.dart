@@ -24,8 +24,28 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: driver == null
-          ? const Center(child: CircularProgressIndicator())
+      body: authState.isLoading
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Loading profile...'),
+                ],
+              ),
+            )
+          : driver == null
+          ? const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.person_off, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No profile data available'),
+                ],
+              ),
+            )
           : SingleChildScrollView(
               padding: EdgeInsets.all(16.w),
               child: Column(
@@ -241,12 +261,12 @@ class ProfileScreen extends ConsumerWidget {
         content: const Text('Are you sure you want to logout?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
+              context.pop();
               ref.read(authProvider.notifier).logout();
             },
             style: ElevatedButton.styleFrom(
@@ -303,5 +323,3 @@ class _InfoItem extends StatelessWidget {
     );
   }
 }
-
-

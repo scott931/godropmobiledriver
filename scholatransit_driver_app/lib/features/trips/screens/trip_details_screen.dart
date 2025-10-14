@@ -45,12 +45,14 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: Icon(
-            Icons.close,
-            color: Colors.grey[700],
-            size: 24.w,
-          ),
-          onPressed: () => context.pop(),
+          icon: Icon(Icons.close, color: Colors.grey[700], size: 24.w),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/trips');
+            }
+          },
         ),
         title: Text(
           '${trip.startLocation ?? "Unknown"} to ${trip.endLocation ?? "Unknown"}',
@@ -62,11 +64,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.refresh,
-              color: Colors.grey[600],
-              size: 24.w,
-            ),
+            icon: Icon(Icons.refresh, color: Colors.grey[600], size: 24.w),
             onPressed: () {
               ref.read(tripProvider.notifier).loadTripDetails(widget.tripId);
             },
@@ -112,11 +110,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.directions_bus,
-            color: Colors.white,
-            size: 24.w,
-          ),
+          Icon(Icons.directions_bus, color: Colors.white, size: 24.w),
           SizedBox(width: 12.w),
           Expanded(
             child: Column(
@@ -234,7 +228,9 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                 child: _buildInfoItem(
                   icon: Icons.schedule,
                   label: 'Duration',
-                  value: trip.duration != null ? _formatDuration(trip.duration!) : 'N/A',
+                  value: trip.duration != null
+                      ? _formatDuration(trip.duration!)
+                      : 'N/A',
                   color: const Color(0xFFDC2626),
                 ),
               ),
@@ -243,7 +239,9 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                 child: _buildInfoItem(
                   icon: Icons.straighten,
                   label: 'Distance',
-                  value: trip.distance != null ? '${trip.distance!.toStringAsFixed(1)} km' : 'N/A',
+                  value: trip.distance != null
+                      ? '${trip.distance!.toStringAsFixed(1)} km'
+                      : 'N/A',
                   color: const Color(0xFF7C3AED),
                 ),
               ),
@@ -262,11 +260,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.category,
-                  color: Colors.grey[600],
-                  size: 20.w,
-                ),
+                Icon(Icons.category, color: Colors.grey[600], size: 20.w),
                 SizedBox(width: 12.w),
                 Text(
                   'Trip Type:',
@@ -442,7 +436,10 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
               GestureDetector(
                 onTap: () => context.go('/students'),
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 6.h,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1E3A8A).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8.r),
@@ -860,11 +857,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
   }) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: color,
-          size: 20.w,
-        ),
+        Icon(icon, color: color, size: 20.w),
         SizedBox(width: 12.w),
         Expanded(
           child: Column(
@@ -958,11 +951,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         children: [
           Row(
             children: [
-              Icon(
-                icon,
-                color: color,
-                size: 16.w,
-              ),
+              Icon(icon, color: color, size: 16.w),
               SizedBox(width: 8.w),
               Text(
                 label,
@@ -1014,11 +1003,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
                 color: onTap != null ? color : Colors.grey[400],
                 borderRadius: BorderRadius.circular(8.r),
               ),
-              child: Icon(
-                icon,
-                color: Colors.white,
-                size: 20.w,
-              ),
+              child: Icon(icon, color: Colors.white, size: 20.w),
             ),
             SizedBox(width: 12.w),
             Expanded(
@@ -1045,11 +1030,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
               ),
             ),
             if (onTap != null)
-              Icon(
-                Icons.arrow_forward_ios,
-                color: color,
-                size: 16.w,
-              ),
+              Icon(Icons.arrow_forward_ios, color: color, size: 16.w),
           ],
         ),
       ),
@@ -1080,7 +1061,20 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
   }
 
   String _getMonthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return months[month - 1];
   }
 
@@ -1098,7 +1092,9 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Unable to get current location. Please enable location services.'),
+              content: Text(
+                'Unable to get current location. Please enable location services.',
+              ),
               backgroundColor: AppTheme.errorColor,
             ),
           );
@@ -1107,7 +1103,8 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
       }
     }
 
-    final position = currentPosition ?? ref.read(locationProvider).currentPosition!;
+    final position =
+        currentPosition ?? ref.read(locationProvider).currentPosition!;
 
     final success = await ref
         .read(tripProvider.notifier)
@@ -1142,7 +1139,9 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Unable to get current location. Please enable location services.'),
+              content: Text(
+                'Unable to get current location. Please enable location services.',
+              ),
               backgroundColor: AppTheme.errorColor,
             ),
           );
@@ -1151,7 +1150,8 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
       }
     }
 
-    final position = currentPosition ?? ref.read(locationProvider).currentPosition!;
+    final position =
+        currentPosition ?? ref.read(locationProvider).currentPosition!;
 
     final success = await ref
         .read(tripProvider.notifier)

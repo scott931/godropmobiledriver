@@ -1,5 +1,3 @@
-import 'package:geolocator/geolocator.dart';
-
 enum TripStatus { pending, inProgress, completed, cancelled, delayed }
 
 enum TripType { pickup, dropoff, scheduled, emergency }
@@ -36,6 +34,14 @@ class Trip {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  // ETA-related fields
+  final DateTime? estimatedArrival;
+  final double? currentSpeed;
+  final bool? etaIsDelayed;
+  final String? etaStatus;
+  final double? trafficMultiplier;
+  final DateTime? etaLastUpdated;
+
   const Trip({
     required this.id,
     required this.tripId,
@@ -67,6 +73,12 @@ class Trip {
     this.duration,
     required this.createdAt,
     required this.updatedAt,
+    this.estimatedArrival,
+    this.currentSpeed,
+    this.etaIsDelayed,
+    this.etaStatus,
+    this.trafficMultiplier,
+    this.etaLastUpdated,
   });
 
   bool get isActive => status == TripStatus.inProgress;
@@ -90,6 +102,65 @@ class Trip {
       return DateTime.now().isAfter(scheduledEnd);
     }
     return false;
+  }
+
+  // ETA-related getters
+  Duration? get timeToArrival {
+    if (estimatedArrival == null) return null;
+    return estimatedArrival!.difference(DateTime.now());
+  }
+
+  String get formattedTimeToArrival {
+    final duration = timeToArrival;
+    if (duration == null) return '--';
+
+    if (duration.inHours > 0) {
+      return '${duration.inHours}h ${duration.inMinutes % 60}m';
+    } else {
+      return '${duration.inMinutes}m';
+    }
+  }
+
+  bool get isRunningLate {
+    if (estimatedArrival == null) return false;
+    return estimatedArrival!.isAfter(scheduledEnd);
+  }
+
+  String get etaStatusDisplay {
+    if (etaStatus != null) return etaStatus!;
+
+    if (estimatedArrival == null) return 'Calculating...';
+
+    if (isRunningLate) {
+      return 'Delayed';
+    } else if ((timeToArrival?.inMinutes ?? 0) <= 5) {
+      return 'Arriving Soon';
+    } else if ((timeToArrival?.inMinutes ?? 0) <= 15) {
+      return 'On Time';
+    } else {
+      return 'Scheduled';
+    }
+  }
+
+  int get etaColor {
+    if (estimatedArrival == null) return 0xFF9E9E9E; // Grey
+
+    if (isRunningLate) {
+      return 0xFFD32F2F; // Red
+    } else if ((timeToArrival?.inMinutes ?? 0) <= 5) {
+      return 0xFF4CAF50; // Green
+    } else {
+      return 0xFF2196F3; // Blue
+    }
+  }
+
+  String get trafficConditions {
+    if (trafficMultiplier == null) return 'Unknown';
+
+    if (trafficMultiplier! <= 0.8) return 'Light Traffic';
+    if (trafficMultiplier! <= 1.2) return 'Normal Traffic';
+    if (trafficMultiplier! <= 1.5) return 'Heavy Traffic';
+    return 'Severe Traffic';
   }
 
   factory Trip.fromJson(Map<String, dynamic> json) {
@@ -122,12 +193,23 @@ class Trip {
       notes: json['notes'],
       delayReason: json['delay_reason'],
       odometerReading: json['odometer_reading'],
-      distance: json['total_distance']?.toDouble() ?? json['distance']?.toDouble(),
+      distance:
+          json['total_distance']?.toDouble() ?? json['distance']?.toDouble(),
       averageSpeed: json['average_speed']?.toDouble(),
       maxSpeed: json['max_speed']?.toDouble(),
       duration: json['duration'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
+      estimatedArrival: json['estimated_arrival'] != null
+          ? DateTime.parse(json['estimated_arrival'])
+          : null,
+      currentSpeed: json['current_speed']?.toDouble(),
+      etaIsDelayed: json['is_delayed'],
+      etaStatus: json['eta_status'],
+      trafficMultiplier: json['traffic_multiplier']?.toDouble(),
+      etaLastUpdated: json['eta_last_updated'] != null
+          ? DateTime.parse(json['eta_last_updated'])
+          : null,
     );
   }
 
@@ -168,12 +250,23 @@ class Trip {
       notes: json['notes'],
       delayReason: json['delay_reason'],
       odometerReading: json['odometer_reading'],
-      distance: json['total_distance']?.toDouble() ?? json['distance']?.toDouble(),
+      distance:
+          json['total_distance']?.toDouble() ?? json['distance']?.toDouble(),
       averageSpeed: json['average_speed']?.toDouble(),
       maxSpeed: json['max_speed']?.toDouble(),
       duration: json['duration'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
+      estimatedArrival: json['estimated_arrival'] != null
+          ? DateTime.parse(json['estimated_arrival'])
+          : null,
+      currentSpeed: json['current_speed']?.toDouble(),
+      etaIsDelayed: json['is_delayed'],
+      etaStatus: json['eta_status'],
+      trafficMultiplier: json['traffic_multiplier']?.toDouble(),
+      etaLastUpdated: json['eta_last_updated'] != null
+          ? DateTime.parse(json['eta_last_updated'])
+          : null,
     );
   }
 
@@ -209,6 +302,12 @@ class Trip {
       'duration': duration,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'estimated_arrival': estimatedArrival?.toIso8601String(),
+      'current_speed': currentSpeed,
+      'is_delayed': etaIsDelayed,
+      'eta_status': etaStatus,
+      'traffic_multiplier': trafficMultiplier,
+      'eta_last_updated': etaLastUpdated?.toIso8601String(),
     };
   }
 
@@ -261,11 +360,10 @@ class Trip {
           final latitude = double.tryParse(coords[1]);
 
           if (longitude != null && latitude != null) {
-            print('🔍 DEBUG: Parsed WKT coordinates - Lat: $latitude, Lng: $longitude');
-            return {
-              'latitude': latitude,
-              'longitude': longitude,
-            };
+            print(
+              '🔍 DEBUG: Parsed WKT coordinates - Lat: $latitude, Lng: $longitude',
+            );
+            return {'latitude': latitude, 'longitude': longitude};
           }
         }
       }
@@ -309,6 +407,12 @@ class Trip {
     int? duration,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DateTime? estimatedArrival,
+    double? currentSpeed,
+    bool? etaIsDelayed,
+    String? etaStatus,
+    double? trafficMultiplier,
+    DateTime? etaLastUpdated,
   }) {
     return Trip(
       id: id ?? this.id,
@@ -341,6 +445,12 @@ class Trip {
       duration: duration ?? this.duration,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      estimatedArrival: estimatedArrival ?? this.estimatedArrival,
+      currentSpeed: currentSpeed ?? this.currentSpeed,
+      etaIsDelayed: etaIsDelayed ?? this.etaIsDelayed,
+      etaStatus: etaStatus ?? this.etaStatus,
+      trafficMultiplier: trafficMultiplier ?? this.trafficMultiplier,
+      etaLastUpdated: etaLastUpdated ?? this.etaLastUpdated,
     );
   }
 

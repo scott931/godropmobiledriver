@@ -1,5 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../config/app_config.dart';
@@ -32,9 +30,20 @@ class ApiService {
   static Interceptor _authInterceptor() {
     return InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = StorageService.getAuthToken();
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
+        // Only add auth token for non-auth endpoints
+        final path = options.path;
+        final isAuthEndpoint =
+            path.contains('/login/') ||
+            path.contains('/register/') ||
+            path.contains('/password/reset/') ||
+            path.contains('/otp/') ||
+            path.contains('/refresh-token/');
+
+        if (!isAuthEndpoint) {
+          final token = StorageService.getAuthToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
         }
         handler.next(options);
       },
@@ -199,10 +208,29 @@ class ApiService {
         final statusCode = error.response?.statusCode;
         final data = error.response?.data;
 
+        // Handle specific error messages from the API
+        if (data is Map<String, dynamic>) {
+          if (data.containsKey('message')) {
+            return data['message'] as String;
+          }
+          if (data.containsKey('error')) {
+            final errorData = data['error'];
+            if (errorData is Map<String, dynamic>) {
+              if (errorData.containsKey('non_field_errors')) {
+                final nonFieldErrors = errorData['non_field_errors'] as List?;
+                if (nonFieldErrors != null && nonFieldErrors.isNotEmpty) {
+                  return nonFieldErrors.first.toString();
+                }
+              }
+            }
+            return errorData.toString();
+          }
+        }
+
         if (statusCode == 400) {
           return 'Bad request. Please check your input.';
         } else if (statusCode == 401) {
-          return 'Unauthorized. Please login again.';
+          return 'Invalid credentials. Please check your email and password.';
         } else if (statusCode == 403) {
           return 'Forbidden. You do not have permission to perform this action.';
         } else if (statusCode == 404) {

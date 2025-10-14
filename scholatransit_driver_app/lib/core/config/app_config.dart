@@ -8,10 +8,15 @@ class AppConfig {
   // API Endpoints
   static const String loginEndpoint = '/users/login/';
   static const String registerEndpoint = '/users/register/';
+  static const String registerOtpEndpoint = '/users/otp/register/';
+  static const String registerEmailCompleteEndpoint =
+      '/users/otp/register/complete-email/';
+  static const String passwordResetEndpoint = '/users/password/reset/';
   static const String logoutEndpoint = '/users/logout/';
   static const String refreshTokenEndpoint = '/users/refresh-token/';
   static const String profileEndpoint = '/users/me/';
   static const String verifyOtpLoginEndpoint = '/users/verify-otp/login/';
+  static const String verifyOtpRegisterEndpoint = '/users/verify-otp/register/';
 
   // Trip Management Endpoints
   static const String tripsEndpoint = '/trips/';
@@ -80,8 +85,7 @@ class AppConfig {
 
   // Notification Configuration
   static const String notificationChannelId = 'go_drop_channel';
-  static const String notificationChannelName =
-      'Go Drop Notifications';
+  static const String notificationChannelName = 'Go Drop Notifications';
   static const String notificationChannelDescription =
       'Notifications for drivers about trips, students, and emergencies';
 
@@ -116,4 +120,46 @@ class AppConfig {
   static const bool enableLogging = true;
   static const bool enableCrashReporting = true;
   static const bool enableAnalytics = true;
+
+  // Map UI Color Configuration
+  // Vehicle/Current Location Marker Colors
+  static const String vehicleMarkerColor =
+      '#4285F4'; // Vibrant Blue - primary choice
+  static const String vehicleMarkerColorAlt =
+      '#34A853'; // Bright Green - excellent alternative
+  static const String vehicleMarkerColorSecondary =
+      '#3366CC'; // Darker blue variant
+
+  // Route & Path Colors
+  static const String routeColorPrimary =
+      '#4285F4'; // Bold Blue for primary route
+  static const String routeColorSecondary =
+      '#AECBFA'; // Lighter blue for route fill
+  static const String routeColorBorder = '#4285F4'; // Blue border for route
+  static const String routeColorAlt = '#8A2BE2'; // Purple alternative
+  static const String routeColorAltDark = '#6A0DAD'; // Dark purple variant
+
+  // Multiple Route Colors (for different bus/train lines)
+  static const String routeRed = '#EA4335'; // Red Line
+  static const String routeBlue = '#4285F4'; // Blue Line
+  static const String routeGreen = '#34A853'; // Green Line
+  static const String routeYellow = '#FBBC05'; // Yellow Line
+  static const String routePurple = '#8A2BE2'; // Purple Line
+  static const String routeOrange = '#FF6D01'; // Orange Line
+
+  // Status & Alert Colors (Traffic Light System)
+  static const String statusOnTime = '#34A853'; // Green - On Time, Good Service
+  static const String statusDelay =
+      '#FBBC05'; // Yellow/Amber - Delay, Minor Disruption
+  static const String statusCancelled =
+      '#EA4335'; // Red - Significant Delay, Cancellation
+  static const String statusInactive =
+      '#9AA0A6'; // Grey - Inactive, No Data, Completed
+
+  // Map Background and UI Colors
+  static const String mapBackgroundLight = '#FFFFFF';
+  static const String mapBackgroundDark = '#1F2937';
+  static const String mapTextPrimary = '#1F2937';
+  static const String mapTextSecondary = '#6B7280';
+  static const String mapBorderColor = '#E5E7EB';
 }

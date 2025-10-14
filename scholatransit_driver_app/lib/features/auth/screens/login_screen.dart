@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -47,25 +48,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.pop(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              // TODO: Implement help functionality
-            },
-            child: Text(
-              'Need Help?',
-              style: TextStyle(
-                color: AppTheme.primaryColor,
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
+        automaticallyImplyLeading: false,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -74,6 +57,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(height: 20.h),
+
+              // Logo
+              Center(
+                child: Container(
+                  width: 120.w,
+                  height: 120.h,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primaryColor,
+                    borderRadius: BorderRadius.circular(20.r),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.primaryColor.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Go Drop',
+                      style: TextStyle(
+                        fontSize: 24.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 40.h),
 
               // Title and Description
               Text(
@@ -112,7 +126,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your email';
                         }
-                        if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                        if (!RegExp(
+                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                        ).hasMatch(value)) {
                           return 'Please enter a valid email';
                         }
                         return null;
@@ -128,7 +144,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       obscureText: _obscurePassword,
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                           color: Colors.grey[600],
                         ),
                         onPressed: () {
@@ -171,14 +189,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const Spacer(),
                         TextButton(
-                          onPressed: () {
-                            // TODO: Implement forgot password
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Forgot password feature coming soon'),
-                              ),
-                            );
-                          },
+                          onPressed: () => context.go('/forgot-password'),
                           child: Text(
                             'Forgot Password?',
                             style: TextStyle(
@@ -213,7 +224,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 width: 20.w,
                                 child: const CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : Text(
@@ -288,10 +301,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(
-          color: Colors.grey[600],
-          fontSize: 14.sp,
-        ),
+        labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14.sp),
         prefixIcon: Icon(icon, color: Colors.grey[600]),
         suffixIcon: suffixIcon,
         border: OutlineInputBorder(
@@ -309,21 +319,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         filled: true,
         fillColor: Colors.white,
         contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
-        hintStyle: TextStyle(
-          color: Colors.grey[500],
-          fontSize: 16.sp,
-        ),
+        hintStyle: TextStyle(color: Colors.grey[500], fontSize: 16.sp),
       ),
     );
   }
 
-
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      final success = await ref.read(authProvider.notifier).login(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+      final success = await ref
+          .read(authProvider.notifier)
+          .login(_emailController.text.trim(), _passwordController.text);
 
       if (mounted) {
         if (success) {
@@ -335,5 +340,3 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 }
-
-

@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/notification_badge.dart';
 import '../widgets/dashboard_stats_card.dart';
 import '../widgets/quick_actions_card.dart';
 import '../widgets/current_trip_card.dart';
@@ -35,7 +36,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     // Listen for authentication state changes and reload trips
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.isAuthenticated && previous?.isAuthenticated != next.isAuthenticated) {
+      if (next.isAuthenticated &&
+          previous?.isAuthenticated != next.isAuthenticated) {
         // User just logged in, reload trips
         print('🔄 DEBUG: User logged in, reloading trips...');
         ref.read(tripProvider.notifier).loadActiveTrips();
@@ -67,9 +69,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               color: Colors.grey[100],
               borderRadius: BorderRadius.circular(12.r),
             ),
-            child: IconButton(
-              icon: const Icon(Icons.notifications_outlined, color: Colors.black54),
+            child: NotificationBadge(
               onPressed: () => context.go('/notifications'),
+              child: IconButton(
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: Colors.black54,
+                ),
+                onPressed: () => context.go('/notifications'),
+              ),
             ),
           ),
           Container(
@@ -79,7 +87,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               borderRadius: BorderRadius.circular(12.r),
             ),
             child: IconButton(
-              icon: const Icon(Icons.account_circle_outlined, color: Colors.black54),
+              icon: const Icon(
+                Icons.account_circle_outlined,
+                color: Colors.black54,
+              ),
               onPressed: () => context.go('/profile'),
             ),
           ),
@@ -160,7 +171,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                     SizedBox(height: 16.h),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16.w,
+                        vertical: 8.h,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20.r),
@@ -329,5 +343,3 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 }
-
-

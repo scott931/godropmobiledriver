@@ -24,7 +24,7 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
   final _addressController = TextEditingController();
   final _estimatedResolutionController = TextEditingController();
 
-  String _selectedAlertType = 'safety';
+  String _selectedAlertType = 'vehicle_breakdown';
   String _selectedSeverity = 'medium';
   int? _selectedVehicleId;
   int? _selectedRouteId;
@@ -33,12 +33,56 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
   int? _estimatedDelayMinutes;
 
   final List<Map<String, dynamic>> _alertTypes = [
-    {'value': 'safety', 'label': 'Safety Issue', 'icon': Icons.security},
-    {'value': 'maintenance', 'label': 'Maintenance', 'icon': Icons.build},
-    {'value': 'schedule', 'label': 'Schedule Change', 'icon': Icons.schedule},
-    {'value': 'weather', 'label': 'Weather', 'icon': Icons.wb_sunny},
-    {'value': 'emergency', 'label': 'Emergency', 'icon': Icons.emergency},
-    {'value': 'system', 'label': 'System Issue', 'icon': Icons.bug_report},
+    {
+      'value': 'vehicle_breakdown',
+      'label': 'Vehicle Breakdown',
+      'icon': Icons.car_repair,
+    },
+    {'value': 'accident', 'label': 'Accident', 'icon': Icons.car_crash},
+    {
+      'value': 'weather_emergency',
+      'label': 'Weather Emergency',
+      'icon': Icons.warning,
+    },
+    {
+      'value': 'medical_emergency',
+      'label': 'Medical Emergency',
+      'icon': Icons.medical_services,
+    },
+    {
+      'value': 'security_threat',
+      'label': 'Security Threat',
+      'icon': Icons.security,
+    },
+    {'value': 'route_blocked', 'label': 'Route Blocked', 'icon': Icons.block},
+    {'value': 'delay', 'label': 'Delay', 'icon': Icons.schedule},
+    {'value': 'cancellation', 'label': 'Cancellation', 'icon': Icons.cancel},
+    {
+      'value': 'early_dismissal',
+      'label': 'Early Dismissal',
+      'icon': Icons.school,
+    },
+    {'value': 'late_pickup', 'label': 'Late Pickup', 'icon': Icons.access_time},
+    {
+      'value': 'missing_student',
+      'label': 'Missing Student',
+      'icon': Icons.person_search,
+    },
+    {
+      'value': 'mechanical_issue',
+      'label': 'Mechanical Issue',
+      'icon': Icons.build,
+    },
+    {
+      'value': 'fuel_shortage',
+      'label': 'Fuel Shortage',
+      'icon': Icons.local_gas_station,
+    },
+    {
+      'value': 'driver_emergency',
+      'label': 'Driver Emergency',
+      'icon': Icons.person,
+    },
   ];
 
   final List<Map<String, dynamic>> _severityLevels = [
@@ -67,8 +111,10 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
     }
 
     if (locationState.currentPosition != null) {
-      _locationController.text = '${locationState.currentPosition!.latitude},${locationState.currentPosition!.longitude}';
-      _addressController.text = locationState.currentAddress ?? 'Current location';
+      _locationController.text =
+          '${locationState.currentPosition!.latitude},${locationState.currentPosition!.longitude}';
+      _addressController.text =
+          locationState.currentAddress ?? 'Current location';
     }
 
     // Set default estimated resolution to 2 hours from now
@@ -92,69 +138,91 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
   Widget build(BuildContext context) {
     final emergencyState = ref.watch(emergencyProvider);
     final tripState = ref.watch(tripProvider);
-    final locationState = ref.watch(locationProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: CustomScrollView(
         slivers: [
-          // Modern App Bar
+          // Enhanced App Bar
           SliverAppBar(
-            expandedHeight: 120.h,
+            expandedHeight: 160.h,
             floating: false,
             pinned: true,
             backgroundColor: Colors.transparent,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color(0xFF2563EB),
-                      Color(0xFF1D4ED8),
+                      const Color(0xFF2563EB),
+                      const Color(0xFF1D4ED8),
+                      const Color(0xFF1E40AF),
                     ],
+                    stops: const [0.0, 0.6, 1.0],
                   ),
                 ),
                 child: SafeArea(
                   child: Padding(
-                    padding: EdgeInsets.all(20.w),
-                    child: Row(
+                    padding: EdgeInsets.all(24.w),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Container(
-                          padding: EdgeInsets.all(8.w),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8.r),
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
-                            onPressed: () => context.pop(),
-                          ),
-                        ),
-                        SizedBox(width: 16.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Create Alert',
-                                style: TextStyle(
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(12.w),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back,
                                   color: Colors.white,
-                                  fontSize: 20.sp,
-                                  fontWeight: FontWeight.bold,
+                                  size: 24,
                                 ),
+                                onPressed: () {
+                                  if (context.canPop()) {
+                                    context.pop();
+                                  } else {
+                                    context.go('/emergency');
+                                  }
+                                },
                               ),
-                              Text(
-                                'Report an issue or emergency',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 12.sp,
-                                ),
+                            ),
+                            SizedBox(width: 20.w),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Create Alert',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24.sp,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Report an issue or emergency situation',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.9),
+                                      fontSize: 14.sp,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -166,7 +234,7 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
 
           // Form Content
           SliverPadding(
-            padding: EdgeInsets.all(20.w),
+            padding: EdgeInsets.all(24.w),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 Form(
@@ -259,7 +327,8 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
                                     borderRadius: BorderRadius.circular(12.r),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppTheme.primaryColor.withOpacity(0.3),
+                                        color: AppTheme.primaryColor
+                                            .withOpacity(0.3),
                                         blurRadius: 8,
                                         offset: const Offset(0, 4),
                                       ),
@@ -267,7 +336,10 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
                                   ),
                                   child: IconButton(
                                     onPressed: () => _getCurrentLocation(),
-                                    icon: const Icon(Icons.my_location, color: Colors.white),
+                                    icon: const Icon(
+                                      Icons.my_location,
+                                      color: Colors.white,
+                                    ),
                                     tooltip: 'Use current location',
                                   ),
                                 ),
@@ -321,24 +393,32 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
                               children: [
                                 Expanded(
                                   child: _buildModernTextField(
-                                    initialValue: _affectedStudentsCount?.toString() ?? '',
+                                    initialValue:
+                                        _affectedStudentsCount?.toString() ??
+                                        '',
                                     hintText: 'Affected students count',
                                     icon: Icons.people,
                                     keyboardType: TextInputType.number,
                                     onChanged: (value) {
-                                      _affectedStudentsCount = int.tryParse(value);
+                                      _affectedStudentsCount = int.tryParse(
+                                        value,
+                                      );
                                     },
                                   ),
                                 ),
                                 SizedBox(width: 16.w),
                                 Expanded(
                                   child: _buildModernTextField(
-                                    initialValue: _estimatedDelayMinutes?.toString() ?? '',
+                                    initialValue:
+                                        _estimatedDelayMinutes?.toString() ??
+                                        '',
                                     hintText: 'Delay (minutes)',
                                     icon: Icons.timer,
                                     keyboardType: TextInputType.number,
                                     onChanged: (value) {
-                                      _estimatedDelayMinutes = int.tryParse(value);
+                                      _estimatedDelayMinutes = int.tryParse(
+                                        value,
+                                      );
                                     },
                                   ),
                                 ),
@@ -377,46 +457,43 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16.r),
+        borderRadius: BorderRadius.circular(20.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
+        border: Border.all(color: const Color(0xFFF3F4F6), width: 1),
       ),
       child: Padding(
-        padding: EdgeInsets.all(20.w),
+        padding: EdgeInsets.all(24.w),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(8.w),
+                  padding: EdgeInsets.all(12.w),
                   decoration: BoxDecoration(
                     color: AppTheme.primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8.r),
+                    borderRadius: BorderRadius.circular(12.r),
                   ),
-                  child: Icon(
-                    icon,
-                    color: AppTheme.primaryColor,
-                    size: 20.w,
-                  ),
+                  child: Icon(icon, color: AppTheme.primaryColor, size: 24.w),
                 ),
-                SizedBox(width: 12.w),
+                SizedBox(width: 16.w),
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 16.sp,
+                    fontSize: 18.sp,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.textPrimary,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 16.h),
+            SizedBox(height: 20.h),
             child,
           ],
         ),
@@ -437,11 +514,15 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-          width: 1,
-        ),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: TextFormField(
         controller: controller,
@@ -452,17 +533,26 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
         onChanged: onChanged,
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: TextStyle(
-            color: AppTheme.textSecondary,
-            fontSize: 14.sp,
+          hintStyle: TextStyle(color: AppTheme.textSecondary, fontSize: 14.sp),
+          prefixIcon: Container(
+            margin: EdgeInsets.all(12.w),
+            padding: EdgeInsets.all(8.w),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: Icon(icon, color: AppTheme.primaryColor, size: 20.w),
           ),
-          prefixIcon: Icon(icon, color: AppTheme.primaryColor, size: 20.w),
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 20.w,
+            vertical: 20.h,
+          ),
         ),
         style: TextStyle(
           fontSize: 14.sp,
           color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
@@ -494,16 +584,20 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
                 color: isSelected ? AppTheme.primaryColor : Colors.white,
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(
-                  color: isSelected ? AppTheme.primaryColor : const Color(0xFFE5E7EB),
+                  color: isSelected
+                      ? AppTheme.primaryColor
+                      : const Color(0xFFE5E7EB),
                   width: 2,
                 ),
-                boxShadow: isSelected ? [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ] : null,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppTheme.primaryColor.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -550,16 +644,20 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
                 color: isSelected ? severity['color'] : Colors.white,
                 borderRadius: BorderRadius.circular(12.r),
                 border: Border.all(
-                  color: isSelected ? severity['color'] : const Color(0xFFE5E7EB),
+                  color: isSelected
+                      ? severity['color']
+                      : const Color(0xFFE5E7EB),
                   width: 2,
                 ),
-                boxShadow: isSelected ? [
-                  BoxShadow(
-                    color: (severity['color'] as Color).withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ] : null,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: (severity['color'] as Color).withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ]
+                    : null,
               ),
               child: Text(
                 severity['label'],
@@ -584,17 +682,18 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.directions_bus, color: AppTheme.primaryColor, size: 20.w),
+              Icon(
+                Icons.directions_bus,
+                color: AppTheme.primaryColor,
+                size: 20.w,
+              ),
               SizedBox(width: 8.w),
               Text(
                 'Current Trip',
@@ -632,10 +731,7 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                fontSize: 12.sp,
-                color: AppTheme.textPrimary,
-              ),
+              style: TextStyle(fontSize: 12.sp, color: AppTheme.textPrimary),
             ),
           ),
         ],
@@ -649,10 +745,7 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: const Color(0xFFE5E7EB),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
       ),
       child: ListView.builder(
         itemCount: tripState.students.length,
@@ -662,12 +755,11 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
 
           return Container(
             decoration: BoxDecoration(
-              color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : Colors.transparent,
+              color: isSelected
+                  ? AppTheme.primaryColor.withOpacity(0.1)
+                  : Colors.transparent,
               border: Border(
-                bottom: BorderSide(
-                  color: const Color(0xFFE5E7EB),
-                  width: 1,
-                ),
+                bottom: BorderSide(color: const Color(0xFFE5E7EB), width: 1),
               ),
             ),
             child: CheckboxListTile(
@@ -708,225 +800,73 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
   Widget _buildModernSubmitButton(bool isLoading) {
     return Container(
       width: double.infinity,
-      height: 56.h,
+      height: 64.h,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppTheme.primaryColor, AppTheme.primaryColor.withOpacity(0.8)],
+          colors: [
+            AppTheme.primaryColor,
+            AppTheme.primaryColor.withOpacity(0.8),
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16.r),
+        borderRadius: BorderRadius.circular(20.r),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryColor.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: AppTheme.primaryColor.withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(20.r),
           onTap: isLoading ? null : _submitAlert,
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24.w),
+            padding: EdgeInsets.symmetric(horizontal: 20.w),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (isLoading) ...[
                   SizedBox(
-                    height: 20.h,
-                    width: 20.w,
+                    height: 24.h,
+                    width: 24.w,
                     child: const CircularProgressIndicator(
                       color: Colors.white,
-                      strokeWidth: 2,
+                      strokeWidth: 2.5,
                     ),
                   ),
                   SizedBox(width: 12.w),
                 ] else ...[
-                  Icon(Icons.send, color: Colors.white, size: 20.w),
+                  Container(
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Icon(Icons.send, color: Colors.white, size: 24.w),
+                  ),
                   SizedBox(width: 12.w),
                 ],
-                Text(
-                  isLoading ? 'Creating Alert...' : 'Create Alert',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.bold,
-        color: AppTheme.textPrimary,
-      ),
-    );
-  }
-
-  Widget _buildAlertTypeSelector() {
-    return Container(
-      height: 120.h,
-      child: GridView.builder(
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 8.w,
-          mainAxisSpacing: 8.h,
-          childAspectRatio: 1.2,
-        ),
-        itemCount: _alertTypes.length,
-        itemBuilder: (context, index) {
-          final alertType = _alertTypes[index];
-          final isSelected = _selectedAlertType == alertType['value'];
-
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedAlertType = alertType['value'];
-              });
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: isSelected ? AppTheme.primaryColor : Colors.white,
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(
-                  color: isSelected ? AppTheme.primaryColor : Colors.grey.shade300,
-                  width: 2,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    alertType['icon'],
-                    color: isSelected ? Colors.white : AppTheme.textSecondary,
-                    size: 24.w,
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    alertType['label'],
+                Flexible(
+                  child: Text(
+                    isLoading ? 'Creating Alert...' : 'Create Emergency Alert',
                     style: TextStyle(
-                      fontSize: 10.sp,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? Colors.white : AppTheme.textSecondary,
+                      color: Colors.white,
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.3,
                     ),
                     textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildSeveritySelector() {
-    return Row(
-      children: _severityLevels.map((severity) {
-        final isSelected = _selectedSeverity == severity['value'];
-        return Expanded(
-          child: GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedSeverity = severity['value'];
-              });
-            },
-            child: Container(
-              margin: EdgeInsets.symmetric(horizontal: 4.w),
-              padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 8.w),
-              decoration: BoxDecoration(
-                color: isSelected ? severity['color'] : Colors.white,
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(
-                  color: isSelected ? severity['color'] : Colors.grey.shade300,
-                  width: 2,
-                ),
-              ),
-              child: Text(
-                severity['label'],
-                style: TextStyle(
-                  color: isSelected ? Colors.white : AppTheme.textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildTripInfoCard(TripState tripState) {
-    final trip = tripState.currentTrip!;
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16.w),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.directions_bus, color: AppTheme.primaryColor),
-                SizedBox(width: 8.w),
-                Text(
-                  'Current Trip',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 8.h),
-            Text('Trip ID: ${trip.tripId}'),
-            Text('Route: ${trip.routeName ?? 'N/A'}'),
-            Text('Vehicle: ${trip.vehicleName ?? 'N/A'}'),
-            Text('Status: ${trip.status.name}'),
-          ],
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildStudentsSelector(TripState tripState) {
-    return Container(
-      height: 200.h,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(8.r),
-      ),
-      child: ListView.builder(
-        itemCount: tripState.students.length,
-        itemBuilder: (context, index) {
-          final student = tripState.students[index];
-          final isSelected = _selectedStudentIds.contains(student.id);
-
-          return CheckboxListTile(
-            title: Text('${student.firstName} ${student.lastName}'),
-            subtitle: Text('ID: ${student.studentId}'),
-            value: isSelected,
-            onChanged: (value) {
-              setState(() {
-                if (value == true) {
-                  _selectedStudentIds.add(student.id);
-                } else {
-                  _selectedStudentIds.remove(student.id);
-                }
-              });
-            },
-          );
-        },
       ),
     );
   }
@@ -936,8 +876,10 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
       final locationState = ref.read(locationProvider);
       if (locationState.currentPosition != null) {
         setState(() {
-          _locationController.text = '${locationState.currentPosition!.latitude},${locationState.currentPosition!.longitude}';
-          _addressController.text = locationState.currentAddress ?? 'Current location';
+          _locationController.text =
+              '${locationState.currentPosition!.latitude},${locationState.currentPosition!.longitude}';
+          _addressController.text =
+              locationState.currentAddress ?? 'Current location';
         });
       }
     } catch (e) {
@@ -958,37 +900,51 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
     try {
       final authState = ref.read(authProvider);
       final tripState = ref.read(tripProvider);
-      final locationState = ref.read(locationProvider);
 
-      final success = await ref.read(emergencyProvider.notifier).createEmergencyAlert(
-        emergencyType: _selectedAlertType,
-        severity: _selectedSeverity,
-        title: _titleController.text,
-        description: _descriptionController.text,
-        vehicle: _selectedVehicleId ?? tripState.currentTrip?.vehicleId ?? 1,
-        route: _selectedRouteId ?? tripState.currentTrip?.routeId ?? 1,
-        studentIds: _selectedStudentIds.isNotEmpty ? _selectedStudentIds : null,
-        location: _locationController.text,
-        address: _addressController.text,
-        estimatedResolution: _estimatedResolutionController.text.isNotEmpty
-            ? _estimatedResolutionController.text
-            : DateTime.now().add(const Duration(hours: 2)).toIso8601String(),
-        affectedStudentsCount: _affectedStudentsCount,
-        estimatedDelayMinutes: _estimatedDelayMinutes,
-        metadata: {
-          'created_by_driver': true,
-          'driver_id': authState.driver?.id,
-          'trip_id': tripState.currentTrip?.id,
-          'created_via': 'driver_app_form',
-        },
-      );
+      final success = await ref
+          .read(emergencyProvider.notifier)
+          .createEmergencyAlert(
+            emergencyType: _selectedAlertType,
+            severity: _selectedSeverity,
+            title: _titleController.text,
+            description: _descriptionController.text,
+            vehicle:
+                _selectedVehicleId ?? tripState.currentTrip?.vehicleId ?? 1,
+            route: _selectedRouteId ?? tripState.currentTrip?.routeId ?? 1,
+            studentIds: _selectedStudentIds.isNotEmpty
+                ? _selectedStudentIds
+                : null,
+            location: _locationController.text,
+            address: _addressController.text,
+            estimatedResolution: _estimatedResolutionController.text.isNotEmpty
+                ? _estimatedResolutionController.text
+                : DateTime.now()
+                      .add(const Duration(hours: 2))
+                      .toIso8601String(),
+            affectedStudentsCount: _affectedStudentsCount,
+            estimatedDelayMinutes: _estimatedDelayMinutes,
+            metadata: {
+              'created_by_driver': true,
+              'driver_id': authState.driver?.id,
+              'trip_id': tripState.currentTrip?.id,
+              'created_via': 'driver_app_form',
+            },
+          );
 
       if (success) {
         // Show success notification
-        await ref.read(notificationProvider.notifier).showEmergencyNotification(
-          title: 'Alert Created Successfully',
-          body: 'Your alert has been sent to the appropriate authorities',
-        );
+        try {
+          await ref
+              .read(notificationProvider.notifier)
+              .showEmergencyNotification(
+                title: 'Alert Created Successfully',
+                body: 'Your alert has been sent to the appropriate authorities',
+              );
+          print('🚨 DEBUG: Custom alert notification sent successfully');
+        } catch (e) {
+          print('🚨 DEBUG: Failed to send custom alert notification: $e');
+          // Continue even if notification fails
+        }
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -998,12 +954,21 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
         );
 
         // Navigate back
-        context.pop();
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/emergency');
+        }
       } else {
+        final emergencyState = ref.read(emergencyProvider);
+        final errorMessage = emergencyState.error ?? 'Unknown error occurred';
+        print('🚨 DEBUG: Custom alert creation failed: $errorMessage');
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Failed to create alert'),
+            content: Text('Failed to create alert: $errorMessage'),
             backgroundColor: AppTheme.errorColor,
+            duration: const Duration(seconds: 5),
           ),
         );
       }

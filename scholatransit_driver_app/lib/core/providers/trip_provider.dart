@@ -2,8 +2,11 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/trip_model.dart';
 import '../models/student_model.dart';
+import '../models/eta_model.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
+import '../services/eta_service.dart';
+import '../services/eta_notification_service.dart';
 import '../config/app_config.dart';
 
 class TripState {
@@ -121,7 +124,7 @@ class TripNotifier extends StateNotifier<TripState> {
           isLoading: false,
           trips: tripsList,
           currentTrip: currentTrip,
-          error: null
+          error: null,
         );
       } else {
         state = state.copyWith(
@@ -169,7 +172,6 @@ class TripNotifier extends StateNotifier<TripState> {
       );
     }
   }
-
 
   Future<void> loadDriverTrips(int driverId) async {
     state = state.copyWith(isLoading: true, error: null);
@@ -301,7 +303,9 @@ class TripNotifier extends StateNotifier<TripState> {
         // Update the trips list to reflect the new status
         final updatedTrips = state.trips.map((t) {
           if (t.tripId == trip.tripId) {
-            print('🔄 DEBUG: Updating trip ${trip.tripId} status from ${t.status} to ${trip.status}');
+            print(
+              '🔄 DEBUG: Updating trip ${trip.tripId} status from ${t.status} to ${trip.status}',
+            );
             return trip;
           }
           return t;
@@ -321,6 +325,9 @@ class TripNotifier extends StateNotifier<TripState> {
 
         // Force a refresh of trips to ensure UI is updated
         await loadTrips();
+
+        // Calculate ETA for the started trip
+        await _calculateETAForTrip(trip, latitude, longitude);
 
         return true;
       } else {
@@ -436,14 +443,19 @@ class TripNotifier extends StateNotifier<TripState> {
       final trip = state.trips.firstWhere((t) => t.id == tripId);
 
       // Try the trip-specific students endpoint first
-      String endpoint = '${AppConfig.tripDetailsEndpoint}${trip.tripId}/students/';
-      print('🔍 DEBUG: Loading students for trip ${trip.tripId} from endpoint: $endpoint');
+      String endpoint =
+          '${AppConfig.tripDetailsEndpoint}${trip.tripId}/students/';
+      print(
+        '🔍 DEBUG: Loading students for trip ${trip.tripId} from endpoint: $endpoint',
+      );
 
       var response = await ApiService.get<Map<String, dynamic>>(endpoint);
 
       // If the trip-specific endpoint fails (404), try the general students endpoint
       if (!response.success && response.error?.contains('404') == true) {
-        print('⚠️ DEBUG: Trip-specific students endpoint not found, trying general students endpoint');
+        print(
+          '⚠️ DEBUG: Trip-specific students endpoint not found, trying general students endpoint',
+        );
         endpoint = '${AppConfig.studentsEndpoint}?trip_id=${trip.tripId}';
         print('🔍 DEBUG: Trying general students endpoint: $endpoint');
 
@@ -565,7 +577,9 @@ class TripNotifier extends StateNotifier<TripState> {
       // Find the trip to get its string tripId
       final trip = state.trips.firstWhere((t) => t.id == tripId);
       final endpoint = '${AppConfig.tripDetailsEndpoint}${trip.tripId}/';
-      print('🔍 DEBUG: Loading trip details for ${trip.tripId} from endpoint: $endpoint');
+      print(
+        '🔍 DEBUG: Loading trip details for ${trip.tripId} from endpoint: $endpoint',
+      );
 
       final response = await ApiService.get<Map<String, dynamic>>(endpoint);
 
@@ -671,12 +685,107 @@ class TripNotifier extends StateNotifier<TripState> {
     if (state.trips.length != newTrips.length) return true;
 
     for (int i = 0; i < state.trips.length; i++) {
-      if (i < newTrips.length &&
-          state.trips[i].status != newTrips[i].status) {
+      if (i < newTrips.length && state.trips[i].status != newTrips[i].status) {
         return true;
       }
     }
     return false;
+  }
+
+  /// Calculate ETA for a trip
+  Future<void> _calculateETAForTrip(
+    Trip trip,
+    double? currentLat,
+    double? currentLng,
+  ) async {
+    try {
+      if (trip.endLatitude == null || trip.endLongitude == null) {
+        print(
+          '❌ Trip Provider: Cannot calculate ETA - missing destination coordinates',
+        );
+        return;
+      }
+
+      if (currentLat == null || currentLng == null) {
+        print(
+          '❌ Trip Provider: Cannot calculate ETA - missing current location',
+        );
+        return;
+      }
+
+      print('🚀 Trip Provider: Calculating ETA for trip ${trip.tripId}');
+
+      final result = await ETAService.calculateETA(
+        currentLat: currentLat,
+        currentLng: currentLng,
+        destinationLat: trip.endLatitude!,
+        destinationLng: trip.endLongitude!,
+        trip: trip,
+        routeName: trip.routeName,
+        vehicleType: 'school_bus',
+      );
+
+      if (result.success) {
+        final etaInfo = result.etaInfo;
+
+        // Update trip with ETA information
+        final updatedTrip = trip.copyWith(
+          estimatedArrival: etaInfo.estimatedArrival,
+          currentSpeed: etaInfo.currentSpeed,
+          etaIsDelayed: etaInfo.isDelayed,
+          etaStatus: ETAService.getETAStatus(etaInfo),
+          trafficMultiplier: etaInfo.trafficMultiplier,
+          etaLastUpdated: DateTime.now(),
+        );
+
+        // Update current trip in state
+        state = state.copyWith(currentTrip: updatedTrip);
+
+        // Update trip in trips list
+        final updatedTrips = state.trips.map((t) {
+          if (t.tripId == trip.tripId) {
+            return updatedTrip;
+          }
+          return t;
+        }).toList();
+
+        state = state.copyWith(trips: updatedTrips);
+
+        // Schedule ETA notifications
+        await ETANotificationService.scheduleETANotifications(
+          trip: updatedTrip,
+          etaInfo: etaInfo,
+        );
+
+        print(
+          '✅ Trip Provider: ETA calculated and updated for trip ${trip.tripId}',
+        );
+      } else {
+        print('❌ Trip Provider: Failed to calculate ETA: ${result.error}');
+      }
+    } catch (e) {
+      print('❌ Trip Provider: Error calculating ETA: $e');
+    }
+  }
+
+  /// Update ETA for current trip
+  Future<void> updateCurrentTripETA() async {
+    if (state.currentTrip == null) return;
+
+    final currentTrip = state.currentTrip!;
+    if (currentTrip.endLatitude == null || currentTrip.endLongitude == null)
+      return;
+
+    // This would typically get current location from location service
+    // For now, we'll use the trip's start coordinates as current location
+    if (currentTrip.startLatitude != null &&
+        currentTrip.startLongitude != null) {
+      await _calculateETAForTrip(
+        currentTrip,
+        currentTrip.startLatitude,
+        currentTrip.startLongitude,
+      );
+    }
   }
 
   @override

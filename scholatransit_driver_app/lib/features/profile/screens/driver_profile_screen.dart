@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/models/driver_model.dart';
 import '../../../core/theme/app_theme.dart';
 
 class DriverProfileScreen extends ConsumerStatefulWidget {
@@ -27,7 +29,10 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDriverData();
+    // Load driver data after the first frame to avoid blocking the UI
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadDriverData();
+    });
   }
 
   void _loadDriverData() {
@@ -47,8 +52,76 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
     final authState = ref.watch(authProvider);
     final driver = authState.driver;
 
+    if (authState.isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Profile')),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading profile...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (driver == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Profile'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () async {
+                await ref.read(authProvider.notifier).loadDriverProfile();
+              },
+            ),
+          ],
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                authState.error != null
+                    ? Icons.error_outline
+                    : Icons.person_off,
+                size: 64,
+                color: authState.error != null ? Colors.red : Colors.grey,
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                authState.error != null
+                    ? 'Error loading profile'
+                    : 'No profile data available',
+                style: TextStyle(
+                  fontSize: 16.sp,
+                  color: authState.error != null ? Colors.red : Colors.grey,
+                ),
+              ),
+              if (authState.error != null) ...[
+                SizedBox(height: 8.h),
+                Text(
+                  authState.error!,
+                  style: TextStyle(fontSize: 12.sp, color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+              SizedBox(height: 24.h),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  await ref.read(authProvider.notifier).loadDriverProfile();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -56,6 +129,12 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await ref.read(authProvider.notifier).loadDriverProfile();
+            },
+          ),
           if (!_isEditing)
             IconButton(
               icon: const Icon(Icons.edit),
@@ -75,81 +154,7 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         child: Column(
           children: [
             // Profile Header
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.all(24.w),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppTheme.primaryColor, AppTheme.primaryVariant],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              child: Column(
-                children: [
-                  // Profile Picture
-                  CircleAvatar(
-                    radius: 50.r,
-                    backgroundColor: Colors.white,
-                    backgroundImage: driver.profileImage != null
-                        ? NetworkImage(driver.profileImage!)
-                        : null,
-                    child: driver.profileImage == null
-                        ? Icon(
-                            Icons.person,
-                            size: 50.w,
-                            color: AppTheme.primaryColor,
-                          )
-                        : null,
-                  ),
-                  SizedBox(height: 16.h),
-
-                  // Driver Name
-                  Text(
-                    driver.fullName,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-
-                  // Driver ID
-                  Text(
-                    'Driver ID: ${driver.id}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withOpacity(0.8),
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-
-                  // Status Badge
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 12.w,
-                      vertical: 4.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(driver.status).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12.r),
-                      border: Border.all(
-                        color: _getStatusColor(driver.status),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      driver.status.toUpperCase(),
-                      style: TextStyle(
-                        color: _getStatusColor(driver.status),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12.sp,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _ProfileHeader(driver: driver),
 
             SizedBox(height: 24.h),
 
@@ -375,19 +380,6 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return AppTheme.successColor;
-      case 'inactive':
-        return AppTheme.errorColor;
-      case 'on_leave':
-        return AppTheme.warningColor;
-      default:
-        return AppTheme.textTertiary;
-    }
-  }
-
   void _saveProfile() async {
     if (_formKey.currentState?.validate() ?? false) {
       final updates = {
@@ -460,13 +452,13 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
               // Implement password change logic
-              Navigator.pop(context);
+              context.pop();
             },
             child: const Text('Change'),
           ),
@@ -483,12 +475,12 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         content: const Text('Are you sure you want to sign out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
+              context.pop();
               ref.read(authProvider.notifier).logout();
               context.go('/login');
             },
@@ -508,5 +500,111 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
     _emergencyContactController.dispose();
     _emergencyPhoneController.dispose();
     super.dispose();
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  final Driver driver;
+
+  const _ProfileHeader({required this.driver});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(24.w),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppTheme.primaryColor, AppTheme.primaryVariant],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      child: Column(
+        children: [
+          // Profile Picture
+          CircleAvatar(
+            radius: 50.r,
+            backgroundColor: Colors.white,
+            child: driver.profileImage != null
+                ? ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: driver.profileImage!,
+                      width: 100.w,
+                      height: 100.h,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        width: 100.w,
+                        height: 100.h,
+                        color: Colors.grey[300],
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (context, url, error) => Icon(
+                        Icons.person,
+                        size: 50.w,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                  )
+                : Icon(Icons.person, size: 50.w, color: AppTheme.primaryColor),
+          ),
+          SizedBox(height: 16.h),
+
+          // Driver Name
+          Text(
+            driver.fullName,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 4.h),
+
+          // Driver ID
+          Text(
+            'Driver ID: ${driver.id}',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.white.withOpacity(0.8),
+            ),
+          ),
+          SizedBox(height: 8.h),
+
+          // Status Badge
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+            decoration: BoxDecoration(
+              color: _getStatusColor(driver.status).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12.r),
+              border: Border.all(
+                color: _getStatusColor(driver.status),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              driver.status.toUpperCase(),
+              style: TextStyle(
+                color: _getStatusColor(driver.status),
+                fontWeight: FontWeight.bold,
+                fontSize: 12.sp,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return AppTheme.successColor;
+      case 'inactive':
+        return AppTheme.errorColor;
+      case 'on_leave':
+        return AppTheme.warningColor;
+      default:
+        return AppTheme.textTertiary;
+    }
   }
 }

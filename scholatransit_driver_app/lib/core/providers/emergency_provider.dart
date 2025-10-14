@@ -82,14 +82,44 @@ class EmergencyAlert {
       statusDisplay: json['status_display'] ?? '',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
-      vehicle: json['vehicle'] != null ? Map<String, dynamic>.from(json['vehicle']) : null,
-      route: json['route'] != null ? Map<String, dynamic>.from(json['route']) : null,
-      students: (json['students'] as List?)?.map((s) => Map<String, dynamic>.from(s)).toList() ?? [],
+      vehicle: json['vehicle'] != null
+          ? (json['vehicle'] is Map
+                ? Map<String, dynamic>.from(json['vehicle'])
+                : {'id': json['vehicle'], 'name': 'Vehicle ${json['vehicle']}'})
+          : null,
+      route: json['route'] != null
+          ? (json['route'] is Map
+                ? Map<String, dynamic>.from(json['route'])
+                : {'id': json['route'], 'name': 'Route ${json['route']}'})
+          : null,
+      students: json['students'] != null && json['students'] is List
+          ? (json['students'] as List)
+                .map(
+                  (s) => s is Map
+                      ? Map<String, dynamic>.from(s)
+                      : {'id': s, 'name': 'Student $s'},
+                )
+                .toList()
+          : [],
       location: json['location'],
       locationDisplay: json['location_display'],
       address: json['address'] ?? '',
-      reportedBy: json['reported_by'] != null ? Map<String, dynamic>.from(json['reported_by']) : null,
-      assignedTo: json['assigned_to'] != null ? Map<String, dynamic>.from(json['assigned_to']) : null,
+      reportedBy: json['reported_by'] != null
+          ? (json['reported_by'] is Map
+                ? Map<String, dynamic>.from(json['reported_by'])
+                : {
+                    'id': json['reported_by'],
+                    'name': 'User ${json['reported_by']}',
+                  })
+          : null,
+      assignedTo: json['assigned_to'] != null
+          ? (json['assigned_to'] is Map
+                ? Map<String, dynamic>.from(json['assigned_to'])
+                : {
+                    'id': json['assigned_to'],
+                    'name': 'User ${json['assigned_to']}',
+                  })
+          : null,
       reportedAt: json['reported_at'] ?? '',
       acknowledgedAt: json['acknowledged_at'],
       resolvedAt: json['resolved_at'],
@@ -102,7 +132,11 @@ class EmergencyAlert {
       metadata: Map<String, dynamic>.from(json['metadata'] ?? {}),
       durationMinutes: json['duration_minutes'],
       isActive: json['is_active'] ?? false,
-      updates: (json['updates'] as List?)?.map((u) => Map<String, dynamic>.from(u)).toList() ?? [],
+      updates:
+          (json['updates'] as List?)
+              ?.map((u) => Map<String, dynamic>.from(u))
+              .toList() ??
+          [],
       createdAt: json['created_at'] ?? '',
       updatedAt: json['updated_at'] ?? '',
     );
@@ -195,24 +229,41 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
+      print('🚨 DEBUG: Creating emergency alert...');
+      print('🚨 DEBUG: Type: $emergencyType, Severity: $severity');
+      print('🚨 DEBUG: Title: $title');
+      print('🚨 DEBUG: Vehicle: $vehicle, Route: $route');
+      print('🚨 DEBUG: Location: $location, Address: $address');
+
+      final requestData = {
+        'emergency_type': emergencyType,
+        'severity': severity,
+        'title': title,
+        'description': description,
+        'vehicle': vehicle,
+        'route': route,
+        if (studentIds != null) 'student_ids': studentIds,
+        'location': location,
+        'address': address,
+        if (estimatedResolution != null)
+          'estimated_resolution': estimatedResolution,
+        if (affectedStudentsCount != null)
+          'affected_students_count': affectedStudentsCount,
+        if (estimatedDelayMinutes != null)
+          'estimated_delay_minutes': estimatedDelayMinutes,
+        if (metadata != null) 'metadata': metadata,
+      };
+
+      print('🚨 DEBUG: Request data: $requestData');
+
       final response = await ApiService.post<Map<String, dynamic>>(
         AppConfig.createEmergencyAlertEndpoint,
-        data: {
-          'emergency_type': emergencyType,
-          'severity': severity,
-          'title': title,
-          'description': description,
-          'vehicle': vehicle,
-          'route': route,
-          if (studentIds != null) 'student_ids': studentIds,
-          'location': location,
-          'address': address,
-          if (estimatedResolution != null) 'estimated_resolution': estimatedResolution,
-          if (affectedStudentsCount != null) 'affected_students_count': affectedStudentsCount,
-          if (estimatedDelayMinutes != null) 'estimated_delay_minutes': estimatedDelayMinutes,
-          if (metadata != null) 'metadata': metadata,
-        },
+        data: requestData,
       );
+
+      print('🚨 DEBUG: API Response - Success: ${response.success}');
+      print('🚨 DEBUG: API Response - Error: ${response.error}');
+      print('🚨 DEBUG: API Response - Data: ${response.data}');
 
       if (response.success && response.data != null) {
         final alert = EmergencyAlert.fromJson(response.data!);
@@ -221,15 +272,19 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
           selectedAlert: alert,
           error: null,
         );
+        print(
+          '🚨 DEBUG: Emergency alert created successfully with ID: ${alert.id}',
+        );
         return true;
       } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: response.error ?? 'Failed to create emergency alert',
-        );
+        final errorMessage =
+            response.error ?? 'Failed to create emergency alert';
+        print('🚨 DEBUG: Emergency alert creation failed: $errorMessage');
+        state = state.copyWith(isLoading: false, error: errorMessage);
         return false;
       }
     } catch (e) {
+      print('🚨 DEBUG: Exception during emergency alert creation: $e');
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to create emergency alert: $e',
@@ -254,7 +309,11 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
                 .toList() ??
             [];
 
-        state = state.copyWith(isLoading: false, alerts: alertsList, error: null);
+        state = state.copyWith(
+          isLoading: false,
+          alerts: alertsList,
+          error: null,
+        );
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -319,9 +378,12 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
           'emergency': emergencyId,
           'status_change': statusChange,
           'message': message,
-          if (estimatedResolution != null) 'estimated_resolution': estimatedResolution,
-          if (affectedStudentsCount != null) 'affected_students_count': affectedStudentsCount,
-          if (estimatedDelayMinutes != null) 'estimated_delay_minutes': estimatedDelayMinutes,
+          if (estimatedResolution != null)
+            'estimated_resolution': estimatedResolution,
+          if (affectedStudentsCount != null)
+            'affected_students_count': affectedStudentsCount,
+          if (estimatedDelayMinutes != null)
+            'estimated_delay_minutes': estimatedDelayMinutes,
           if (location != null) 'location': location,
           if (address != null) 'address': address,
           'notify_parents': notifyParents,
@@ -330,10 +392,7 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
       );
 
       if (response.success && response.data != null) {
-        state = state.copyWith(
-          isLoading: false,
-          error: null,
-        );
+        state = state.copyWith(isLoading: false, error: null);
         return true;
       } else {
         state = state.copyWith(
@@ -400,6 +459,7 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
   }
 }
 
-final emergencyProvider = StateNotifierProvider<EmergencyNotifier, EmergencyState>(
-  (ref) => EmergencyNotifier(),
-);
+final emergencyProvider =
+    StateNotifierProvider<EmergencyNotifier, EmergencyState>(
+      (ref) => EmergencyNotifier(),
+    );

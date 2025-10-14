@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -15,9 +16,11 @@ class OtpScreen extends ConsumerStatefulWidget {
 
 class _OtpScreenState extends ConsumerState<OtpScreen> {
   final _formKey = GlobalKey<FormState>();
-  final List<TextEditingController> _otpControllers = List.generate(6, (index) => TextEditingController());
+  final List<TextEditingController> _otpControllers = List.generate(
+    6,
+    (index) => TextEditingController(),
+  );
   final List<FocusNode> _focusNodes = List.generate(6, (index) => FocusNode());
-  int _currentIndex = 0;
 
   @override
   void dispose() {
@@ -53,10 +56,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.pop(),
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -131,7 +131,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12.r),
-                            borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 2),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF3B82F6),
+                              width: 2,
+                            ),
                           ),
                           filled: true,
                           fillColor: Colors.white,
@@ -215,7 +218,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                           width: 20.w,
                           child: const CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : Text(
@@ -238,6 +243,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   }
 
   Future<void> _submit() async {
+    // Check if widget is still mounted before proceeding
+    if (!mounted) return;
+
     // Collect all OTP digits
     String otpCode = '';
     for (var controller in _otpControllers) {
@@ -246,6 +254,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
     // Validate that all fields are filled
     if (otpCode.length != 6) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter the complete 6-digit OTP code'),
@@ -255,10 +264,24 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       return;
     }
 
-    await ref.read(authProvider.notifier).verifyLoginOtp(
-          otpCode: otpCode.trim(),
-        );
+    // Try login OTP first (most common case), then fall back to registration methods
+    if (!mounted) return;
+    final loginSuccess = await ref
+        .read(authProvider.notifier)
+        .verifyLoginOtp(otpCode: otpCode.trim());
+
+    // If login OTP fails, try email completion for registration
+    if (!loginSuccess && mounted) {
+      final emailCompletionSuccess = await ref
+          .read(authProvider.notifier)
+          .completeEmailRegistration(otpCode: otpCode.trim());
+
+      // If email completion fails, try registration OTP
+      if (!emailCompletionSuccess && mounted) {
+        await ref
+            .read(authProvider.notifier)
+            .verifyRegisterOtp(otpCode: otpCode.trim());
+      }
+    }
   }
 }
-
-

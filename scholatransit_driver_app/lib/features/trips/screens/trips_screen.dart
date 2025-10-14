@@ -32,7 +32,8 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
 
     // Listen for authentication state changes and reload trips
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.isAuthenticated && previous?.isAuthenticated != next.isAuthenticated) {
+      if (next.isAuthenticated &&
+          previous?.isAuthenticated != next.isAuthenticated) {
         // User just logged in, reload trips
         print('🔄 DEBUG: User logged in, reloading trips...');
         ref.read(tripProvider.notifier).loadActiveTrips();
@@ -56,10 +57,7 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF1E3A8A),
-                  const Color(0xFF3B82F6),
-                ],
+                colors: [const Color(0xFF1E3A8A), const Color(0xFF3B82F6)],
               ),
             ),
             child: SafeArea(
@@ -71,7 +69,7 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
                     Row(
                       children: [
                         GestureDetector(
-                          onTap: () => Navigator.pop(context),
+                          onTap: () => context.pop(),
                           child: Container(
                             padding: EdgeInsets.all(8.w),
                             decoration: BoxDecoration(
@@ -123,13 +121,11 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
                         ),
                       ],
                     ),
-
                   ],
                 ),
               ),
             ),
           ),
-
 
           // Trips List
           Expanded(
@@ -156,7 +152,8 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
                           padding: EdgeInsets.only(bottom: 16.h),
                           child: _ModernTripCard(
                             trip: trip,
-                            onTap: () => context.go('/trips/details/${trip.id}'),
+                            onTap: () =>
+                                context.go('/trips/details/${trip.id}'),
                             onStart: trip.status == TripStatus.pending
                                 ? () => _startTrip(trip)
                                 : null,
@@ -185,16 +182,11 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
         child: FloatingActionButton(
           onPressed: () => _showNewTripDialog(context),
           backgroundColor: const Color(0xFF3B82F6),
-          child: Icon(
-            Icons.add,
-            color: Colors.white,
-            size: 24.w,
-          ),
+          child: Icon(Icons.add, color: Colors.white, size: 24.w),
         ),
       ),
     );
   }
-
 
   void _showNewTripDialog(BuildContext context) {
     showDialog(
@@ -205,10 +197,7 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
           'This feature will be available soon. You can start trips from the trips list.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
+          TextButton(onPressed: () => context.pop(), child: const Text('OK')),
         ],
       ),
     );
@@ -228,7 +217,9 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Unable to get current location. Please enable location services.'),
+              content: Text(
+                'Unable to get current location. Please enable location services.',
+              ),
               backgroundColor: AppTheme.errorColor,
             ),
           );
@@ -237,7 +228,8 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
       }
     }
 
-    final position = currentPosition ?? ref.read(locationProvider).currentPosition!;
+    final position =
+        currentPosition ?? ref.read(locationProvider).currentPosition!;
 
     final success = await ref
         .read(tripProvider.notifier)
@@ -272,7 +264,9 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Unable to get current location. Please enable location services.'),
+              content: Text(
+                'Unable to get current location. Please enable location services.',
+              ),
               backgroundColor: AppTheme.errorColor,
             ),
           );
@@ -281,7 +275,8 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
       }
     }
 
-    final position = currentPosition ?? ref.read(locationProvider).currentPosition!;
+    final position =
+        currentPosition ?? ref.read(locationProvider).currentPosition!;
 
     final success = await ref
         .read(tripProvider.notifier)
@@ -300,7 +295,6 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
       );
     }
   }
-
 }
 
 class _ModernTripCard extends StatelessWidget {
@@ -377,7 +371,10 @@ class _ModernTripCard extends StatelessWidget {
                     ),
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 6.h,
+                    ),
                     decoration: BoxDecoration(
                       color: _getStatusColor().withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12.r),
@@ -428,10 +425,7 @@ class _ModernTripCard extends StatelessWidget {
                   Expanded(
                     child: Column(
                       children: [
-                        Container(
-                          height: 1.h,
-                          color: Colors.grey[300],
-                        ),
+                        Container(height: 1.h, color: Colors.grey[300]),
                         SizedBox(height: 8.h),
                         Container(
                           width: 24.w,
@@ -447,10 +441,7 @@ class _ModernTripCard extends StatelessWidget {
                           ),
                         ),
                         SizedBox(height: 8.h),
-                        Container(
-                          height: 1.h,
-                          color: Colors.grey[300],
-                        ),
+                        Container(height: 1.h, color: Colors.grey[300]),
                       ],
                     ),
                   ),
@@ -486,6 +477,11 @@ class _ModernTripCard extends StatelessWidget {
 
               SizedBox(height: 16.h),
 
+              // ETA Information
+              if (trip.estimatedArrival != null) _buildETAInfo(),
+
+              SizedBox(height: 16.h),
+
               // Trip Details and Actions
               Row(
                 children: [
@@ -515,7 +511,10 @@ class _ModernTripCard extends StatelessWidget {
                   // Action Button
                   if (onStart != null || onEnd != null)
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16.w,
+                        vertical: 8.h,
+                      ),
                       decoration: BoxDecoration(
                         color: onStart != null
                             ? const Color(0xFF10B981)
@@ -600,6 +599,76 @@ class _ModernTripCard extends StatelessWidget {
   String _formatTime(DateTime time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
+
+  Widget _buildETAInfo() {
+    return Container(
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: trip.isRunningLate
+            ? Colors.red.withOpacity(0.1)
+            : Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(
+          color: trip.isRunningLate
+              ? Colors.red.withOpacity(0.3)
+              : Colors.green.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            trip.isRunningLate ? Icons.warning : Icons.schedule,
+            color: trip.isRunningLate ? Colors.red : Colors.green,
+            size: 16.w,
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ETA: ${trip.formattedTimeToArrival}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: trip.isRunningLate ? Colors.red : Colors.green,
+                  ),
+                ),
+                if (trip.trafficConditions != 'Unknown') ...[
+                  SizedBox(height: 2.h),
+                  Text(
+                    trip.trafficConditions,
+                    style: GoogleFonts.poppins(
+                      fontSize: 10.sp,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (trip.isRunningLate) ...[
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+              child: Text(
+                'DELAYED',
+                style: GoogleFonts.poppins(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.red,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _TripAttribute extends StatelessWidget {
@@ -620,11 +689,7 @@ class _TripAttribute extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(
-              icon,
-              size: 12.w,
-              color: Colors.grey[600],
-            ),
+            Icon(icon, size: 12.w, color: Colors.grey[600]),
             SizedBox(width: 4.w),
             Text(
               label,
@@ -692,5 +757,3 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-
-

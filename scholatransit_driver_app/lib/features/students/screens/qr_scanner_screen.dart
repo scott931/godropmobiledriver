@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../core/providers/trip_provider.dart';
@@ -44,12 +45,12 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
+              context.pop();
               openAppSettings();
             },
             child: const Text('Settings'),
@@ -103,10 +104,7 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
                 height: 250.w,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppTheme.primaryColor,
-                    width: 4,
-                  ),
+                  border: Border.all(color: AppTheme.primaryColor, width: 4),
                 ),
               ),
             ),
@@ -242,10 +240,7 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
         ),
         content: Text('Student $studentId has been checked in successfully.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
+          TextButton(onPressed: () => context.pop(), child: const Text('OK')),
         ],
       ),
     );
@@ -264,10 +259,7 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
         ),
         content: Text(message),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
+          TextButton(onPressed: () => context.pop(), child: const Text('OK')),
         ],
       ),
     );
@@ -288,10 +280,7 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
           'This QR code is not valid for student check-in. Please scan a student QR code.',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
+          TextButton(onPressed: () => context.pop(), child: const Text('OK')),
         ],
       ),
     );
@@ -320,12 +309,12 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => context.pop(),
             child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
+              context.pop();
               if (studentIdController.text.isNotEmpty) {
                 _checkInStudent(studentIdController.text);
               }
@@ -338,7 +327,7 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
   }
 
   void _showStudentList() {
-    Navigator.pop(context);
+    context.pop();
     // Navigate to students screen
   }
 

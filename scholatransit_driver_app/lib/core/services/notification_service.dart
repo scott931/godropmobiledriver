@@ -46,10 +46,13 @@ class NotificationService {
 
   static Future<void> registerDeviceToken(String token) async {
     try {
-      await ApiService.post(AppConfig.deviceTokenEndpoint, data: {
-        'device_token': token,
-        'device_type': Platform.isAndroid ? 'android' : 'ios',
-      });
+      await ApiService.post(
+        AppConfig.deviceTokenEndpoint,
+        data: {
+          'device_token': token,
+          'device_type': Platform.isAndroid ? 'android' : 'ios',
+        },
+      );
     } catch (_) {}
   }
 
@@ -110,12 +113,19 @@ class NotificationService {
     required String body,
     String? emergencyId,
   }) async {
-    await showLocalNotification(
-      title: title,
-      body: body,
-      payload: emergencyId,
-      id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
-    );
+    try {
+      print('🔔 DEBUG: Showing emergency notification: $title');
+      await showLocalNotification(
+        title: title,
+        body: body,
+        payload: emergencyId,
+        id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      );
+      print('🔔 DEBUG: Emergency notification shown successfully');
+    } catch (e) {
+      print('🔔 DEBUG: Failed to show emergency notification: $e');
+      rethrow;
+    }
   }
 
   static Future<void> showStudentStatusNotification({
@@ -193,5 +203,3 @@ class NotificationService {
 }
 
 // FCM is disabled, no background handler needed
-
-

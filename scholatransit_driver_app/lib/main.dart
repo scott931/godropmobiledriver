@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -8,6 +9,7 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/services/storage_service.dart';
 import 'core/services/api_service.dart';
+import 'core/widgets/system_back_button_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,13 +61,15 @@ class GoDropApp extends ConsumerWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.system,
-          routerConfig: AppRouter.router(ref),
+          routerConfig: ref.watch(appRouterProvider),
           builder: (context, child) {
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: TextScaler.linear(1.0), // Disable text scaling
+            return SystemBackButtonHandler(
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(1.0), // Disable text scaling
+                ),
+                child: child!,
               ),
-              child: child!,
             );
           },
         );

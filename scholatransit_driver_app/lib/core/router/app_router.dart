@@ -5,18 +5,19 @@ import '../../features/splash/screens/splash_screen.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/auth/screens/otp_screen.dart';
+import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/trips/screens/trips_screen.dart';
 import '../../features/trips/screens/trip_details_screen.dart';
 import '../../features/students/screens/students_screen.dart';
 import '../../features/students/screens/qr_scanner_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
-import '../../features/profile/screens/profile_screen.dart';
 import '../../features/profile/screens/driver_profile_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/emergency/screens/emergency_screen.dart';
 import '../../features/emergency/screens/create_alert_screen.dart';
 import '../../features/map/screens/map_screen.dart';
+import '../widgets/simple_bottom_navigation.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -43,6 +44,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/otp',
         name: 'otp',
         builder: (context, state) => const OtpScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
       // Main app routes
@@ -122,26 +128,9 @@ class MainShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
+      bottomNavigationBar: SimpleBottomNavigation(
         currentIndex: _getCurrentIndex(context),
         onTap: (index) => _onTap(context, index),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.directions_bus),
-            label: 'Trips',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Students'),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.emergency),
-            label: 'Emergency',
-          ),
-        ],
       ),
     );
   }
@@ -152,7 +141,7 @@ class MainShell extends ConsumerWidget {
     if (location.startsWith('/trips')) return 1;
     if (location.startsWith('/students')) return 2;
     if (location.startsWith('/map')) return 3;
-    if (location.startsWith('/emergency')) return 4;
+    if (location.startsWith('/notifications')) return 4;
     return 0;
   }
 
@@ -171,7 +160,7 @@ class MainShell extends ConsumerWidget {
         context.go('/map');
         break;
       case 4:
-        context.go('/emergency');
+        context.go('/notifications');
         break;
     }
   }
