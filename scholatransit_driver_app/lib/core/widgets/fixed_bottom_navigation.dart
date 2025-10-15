@@ -299,29 +299,32 @@ class _FixedBottomNavigationWithFABState
               builder: (context, child) {
                 return Transform.scale(
                   scale: _fabScaleAnimation.value,
-                  child: Container(
-                    width: 52.w,
-                    height: 52.w,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      borderRadius: BorderRadius.circular(26.r),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primaryColor.withOpacity(0.2),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
+                  child: Tooltip(
+                    message: 'Create emergency alert',
+                    child: Container(
+                      width: 52.w,
+                      height: 52.w,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor,
                         borderRadius: BorderRadius.circular(26.r),
-                        onTap: () => context.go('/emergency/create-alert'),
-                        child: Icon(
-                          Icons.emergency_rounded,
-                          color: Colors.white,
-                          size: 22.w,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.primaryColor.withOpacity(0.2),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(26.r),
+                          onTap: () => context.go('/emergency/create-alert'),
+                          child: Icon(
+                            Icons.emergency_rounded,
+                            color: Colors.white,
+                            size: 22.w,
+                          ),
                         ),
                       ),
                     ),

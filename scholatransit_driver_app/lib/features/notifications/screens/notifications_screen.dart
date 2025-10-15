@@ -350,6 +350,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   void _showAlertDetails(Map<String, dynamic> alert) {
     // Debug: Print alert data to understand the structure
     print('🚨 DEBUG: Alert details data: $alert');
+    print('🚨 DEBUG: Alert keys: ${alert.keys.toList()}');
+    print('🚨 DEBUG: Status: ${alert['status']}');
+    print('🚨 DEBUG: Severity: ${alert['severity']}');
+    print('🚨 DEBUG: Emergency Type: ${alert['emergency_type']}');
+    print('🚨 DEBUG: Address: ${alert['address']}');
+    print('🚨 DEBUG: Vehicle: ${alert['vehicle']}');
+    print('🚨 DEBUG: Route: ${alert['route']}');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -396,42 +403,48 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     alert['emergency_type'] ??
                     'Unknown',
               ),
-              if (alert['address'] != null &&
-                  alert['address'].toString().isNotEmpty)
-                _buildDetailRow('Location', alert['address']),
-              if (alert['affected_students_count'] != null)
-                _buildDetailRow(
-                  'Affected Students',
-                  alert['affected_students_count'].toString(),
-                ),
-              if (alert['estimated_delay_minutes'] != null)
-                _buildDetailRow(
-                  'Estimated Delay',
-                  '${alert['estimated_delay_minutes']} minutes',
-                ),
-              if (alert['reported_at'] != null)
-                _buildDetailRow(
-                  'Reported At',
-                  _formatTimestamp(DateTime.parse(alert['reported_at'])),
-                ),
-              if (alert['estimated_resolution'] != null)
-                _buildDetailRow(
-                  'Estimated Resolution',
-                  _formatTimestamp(
-                    DateTime.parse(alert['estimated_resolution']),
-                  ),
-                ),
-              if (alert['vehicle'] != null)
-                _buildDetailRow(
-                  'Vehicle',
-                  alert['vehicle']['name'] ??
-                      'Vehicle ${alert['vehicle']['id']}',
-                ),
-              if (alert['route'] != null)
-                _buildDetailRow(
-                  'Route',
-                  alert['route']['name'] ?? 'Route ${alert['route']['id']}',
-                ),
+              _buildDetailRow(
+                'Location',
+                alert['address']?.toString() ?? 'Not specified',
+              ),
+              _buildDetailRow(
+                'Affected Students',
+                alert['affected_students_count']?.toString() ?? '0',
+              ),
+              _buildDetailRow(
+                'Estimated Delay',
+                alert['estimated_delay_minutes'] != null
+                    ? '${alert['estimated_delay_minutes']} minutes'
+                    : 'Not specified',
+              ),
+              _buildDetailRow(
+                'Reported At',
+                alert['reported_at'] != null
+                    ? _formatTimestamp(DateTime.parse(alert['reported_at']))
+                    : 'Not specified',
+              ),
+              _buildDetailRow(
+                'Estimated Resolution',
+                alert['estimated_resolution'] != null
+                    ? _formatTimestamp(
+                        DateTime.parse(alert['estimated_resolution']),
+                      )
+                    : 'Not specified',
+              ),
+              _buildDetailRow(
+                'Vehicle',
+                alert['vehicle'] != null
+                    ? (alert['vehicle']['name'] ??
+                          'Vehicle ${alert['vehicle']['id']}')
+                    : 'Not specified',
+              ),
+              _buildDetailRow(
+                'Route',
+                alert['route'] != null
+                    ? (alert['route']['name'] ??
+                          'Route ${alert['route']['id']}')
+                    : 'Not specified',
+              ),
             ],
           ),
         ),

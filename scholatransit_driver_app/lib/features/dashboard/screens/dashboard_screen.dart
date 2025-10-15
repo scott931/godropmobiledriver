@@ -292,51 +292,57 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       ),
       floatingActionButton: tripState.currentTrip != null
-          ? Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF667EEA).withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: FloatingActionButton.extended(
-                onPressed: () => context.go('/map'),
-                icon: const Icon(Icons.location_on, color: Colors.white),
-                label: Text(
-                  'Track Location',
-                  style: GoogleFonts.poppins(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                backgroundColor: const Color(0xFF667EEA),
-                shape: RoundedRectangleBorder(
+          ? Tooltip(
+              message: 'Track your current trip location on the map',
+              child: Container(
+                decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF667EEA).withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: FloatingActionButton.extended(
+                  onPressed: () => context.go('/map'),
+                  icon: const Icon(Icons.location_on, color: Colors.white),
+                  label: Text(
+                    'Track Location',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  backgroundColor: const Color(0xFF667EEA),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
                 ),
               ),
             )
-          : Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16.r),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF667EEA).withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: FloatingActionButton(
-                onPressed: () => context.go('/trips'),
-                child: const Icon(Icons.add, color: Colors.white),
-                backgroundColor: const Color(0xFF667EEA),
-                shape: RoundedRectangleBorder(
+          : Tooltip(
+              message: 'Add a new trip to start tracking',
+              child: Container(
+                decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF667EEA).withOpacity(0.3),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: FloatingActionButton(
+                  onPressed: () => context.go('/trips'),
+                  child: const Icon(Icons.add, color: Colors.white),
+                  backgroundColor: const Color(0xFF667EEA),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                  ),
                 ),
               ),
             ),

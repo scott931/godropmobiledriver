@@ -53,6 +53,15 @@ class AppConfig {
       '/notifications/preferences/';
   static const String deviceTokenEndpoint = '/users/device-token/';
 
+  // Parent Notification Endpoints
+  static const String parentNotificationEndpoint = '/notifications/parents/';
+  static const String parentNotificationPreferencesEndpoint =
+      '/notifications/parents/preferences/';
+  static const String parentNotificationHistoryEndpoint =
+      '/notifications/parents/history/';
+  static const String parentNotificationStatusEndpoint =
+      '/notifications/parents/status/';
+
   // Tracking Endpoints
   static const String trackingEndpoint = '/tracking/';
   static const String liveTrackingEndpoint = '/tracking/live/';

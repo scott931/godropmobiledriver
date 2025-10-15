@@ -44,42 +44,63 @@ class LocationService {
     try {
       final hasPermission = await _checkLocationSettings();
       if (!hasPermission) {
-        throw Exception('Location permission not granted');
+        print('❌ Location permission not granted');
+        return null;
       }
 
-      // Try with high accuracy first
-      try {
-        final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        );
-        _currentPosition = position;
-        return position;
-      } catch (e) {
-        print('High accuracy location failed, trying medium accuracy: $e');
+      // Progressive fallback strategy with optimized timeouts
+      final accuracyLevels = [
+        {
+          'accuracy': LocationAccuracy
+              .medium, // Start with medium for better reliability
+          'timeout': Duration(seconds: 3),
+          'name': 'medium',
+        },
+        {
+          'accuracy': LocationAccuracy.low,
+          'timeout': Duration(seconds: 2),
+          'name': 'low',
+        },
+        {
+          'accuracy': LocationAccuracy.lowest,
+          'timeout': Duration(seconds: 1),
+          'name': 'lowest',
+        },
+      ];
 
-        // Fallback to medium accuracy
+      for (final level in accuracyLevels) {
         try {
+          print('📍 Trying ${level['name']} accuracy location...');
           final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.medium,
-            timeLimit: Duration(seconds: 10),
+            desiredAccuracy: level['accuracy'] as LocationAccuracy,
+            timeLimit: level['timeout'] as Duration,
           );
           _currentPosition = position;
+          print('✅ Location obtained with ${level['name']} accuracy');
           return position;
-        } catch (e2) {
-          print('Medium accuracy location failed, trying low accuracy: $e2');
-
-          // Final fallback to low accuracy
-          final position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.low,
-            timeLimit: Duration(seconds: 5),
-          );
-          _currentPosition = position;
-          return position;
+        } catch (e) {
+          print('❌ ${level['name']} accuracy failed: $e');
+          // Continue to next accuracy level
         }
       }
+
+      // If all accuracy levels fail, try with cached location
+      print('⚠️ All accuracy levels failed, trying cached location...');
+      try {
+        final position = await Geolocator.getLastKnownPosition();
+        if (position != null) {
+          _currentPosition = position;
+          print('✅ Using cached location');
+          return position;
+        }
+      } catch (e) {
+        print('❌ Cached location also failed: $e');
+      }
+
+      print('❌ All location methods failed');
+      return null;
     } catch (e) {
-      print('Error getting current position: $e');
+      print('❌ Error getting current position: $e');
       return null;
     }
   }
@@ -88,29 +109,40 @@ class LocationService {
     try {
       final hasPermission = await _checkLocationSettings();
       if (!hasPermission) {
-        throw Exception('Location permission not granted');
+        print('❌ Location permission not granted');
+        return;
       }
+
+      print('📍 Starting location tracking with optimized settings...');
 
       _positionStream =
           Geolocator.getPositionStream(
             locationSettings: LocationSettings(
-              accuracy: LocationAccuracy.medium, // Use medium accuracy for better reliability
+              accuracy: LocationAccuracy
+                  .low, // Use low accuracy for better reliability
               distanceFilter: AppConfig.locationAccuracyThreshold.toInt(),
-              timeLimit: Duration(seconds: 20), // Reduced timeout for stream
+              timeLimit: Duration(
+                seconds: 4,
+              ), // Shorter timeout for better responsiveness
             ),
           ).listen(
             (Position position) {
               _currentPosition = position;
               _locationController.add(position);
+              print(
+                '📍 Location update: ${position.latitude}, ${position.longitude} (accuracy: ${position.accuracy}m)',
+              );
             },
             onError: (error) {
-              print('Location tracking error: $error');
-              // Try to restart with lower accuracy if high accuracy fails
+              print('❌ Location tracking error: $error');
+              // Try to restart with lower accuracy if medium accuracy fails
               _restartLocationTrackingWithLowerAccuracy();
             },
           );
+
+      print('✅ Location tracking started successfully');
     } catch (e) {
-      print('Error starting location tracking: $e');
+      print('❌ Error starting location tracking: $e');
     }
   }
 
@@ -176,26 +208,77 @@ class LocationService {
 
   static Future<void> _restartLocationTrackingWithLowerAccuracy() async {
     try {
+      print('🔄 Restarting location tracking with lower accuracy...');
       await stopLocationTracking();
+
+      // Wait a moment before restarting to avoid conflicts
+      await Future.delayed(Duration(milliseconds: 500));
 
       _positionStream =
           Geolocator.getPositionStream(
             locationSettings: LocationSettings(
               accuracy: LocationAccuracy.low, // Use low accuracy as fallback
-              distanceFilter: AppConfig.locationAccuracyThreshold.toInt() * 2, // Increase distance filter
-              timeLimit: Duration(seconds: 15),
+              distanceFilter:
+                  AppConfig.locationAccuracyThreshold.toInt() *
+                  2, // Increase distance filter
+              timeLimit: Duration(seconds: 10), // Shorter timeout for fallback
             ),
           ).listen(
             (Position position) {
               _currentPosition = position;
               _locationController.add(position);
+              print(
+                '📍 Fallback location update: ${position.latitude}, ${position.longitude} (accuracy: ${position.accuracy}m)',
+              );
             },
             onError: (error) {
-              print('Location tracking error (low accuracy): $error');
+              print('❌ Location tracking error (low accuracy): $error');
+              // Try one more time with lowest accuracy
+              _restartLocationTrackingWithLowestAccuracy();
             },
           );
+
+      print('✅ Location tracking restarted with lower accuracy');
     } catch (e) {
-      print('Error restarting location tracking: $e');
+      print('❌ Error restarting location tracking: $e');
+    }
+  }
+
+  static Future<void> _restartLocationTrackingWithLowestAccuracy() async {
+    try {
+      print('🔄 Restarting location tracking with lowest accuracy...');
+      await stopLocationTracking();
+
+      // Wait a moment before restarting
+      await Future.delayed(Duration(milliseconds: 1000));
+
+      _positionStream =
+          Geolocator.getPositionStream(
+            locationSettings: LocationSettings(
+              accuracy: LocationAccuracy
+                  .lowest, // Use lowest accuracy as final fallback
+              distanceFilter:
+                  AppConfig.locationAccuracyThreshold.toInt() *
+                  3, // Even larger distance filter
+              timeLimit: Duration(seconds: 8), // Even shorter timeout
+            ),
+          ).listen(
+            (Position position) {
+              _currentPosition = position;
+              _locationController.add(position);
+              print(
+                '📍 Lowest accuracy location update: ${position.latitude}, ${position.longitude} (accuracy: ${position.accuracy}m)',
+              );
+            },
+            onError: (error) {
+              print('❌ Location tracking error (lowest accuracy): $error');
+              print('❌ All location tracking methods have failed');
+            },
+          );
+
+      print('✅ Location tracking restarted with lowest accuracy');
+    } catch (e) {
+      print('❌ Error restarting location tracking with lowest accuracy: $e');
     }
   }
 
@@ -204,5 +287,3 @@ class LocationService {
     await _locationController.close();
   }
 }
-
-
