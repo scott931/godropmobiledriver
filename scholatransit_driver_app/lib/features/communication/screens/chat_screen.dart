@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/models/message_model.dart';
 import '../../../core/models/conversation_model.dart';
 import '../widgets/message_bubble.dart';
@@ -11,10 +12,7 @@ import '../widgets/chat_input_field.dart';
 class ChatScreen extends StatefulWidget {
   final Conversation conversation;
 
-  const ChatScreen({
-    super.key,
-    required this.conversation,
-  });
+  const ChatScreen({super.key, required this.conversation});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -195,7 +193,13 @@ class _ChatScreenState extends State<ChatScreen> {
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/conversations');
+            }
+          },
         ),
         title: Row(
           children: [
@@ -290,7 +294,10 @@ class _ChatScreenState extends State<ChatScreen> {
                     children: [
                       Container(
                         margin: EdgeInsets.symmetric(vertical: 16.h),
-                        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 6.h,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(12.r),
@@ -335,10 +342,7 @@ class _ChatScreenState extends State<ChatScreen> {
       );
     }
 
-    return MessageBubble(
-      message: message,
-      isMe: isMe,
-    );
+    return MessageBubble(message: message, isMe: isMe);
   }
 
   @override

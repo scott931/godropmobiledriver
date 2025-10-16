@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 class NotificationDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> notification;
@@ -23,7 +24,13 @@ class NotificationDetailsScreen extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.black, size: 24.w),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/notifications');
+            }
+          },
         ),
         title: Text(
           'Notification Details',

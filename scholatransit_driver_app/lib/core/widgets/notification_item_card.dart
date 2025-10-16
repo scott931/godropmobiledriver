@@ -16,27 +16,29 @@ class NotificationItemCard extends ConsumerWidget {
     final timestamp = DateTime.parse(notification['timestamp'] as String);
     final type = notification['type'] as String;
 
-    return Container(
-      margin: EdgeInsets.only(bottom: 1.h),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1)),
-      ),
-      child: GestureDetector(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) =>
-                  NotificationDetailsScreen(notification: notification),
-            ),
-          );
-        },
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) =>
+                NotificationDetailsScreen(notification: notification),
+          ),
+        );
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: 1.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            bottom: BorderSide(color: Colors.grey[200]!, width: 1),
+          ),
+        ),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Type Label
+              // Type Label at the top
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(
@@ -52,64 +54,74 @@ class NotificationItemCard extends ConsumerWidget {
                   ),
                 ),
               ),
-              SizedBox(width: 12.w),
+              SizedBox(height: 12.h),
 
-              // Main Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Title
-                    Text(
-                      title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                        height: 1.3,
-                      ),
+              // Main Content Row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Main Content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title
+                        Text(
+                          title,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                            height: 1.3,
+                          ),
+                        ),
+                        SizedBox(height: 4.h),
+
+                        // Description
+                        Text(
+                          body,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.sp,
+                            color: Colors.grey[600],
+                            height: 1.4,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 6.h),
+
+                        // Associated Name (if available)
+                        if (notification['sender_name'] != null)
+                          Text(
+                            notification['sender_name'],
+                            style: GoogleFonts.poppins(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.red[600],
+                            ),
+                          ),
+                      ],
                     ),
-                    SizedBox(height: 4.h),
+                  ),
 
-                    // Description
-                    Text(
-                      body,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12.sp,
-                        color: Colors.grey[600],
-                        height: 1.4,
+                  // Timestamp
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 12.w,
+                        color: Colors.grey[500],
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: 6.h),
-
-                    // Associated Name (if available)
-                    if (notification['sender_name'] != null)
+                      SizedBox(height: 2.h),
                       Text(
-                        notification['sender_name'],
+                        _formatTimestamp(timestamp),
                         style: GoogleFonts.poppins(
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.red[600],
+                          fontSize: 10.sp,
+                          color: Colors.grey[500],
                         ),
                       ),
-                  ],
-                ),
-              ),
-
-              // Timestamp
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Icon(Icons.access_time, size: 12.w, color: Colors.grey[500]),
-                  SizedBox(height: 2.h),
-                  Text(
-                    _formatTimestamp(timestamp),
-                    style: GoogleFonts.poppins(
-                      fontSize: 10.sp,
-                      color: Colors.grey[500],
-                    ),
+                    ],
                   ),
                 ],
               ),

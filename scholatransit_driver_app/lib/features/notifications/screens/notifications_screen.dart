@@ -175,28 +175,28 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final status = alert['status'] as String;
     final severity = alert['severity'] as String;
 
-    return Container(
-      margin: EdgeInsets.only(bottom: 1.h),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1)),
-      ),
-        child: GestureDetector(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => EmergencyAlertDetailsScreen(
-                  alert: alert,
-                ),
-              ),
-            );
-          },
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => EmergencyAlertDetailsScreen(alert: alert),
+          ),
+        );
+      },
+      child: Container(
+        margin: EdgeInsets.only(bottom: 1.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            bottom: BorderSide(color: Colors.grey[200]!, width: 1),
+          ),
+        ),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Type Label
+              // Type Label at the top
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(
@@ -212,96 +212,108 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   ),
                 ),
               ),
-              SizedBox(width: 12.w),
+              SizedBox(height: 12.h),
 
-              // Main Content
-              Expanded(
-                child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-                    // Title
-                    Text(
-                      title,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black87,
-                        height: 1.3,
-                      ),
-                    ),
-            SizedBox(height: 4.h),
-
-                    // Description
-            Text(
-              body,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12.sp,
-                        color: Colors.grey[600],
-                        height: 1.4,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: 6.h),
-
-                    // Status and Severity
-            Row(
-              children: [
-                Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 6.w,
-                            vertical: 2.h,
-                          ),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(status).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(3.r),
-                  ),
-                  child: Text(
-                    status.toUpperCase(),
-                            style: GoogleFonts.poppins(
-                              fontSize: 9.sp,
-                              fontWeight: FontWeight.w600,
-                              color: _getStatusColor(status),
-                            ),
+              // Main Content Row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Main Content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title
+                        Text(
+                          title,
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                            height: 1.3,
                           ),
                         ),
-                        SizedBox(width: 6.w),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 6.w,
-                            vertical: 2.h,
+                        SizedBox(height: 4.h),
+
+                        // Description
+                        Text(
+                          body,
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.sp,
+                            color: Colors.grey[600],
+                            height: 1.4,
                           ),
-                          decoration: BoxDecoration(
-                            color: _getSeverityColor(severity).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(3.r),
-                          ),
-                          child: Text(
-                            severity.toUpperCase(),
-                            style: GoogleFonts.poppins(
-                              fontSize: 9.sp,
-                              fontWeight: FontWeight.w600,
-                              color: _getSeverityColor(severity),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 6.h),
+
+                        // Status and Severity
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6.w,
+                                vertical: 2.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getStatusColor(status).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(3.r),
+                              ),
+                              child: Text(
+                                status.toUpperCase(),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 9.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: _getStatusColor(status),
+                                ),
+                              ),
                             ),
-                          ),
+                            SizedBox(width: 6.w),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6.w,
+                                vertical: 2.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getSeverityColor(
+                                  severity,
+                                ).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(3.r),
+                              ),
+                              child: Text(
+                                severity.toUpperCase(),
+                                style: GoogleFonts.poppins(
+                                  fontSize: 9.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: _getSeverityColor(severity),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
-              // Timestamp
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Icon(Icons.access_time, size: 12.w, color: Colors.grey[500]),
-                  SizedBox(height: 2.h),
-                  Text(
-                    _formatTimestamp(timestamp),
-                    style: GoogleFonts.poppins(
-                      fontSize: 10.sp,
-                      color: Colors.grey[500],
-                    ),
+                  // Timestamp
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 12.w,
+                        color: Colors.grey[500],
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        _formatTimestamp(timestamp),
+                        style: GoogleFonts.poppins(
+                          fontSize: 10.sp,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -311,7 +323,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       ),
     );
   }
-
 
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {

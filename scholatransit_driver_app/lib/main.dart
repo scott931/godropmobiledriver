@@ -9,6 +9,7 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/services/storage_service.dart';
 import 'core/services/api_service.dart';
+import 'core/services/location_health_monitor.dart';
 import 'core/widgets/system_back_button_handler.dart';
 
 void main() async {
@@ -32,6 +33,9 @@ Future<void> _initializeServices() async {
 
   // Initialize API client (Dio, interceptors)
   await ApiService.init();
+
+  // Initialize location health monitoring
+  LocationHealthMonitor.startMonitoring();
 }
 
 Future<void> _requestPermissions() async {

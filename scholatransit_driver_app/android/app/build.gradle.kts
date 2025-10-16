@@ -37,6 +37,14 @@ android {
 
         // Mapbox token
         buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"pk.eyJ1Ijoid2F5bmU5MzEiLCJhIjoiY21maW5qaWpjMGRpazJsc2VnNmRoOW0xaSJ9.S4led3XBi7bpACc4D2KyBQ\"")
+
+        // Graphics and memory optimizations
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+
+        // Increase heap size to handle graphics buffer issues
+        manifestPlaceholders["android:largeHeap"] = "true"
     }
 
     buildTypes {

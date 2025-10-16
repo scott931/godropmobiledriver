@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
+import 'location_error_handler.dart';
 
 /// Stream-first location service with quality scoring and hysteresis
 /// This approach prioritizes responsiveness over strict accuracy
@@ -53,6 +54,7 @@ class StreamFirstLocationService {
       _startHealthCheck();
 
       // Start with relaxed stream settings for immediate response
+      // Reduced timeout to prevent the 5-second timeout issue
       await _startPositionStream();
 
       // Try to get a quick initial position
@@ -105,7 +107,10 @@ class StreamFirstLocationService {
     _positionStreamSubscription =
         Geolocator.getPositionStream(locationSettings: settings).listen(
           _handlePositionUpdate,
-          onError: _handleStreamError,
+          onError: (error) async {
+            await LocationErrorHandler.handleLocationError(error);
+            _handleStreamError(error);
+          },
           cancelOnError: false,
         );
   }
@@ -116,9 +121,10 @@ class StreamFirstLocationService {
 
     try {
       // Try quick position with relaxed settings
+      // Reduced timeout to prevent the 5-second timeout issue
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.low,
-        timeLimit: Duration(seconds: 8),
+        timeLimit: Duration(seconds: 3), // Reduced from 8 to 3 seconds
       );
 
       _updatePosition(position);
@@ -171,6 +177,8 @@ class StreamFirstLocationService {
 
     if (shouldAccept) {
       _updatePosition(position);
+      // Reset error tracking on successful position update
+      LocationErrorHandler.resetErrorTracking();
     } else {
       debugPrint('⚠️ Position rejected by quality score');
     }
