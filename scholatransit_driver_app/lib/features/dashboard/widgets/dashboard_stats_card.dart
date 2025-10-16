@@ -41,14 +41,10 @@ class DashboardStatsCard extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.all(12.w),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: Colors.black,
                     borderRadius: BorderRadius.circular(12.r),
                   ),
-                  child: Icon(icon, color: color, size: 24.w),
+                  child: Icon(icon, color: Colors.white, size: 24.w),
                 ),
                 const Spacer(),
                 Container(
@@ -89,5 +85,3 @@ class DashboardStatsCard extends StatelessWidget {
     );
   }
 }
-
-

@@ -12,6 +12,9 @@ import '../../features/trips/screens/trip_details_screen.dart';
 import '../../features/students/screens/students_screen.dart';
 import '../../features/students/screens/qr_scanner_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
+import '../../features/notifications/screens/alert_details_screen.dart';
+import '../../features/communication/screens/conversations_screen.dart';
+import '../../features/communication/screens/chat_screen.dart';
 import '../../features/profile/screens/driver_profile_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/emergency/screens/emergency_screen.dart';
@@ -94,6 +97,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const NotificationsScreen(),
           ),
           GoRoute(
+            path: '/notifications/alert-details',
+            name: 'alert-details',
+            builder: (context, state) {
+              final alertData = state.extra as Map<String, dynamic>;
+              return AlertDetailsScreen(alertData: alertData);
+            },
+          ),
+          GoRoute(
+            path: '/conversations',
+            name: 'conversations',
+            builder: (context, state) => const ConversationsScreen(),
+          ),
+          GoRoute(
+            path: '/conversations/chat/:conversationId',
+            name: 'chat',
+            builder: (context, state) {
+              final conversationData = state.extra as Map<String, dynamic>;
+              return ChatScreen(conversation: conversationData['conversation']);
+            },
+          ),
+          GoRoute(
             path: '/emergency',
             name: 'emergency',
             builder: (context, state) => const EmergencyScreen(),
@@ -141,7 +165,7 @@ class MainShell extends ConsumerWidget {
     if (location.startsWith('/trips')) return 1;
     if (location.startsWith('/students')) return 2;
     if (location.startsWith('/map')) return 3;
-    if (location.startsWith('/notifications')) return 4;
+    if (location.startsWith('/conversations')) return 4;
     return 0;
   }
 
@@ -160,7 +184,7 @@ class MainShell extends ConsumerWidget {
         context.go('/map');
         break;
       case 4:
-        context.go('/notifications');
+        context.go('/conversations');
         break;
     }
   }

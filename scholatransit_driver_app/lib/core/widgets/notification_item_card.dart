@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../providers/notification_provider.dart';
-import '../theme/app_theme.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../features/notifications/screens/notification_details_screen.dart';
 
 class NotificationItemCard extends ConsumerWidget {
   final Map<String, dynamic> notification;
@@ -11,110 +11,154 @@ class NotificationItemCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isRead = notification['isRead'] as bool;
     final title = notification['title'] as String;
     final body = notification['body'] as String;
     final timestamp = DateTime.parse(notification['timestamp'] as String);
     final type = notification['type'] as String;
 
     return Container(
-      margin: EdgeInsets.only(bottom: 12.h),
+      margin: EdgeInsets.only(bottom: 1.h),
       decoration: BoxDecoration(
-        color: isRead ? Colors.white : const Color(0xFFF0F9FF),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: isRead ? const Color(0xFFE5E7EB) : const Color(0xFF3B82F6),
-          width: isRead ? 1 : 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1)),
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.all(16.w),
-        leading: Container(
-          padding: EdgeInsets.all(8.w),
-          decoration: BoxDecoration(
-            color: _getTypeColor(type).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8.r),
-          ),
-          child: Icon(
-            _getTypeIcon(type),
-            color: _getTypeColor(type),
-            size: 20.w,
-          ),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 16.sp,
-            fontWeight: isRead ? FontWeight.w500 : FontWeight.bold,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 4.h),
-            Text(
-              body,
-              style: TextStyle(fontSize: 14.sp, color: AppTheme.textSecondary),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) =>
+                  NotificationDetailsScreen(notification: notification),
             ),
-            SizedBox(height: 8.h),
-            Text(
-              _formatTimestamp(timestamp),
-              style: TextStyle(fontSize: 12.sp, color: AppTheme.textSecondary),
-            ),
-          ],
-        ),
-        trailing: isRead
-            ? null
-            : Container(
-                width: 8.w,
-                height: 8.w,
+          );
+        },
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Type Label
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6),
+                  color: _getTypeColor(type),
                   borderRadius: BorderRadius.circular(4.r),
                 ),
+                child: Text(
+                  _getTypeLabel(type),
+                  style: GoogleFonts.poppins(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-        onTap: () {
-          if (!isRead) {
-            ref
-                .read(notificationProvider.notifier)
-                .markAsRead(notification['id']);
-          }
-        },
+              SizedBox(width: 12.w),
+
+              // Main Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        height: 1.3,
+                      ),
+                    ),
+                    SizedBox(height: 4.h),
+
+                    // Description
+                    Text(
+                      body,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12.sp,
+                        color: Colors.grey[600],
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 6.h),
+
+                    // Associated Name (if available)
+                    if (notification['sender_name'] != null)
+                      Text(
+                        notification['sender_name'],
+                        style: GoogleFonts.poppins(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.red[600],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // Timestamp
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Icon(Icons.access_time, size: 12.w, color: Colors.grey[500]),
+                  SizedBox(height: 2.h),
+                  Text(
+                    _formatTimestamp(timestamp),
+                    style: GoogleFonts.poppins(
+                      fontSize: 10.sp,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Color _getTypeColor(String type) {
-    switch (type) {
+    switch (type.toLowerCase()) {
       case 'emergency':
         return Colors.red;
       case 'trip':
         return Colors.blue;
       case 'student':
         return Colors.green;
+      case 'message':
+        return Colors.orange;
+      case 'comment':
+        return Colors.purple;
+      case 'connect':
+        return Colors.blue;
+      case 'joined':
+        return Colors.green;
       default:
         return Colors.grey;
     }
   }
 
-  IconData _getTypeIcon(String type) {
-    switch (type) {
+  String _getTypeLabel(String type) {
+    switch (type.toLowerCase()) {
       case 'emergency':
-        return Icons.warning;
+        return 'Emergency';
       case 'trip':
-        return Icons.directions_bus;
+        return 'Trip';
       case 'student':
-        return Icons.school;
+        return 'Student';
+      case 'message':
+        return 'Message';
+      case 'comment':
+        return 'Comment';
+      case 'connect':
+        return 'Connect';
+      case 'joined':
+        return 'Joined New User';
       default:
-        return Icons.notifications;
+        return 'Notification';
     }
   }
 
@@ -128,8 +172,34 @@ class NotificationItemCard extends ConsumerWidget {
       return '${difference.inMinutes}m ago';
     } else if (difference.inHours < 24) {
       return '${difference.inHours}h ago';
-    } else {
+    } else if (difference.inDays < 7) {
       return '${difference.inDays}d ago';
+    } else {
+      // Format as "24 Nov 2018 at 9:30 AM" like in the design
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      final day = timestamp.day;
+      final month = months[timestamp.month - 1];
+      final year = timestamp.year;
+      final hour = timestamp.hour;
+      final minute = timestamp.minute;
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+      final minuteStr = minute.toString().padLeft(2, '0');
+
+      return '$day $month $year at $displayHour:$minuteStr $period';
     }
   }
 }

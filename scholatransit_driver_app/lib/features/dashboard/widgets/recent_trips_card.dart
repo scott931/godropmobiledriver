@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/models/trip_model.dart';
 import '../../../core/theme/app_theme.dart';
@@ -13,31 +14,51 @@ class RecentTripsCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tripState = ref.watch(tripProvider);
 
-    return Card(
-      elevation: 4,
-      shadowColor: Colors.black.withOpacity(0.1),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Padding(
-        padding: EdgeInsets.all(16.w),
+        padding: EdgeInsets.all(24.w),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
+                Container(
+                  width: 4.w,
+                  height: 24.h,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(2.r),
+                  ),
+                ),
+                SizedBox(width: 12.w),
                 Text(
                   'Recent Trips',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  style: GoogleFonts.poppins(
+                    fontSize: 20.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
                 ),
                 const Spacer(),
                 TextButton(
                   onPressed: () => context.go('/trips'),
                   child: Text(
-                    'View All',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
+                    'See all',
+                    style: GoogleFonts.poppins(
+                      color: Colors.black,
                       fontWeight: FontWeight.w600,
+                      fontSize: 14.sp,
                     ),
                   ),
                 ),
@@ -67,24 +88,25 @@ class _TripItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: EdgeInsets.only(bottom: 12.h),
-      padding: EdgeInsets.all(12.w),
+      padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
-        color: AppTheme.backgroundColor,
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: AppTheme.borderColor, width: 1),
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.grey[200]!, width: 1),
       ),
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(8.w),
+            width: 40.w,
+            height: 40.w,
             decoration: BoxDecoration(
               color: _getStatusColor().withOpacity(0.1),
-              borderRadius: BorderRadius.circular(6.r),
+              borderRadius: BorderRadius.circular(8.r),
             ),
             child: Icon(
               Icons.directions_bus,
               color: _getStatusColor(),
-              size: 16.w,
+              size: 20.w,
             ),
           ),
           SizedBox(width: 12.w),
@@ -94,16 +116,19 @@ class _TripItem extends StatelessWidget {
               children: [
                 Text(
                   trip.tripId,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: GoogleFonts.poppins(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
                 ),
-                SizedBox(height: 2.h),
+                SizedBox(height: 4.h),
                 Text(
                   _getStatusText(),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: _getStatusColor(),
-                    fontWeight: FontWeight.w500,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14.sp,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
@@ -114,23 +139,19 @@ class _TripItem extends StatelessWidget {
             children: [
               Text(
                 _formatTime(trip.scheduledStart),
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
-              ),
-              SizedBox(height: 2.h),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                decoration: BoxDecoration(
-                  color: _getStatusColor().withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4.r),
+                style: GoogleFonts.poppins(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black,
                 ),
-                child: Text(
-                  _getStatusBadge(),
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: _getStatusColor(),
-                    fontWeight: FontWeight.bold,
-                  ),
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                '4 hrs Ago',
+                style: GoogleFonts.poppins(
+                  fontSize: 12.sp,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],
@@ -170,21 +191,6 @@ class _TripItem extends StatelessWidget {
     }
   }
 
-  String _getStatusBadge() {
-    switch (trip.status) {
-      case TripStatus.pending:
-        return 'PENDING';
-      case TripStatus.inProgress:
-        return 'ACTIVE';
-      case TripStatus.completed:
-        return 'DONE';
-      case TripStatus.cancelled:
-        return 'CANCELLED';
-      case TripStatus.delayed:
-        return 'DELAYED';
-    }
-  }
-
   String _formatTime(DateTime time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
@@ -200,21 +206,25 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.directions_bus_outlined,
             size: 48.w,
-            color: AppTheme.textTertiary,
+            color: Colors.grey[400],
           ),
           SizedBox(height: 16.h),
           Text(
             'No trips yet',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
+            style: GoogleFonts.poppins(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[700],
+            ),
           ),
           SizedBox(height: 8.h),
           Text(
             'Your recent trips will appear here',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textTertiary),
+            style: GoogleFonts.poppins(
+              fontSize: 14.sp,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w400,
+            ),
             textAlign: TextAlign.center,
           ),
         ],
@@ -222,5 +232,3 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
-
-

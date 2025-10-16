@@ -277,6 +277,19 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
   void clearAllNotifications() {
     state = state.copyWith(notifications: [], unreadCount: 0);
   }
+
+  void dismissNotification(int notificationId) {
+    final updatedNotifications = state.notifications
+        .where((notification) => notification['id'] != notificationId)
+        .toList();
+
+    final unreadCount = updatedNotifications.where((n) => !n['isRead']).length;
+
+    state = state.copyWith(
+      notifications: updatedNotifications,
+      unreadCount: unreadCount,
+    );
+  }
 }
 
 final notificationProvider =

@@ -32,7 +32,7 @@ class QuickActionsCard extends StatelessWidget {
                   width: 4.w,
                   height: 24.h,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF667EEA),
+                    color: Colors.black,
                     borderRadius: BorderRadius.circular(2.r),
                   ),
                 ),
@@ -119,31 +119,37 @@ class _QuickActionButton extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.symmetric(vertical: 20.h, horizontal: 16.w),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: Colors.grey[50],
           borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: color.withOpacity(0.2), width: 1),
+          border: Border.all(color: Colors.grey[200]!, width: 1),
         ),
         child: Column(
           children: [
             Container(
               padding: EdgeInsets.all(12.w),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: Colors.black,
                 borderRadius: BorderRadius.circular(12.r),
               ),
-              child: Icon(icon, color: color, size: 24.w),
+              child: Icon(icon, color: Colors.white, size: 24.w),
             ),
             SizedBox(height: 12.h),
             Text(
               label,
               style: GoogleFonts.poppins(
                 fontSize: 14.sp,
-                color: color,
+                color: Colors.black,
                 fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              'Quick access to $label',
+              style: GoogleFonts.poppins(
+                fontSize: 12.sp,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w400,
               ),
               textAlign: TextAlign.center,
             ),
@@ -153,5 +159,3 @@ class _QuickActionButton extends StatelessWidget {
     );
   }
 }
-
-

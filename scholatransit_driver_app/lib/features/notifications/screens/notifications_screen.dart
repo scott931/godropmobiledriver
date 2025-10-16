@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/notification_provider.dart';
 import '../../../core/providers/emergency_provider.dart';
 import '../../../core/widgets/notification_item_card.dart';
-import '../../../core/theme/app_theme.dart';
+import 'emergency_alert_details_screen.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -151,7 +151,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
 
     return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+      padding: EdgeInsets.zero,
       itemCount: allItems.length,
       itemBuilder: (context, index) {
         final item = allItems[index];
@@ -169,7 +169,6 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     EmergencyState emergencyState,
   ) {
     final alert = alertData['alertData'] as Map<String, dynamic>;
-    final isRead = alertData['isRead'] as bool;
     final title = alertData['title'] as String;
     final body = alertData['body'] as String;
     final timestamp = DateTime.parse(alertData['timestamp'] as String);
@@ -177,132 +176,142 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final severity = alert['severity'] as String;
 
     return Container(
-      margin: EdgeInsets.only(bottom: 12.h),
+      margin: EdgeInsets.only(bottom: 1.h),
       decoration: BoxDecoration(
-        color: isRead ? Colors.white : const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-          color: isRead ? const Color(0xFFE5E7EB) : _getSeverityColor(severity),
-          width: isRead ? 1 : 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Colors.grey[200]!, width: 1)),
       ),
-      child: ListTile(
-        contentPadding: EdgeInsets.all(16.w),
-        leading: Container(
-          padding: EdgeInsets.all(8.w),
-          decoration: BoxDecoration(
-            color: _getSeverityColor(severity).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8.r),
-          ),
-          child: Icon(
-            Icons.warning,
-            color: _getSeverityColor(severity),
-            size: 20.w,
-          ),
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 16.sp,
-            fontWeight: isRead ? FontWeight.w500 : FontWeight.bold,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 4.h),
-            Text(
-              body,
-              style: TextStyle(fontSize: 14.sp, color: AppTheme.textSecondary),
-            ),
-            SizedBox(height: 8.h),
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(status).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(
-                      color: _getStatusColor(status).withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    status.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10.sp,
-                      fontWeight: FontWeight.bold,
-                      color: _getStatusColor(status),
-                    ),
-                  ),
+        child: GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => EmergencyAlertDetailsScreen(
+                  alert: alert,
                 ),
-                SizedBox(width: 8.w),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                  decoration: BoxDecoration(
-                    color: _getSeverityColor(severity).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(
-                      color: _getSeverityColor(severity).withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    severity.toUpperCase(),
-                    style: TextStyle(
-                      fontSize: 10.sp,
-                      fontWeight: FontWeight.bold,
-                      color: _getSeverityColor(severity),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  _formatTimestamp(timestamp),
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!isRead)
+              ),
+            );
+          },
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Type Label
               Container(
-                width: 8.w,
-                height: 8.w,
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(
                   color: _getSeverityColor(severity),
                   borderRadius: BorderRadius.circular(4.r),
                 ),
+                child: Text(
+                  'Emergency',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
               ),
-            SizedBox(width: 8.w),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: AppTheme.textSecondary,
-              size: 16.w,
-            ),
-          ],
+              SizedBox(width: 12.w),
+
+              // Main Content
+              Expanded(
+                child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+                    // Title
+                    Text(
+                      title,
+                      style: GoogleFonts.poppins(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        height: 1.3,
+                      ),
+                    ),
+            SizedBox(height: 4.h),
+
+                    // Description
+            Text(
+              body,
+                      style: GoogleFonts.poppins(
+                        fontSize: 12.sp,
+                        color: Colors.grey[600],
+                        height: 1.4,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 6.h),
+
+                    // Status and Severity
+            Row(
+              children: [
+                Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 6.w,
+                            vertical: 2.h,
+                          ),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(status).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(3.r),
+                  ),
+                  child: Text(
+                    status.toUpperCase(),
+                            style: GoogleFonts.poppins(
+                              fontSize: 9.sp,
+                              fontWeight: FontWeight.w600,
+                              color: _getStatusColor(status),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 6.w),
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 6.w,
+                            vertical: 2.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getSeverityColor(severity).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(3.r),
+                          ),
+                          child: Text(
+                            severity.toUpperCase(),
+                            style: GoogleFonts.poppins(
+                              fontSize: 9.sp,
+                              fontWeight: FontWeight.w600,
+                              color: _getSeverityColor(severity),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Timestamp
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Icon(Icons.access_time, size: 12.w, color: Colors.grey[500]),
+                  SizedBox(height: 2.h),
+                  Text(
+                    _formatTimestamp(timestamp),
+                    style: GoogleFonts.poppins(
+                      fontSize: 10.sp,
+                      color: Colors.grey[500],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        onTap: () {
-          _showAlertDetails(alert);
-        },
       ),
     );
   }
+
 
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {
@@ -342,148 +351,35 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       return '${difference.inMinutes}m ago';
     } else if (difference.inHours < 24) {
       return '${difference.inHours}h ago';
-    } else {
+    } else if (difference.inDays < 7) {
       return '${difference.inDays}d ago';
+    } else {
+      // Format as "24 Nov 2018 at 9:30 AM" like in the design
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      final day = timestamp.day;
+      final month = months[timestamp.month - 1];
+      final year = timestamp.year;
+      final hour = timestamp.hour;
+      final minute = timestamp.minute;
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+      final minuteStr = minute.toString().padLeft(2, '0');
+
+      return '$day $month $year at $displayHour:$minuteStr $period';
     }
-  }
-
-  void _showAlertDetails(Map<String, dynamic> alert) {
-    // Debug: Print alert data to understand the structure
-    print('🚨 DEBUG: Alert details data: $alert');
-    print('🚨 DEBUG: Alert keys: ${alert.keys.toList()}');
-    print('🚨 DEBUG: Status: ${alert['status']}');
-    print('🚨 DEBUG: Severity: ${alert['severity']}');
-    print('🚨 DEBUG: Emergency Type: ${alert['emergency_type']}');
-    print('🚨 DEBUG: Address: ${alert['address']}');
-    print('🚨 DEBUG: Vehicle: ${alert['vehicle']}');
-    print('🚨 DEBUG: Route: ${alert['route']}');
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20.r),
-        ),
-        title: Row(
-          children: [
-            Icon(
-              Icons.warning,
-              color: _getSeverityColor(alert['severity'] ?? ''),
-              size: 24.w,
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Text(
-                alert['title'] ?? 'Emergency Alert',
-                style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                alert['description'] ?? 'No description available',
-                style: TextStyle(fontSize: 14.sp),
-              ),
-              SizedBox(height: 16.h),
-              _buildDetailRow(
-                'Status',
-                alert['status_display'] ?? alert['status'] ?? 'Unknown',
-              ),
-              _buildDetailRow(
-                'Severity',
-                alert['severity_display'] ?? alert['severity'] ?? 'Unknown',
-              ),
-              _buildDetailRow(
-                'Type',
-                alert['emergency_type_display'] ??
-                    alert['emergency_type'] ??
-                    'Unknown',
-              ),
-              _buildDetailRow(
-                'Location',
-                alert['address']?.toString() ?? 'Not specified',
-              ),
-              _buildDetailRow(
-                'Affected Students',
-                alert['affected_students_count']?.toString() ?? '0',
-              ),
-              _buildDetailRow(
-                'Estimated Delay',
-                alert['estimated_delay_minutes'] != null
-                    ? '${alert['estimated_delay_minutes']} minutes'
-                    : 'Not specified',
-              ),
-              _buildDetailRow(
-                'Reported At',
-                alert['reported_at'] != null
-                    ? _formatTimestamp(DateTime.parse(alert['reported_at']))
-                    : 'Not specified',
-              ),
-              _buildDetailRow(
-                'Estimated Resolution',
-                alert['estimated_resolution'] != null
-                    ? _formatTimestamp(
-                        DateTime.parse(alert['estimated_resolution']),
-                      )
-                    : 'Not specified',
-              ),
-              _buildDetailRow(
-                'Vehicle',
-                alert['vehicle'] != null
-                    ? (alert['vehicle']['name'] ??
-                          'Vehicle ${alert['vehicle']['id']}')
-                    : 'Not specified',
-              ),
-              _buildDetailRow(
-                'Route',
-                alert['route'] != null
-                    ? (alert['route']['name'] ??
-                          'Route ${alert['route']['id']}')
-                    : 'Not specified',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8.h),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120.w,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(fontSize: 12.sp, color: AppTheme.textPrimary),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

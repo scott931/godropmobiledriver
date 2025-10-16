@@ -3,7 +3,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/models/trip_model.dart';
-import '../../../core/theme/app_theme.dart';
 
 class CurrentTripCard extends StatelessWidget {
   final Trip trip;
@@ -14,15 +13,11 @@ class CurrentTripCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
+        color: Colors.black,
         borderRadius: BorderRadius.circular(20.r),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667EEA).withOpacity(0.3),
+            color: Colors.black.withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -133,18 +128,18 @@ class CurrentTripCard extends StatelessWidget {
                     ),
                     child: ElevatedButton.icon(
                       onPressed: () => context.go('/map'),
-                      icon: const Icon(Icons.map, color: Color(0xFF667EEA)),
+                      icon: const Icon(Icons.map, color: Colors.black),
                       label: Text(
                         'View Map',
                         style: GoogleFonts.poppins(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w600,
-                          color: const Color(0xFF667EEA),
+                          color: Colors.black,
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF667EEA),
+                        foregroundColor: Colors.black,
                         padding: EdgeInsets.symmetric(vertical: 14.h),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12.r),

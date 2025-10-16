@@ -78,6 +78,9 @@ class AppConfig {
   static const String createEmergencyAlertEndpoint = '/emergency/alerts/';
   static const String emergencyUpdatesEndpoint = '/emergency/alerts/';
 
+  // Communication Endpoints
+  static const String conversationsEndpoint = '/communication/conversations/';
+
   // App Configuration
   static const String appName = 'Go Drop';
   static const String appVersion = '1.0.0';

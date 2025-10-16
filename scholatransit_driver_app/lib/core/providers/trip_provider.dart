@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/trip_model.dart';
 import '../models/student_model.dart';
-import '../models/eta_model.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/eta_service.dart';
@@ -489,6 +488,108 @@ class TripNotifier extends StateNotifier<TripState> {
     }
   }
 
+  /// Get the number of students for a specific trip
+  Future<int> getTripStudentCount(int tripId) async {
+    try {
+      // Find the trip to get its string tripId
+      final trip = state.trips.firstWhere((t) => t.id == tripId);
+
+      // Try the trip-specific students endpoint first
+      String endpoint =
+          '${AppConfig.tripDetailsEndpoint}${trip.tripId}/students/';
+      print(
+        '🔍 DEBUG: Getting student count for trip ${trip.tripId} from endpoint: $endpoint',
+      );
+
+      var response = await ApiService.get<Map<String, dynamic>>(endpoint);
+
+      // If the trip-specific endpoint fails (404), try the general students endpoint
+      if (!response.success && response.error?.contains('404') == true) {
+        print(
+          '⚠️ DEBUG: Trip-specific students endpoint not found, trying general students endpoint',
+        );
+        endpoint = '${AppConfig.studentsEndpoint}?trip_id=${trip.tripId}';
+        print('🔍 DEBUG: Trying general students endpoint: $endpoint');
+
+        response = await ApiService.get<Map<String, dynamic>>(endpoint);
+      }
+
+      if (response.success && response.data != null) {
+        final data = response.data!;
+        final studentsList =
+            (data['results'] as List?)
+                ?.map((student) => Student.fromJson(student))
+                .toList() ??
+            [];
+
+        print(
+          '✅ DEBUG: Found ${studentsList.length} students for trip ${trip.tripId}',
+        );
+        return studentsList.length;
+      } else {
+        print('❌ DEBUG: Failed to get student count - ${response.error}');
+        return 0;
+      }
+    } catch (e) {
+      print('💥 DEBUG: Exception getting student count: $e');
+      return 0;
+    }
+  }
+
+  /// Get the total number of students across all active trips (fleet count)
+  Future<int> getFleetStudentCount() async {
+    try {
+      int totalStudents = 0;
+
+      // Get all active trips
+      final activeTrips = state.trips.where((trip) => trip.isActive).toList();
+
+      print(
+        '🔍 DEBUG: Getting fleet student count for ${activeTrips.length} active trips',
+      );
+
+      // For each active trip, get the student count
+      for (final trip in activeTrips) {
+        final studentCount = await getTripStudentCount(trip.id);
+        totalStudents += studentCount;
+        print('🔍 DEBUG: Trip ${trip.tripId} has $studentCount students');
+      }
+
+      print('✅ DEBUG: Total fleet student count: $totalStudents');
+      return totalStudents;
+    } catch (e) {
+      print('💥 DEBUG: Exception getting fleet student count: $e');
+      return 0;
+    }
+  }
+
+  /// Get student count for multiple trips (fleet overview)
+  Future<Map<String, int>> getFleetStudentCounts() async {
+    try {
+      Map<String, int> tripStudentCounts = {};
+
+      // Get all active trips
+      final activeTrips = state.trips.where((trip) => trip.isActive).toList();
+
+      print(
+        '🔍 DEBUG: Getting student counts for ${activeTrips.length} active trips',
+      );
+
+      // For each active trip, get the student count
+      for (final trip in activeTrips) {
+        final studentCount = await getTripStudentCount(trip.id);
+        tripStudentCounts[trip.tripId] = studentCount;
+        print('🔍 DEBUG: Trip ${trip.tripId} has $studentCount students');
+      }
+
+      print('✅ DEBUG: Fleet student counts: $tripStudentCounts');
+      return tripStudentCounts;
+    } catch (e) {
+      print('💥 DEBUG: Exception getting fleet student counts: $e');
+      return {};
+    }
+  }
+
   Future<bool> updateStudentStatus(int studentId, StudentStatus status) async {
     try {
       final response = await ApiService.post<Map<String, dynamic>>(
@@ -809,4 +910,26 @@ final activeTripsProvider = Provider<List<Trip>>((ref) {
 
 final tripStudentsProvider = Provider<List<Student>>((ref) {
   return ref.watch(tripProvider).students;
+});
+
+// Fleet Student Count Providers
+final fleetStudentCountProvider = FutureProvider<int>((ref) async {
+  final tripNotifier = ref.read(tripProvider.notifier);
+  return await tripNotifier.getFleetStudentCount();
+});
+
+final fleetStudentCountsProvider = FutureProvider<Map<String, int>>((
+  ref,
+) async {
+  final tripNotifier = ref.read(tripProvider.notifier);
+  return await tripNotifier.getFleetStudentCounts();
+});
+
+// Trip-specific student count provider
+final tripStudentCountProvider = FutureProvider.family<int, int>((
+  ref,
+  tripId,
+) async {
+  final tripNotifier = ref.read(tripProvider.notifier);
+  return await tripNotifier.getTripStudentCount(tripId);
 });

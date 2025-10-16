@@ -54,9 +54,9 @@ class SimpleBottomNavigation extends StatelessWidget {
                 index: 3,
               ),
               _buildNavItem(
-                icon: Icons.notifications_outlined,
-                activeIcon: Icons.notifications_rounded,
-                label: 'Alerts',
+                icon: Icons.chat_bubble_outline,
+                activeIcon: Icons.chat_bubble,
+                label: 'Conversations',
                 index: 4,
               ),
             ],
