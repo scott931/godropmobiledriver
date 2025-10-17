@@ -14,6 +14,7 @@ class Student {
   final String? address;
   final double? latitude;
   final double? longitude;
+  final int? assignedRoute;
   final StudentStatus status;
   final DateTime? lastSeen;
   final DateTime createdAt;
@@ -33,6 +34,7 @@ class Student {
     this.address,
     this.latitude,
     this.longitude,
+    this.assignedRoute,
     required this.status,
     this.lastSeen,
     required this.createdAt,
@@ -56,6 +58,7 @@ class Student {
       address: json['address'],
       latitude: json['latitude']?.toDouble(),
       longitude: json['longitude']?.toDouble(),
+      assignedRoute: json['assigned_route'],
       status: _parseStudentStatus(json['status']),
       lastSeen: json['last_seen'] != null
           ? DateTime.parse(json['last_seen'])
@@ -80,6 +83,7 @@ class Student {
       'address': address,
       'latitude': latitude,
       'longitude': longitude,
+      'assigned_route': assignedRoute,
       'status': status.name,
       'last_seen': lastSeen?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
@@ -121,6 +125,7 @@ class Student {
     String? address,
     double? latitude,
     double? longitude,
+    int? assignedRoute,
     StudentStatus? status,
     DateTime? lastSeen,
     DateTime? createdAt,
@@ -140,6 +145,7 @@ class Student {
       address: address ?? this.address,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      assignedRoute: assignedRoute ?? this.assignedRoute,
       status: status ?? this.status,
       lastSeen: lastSeen ?? this.lastSeen,
       createdAt: createdAt ?? this.createdAt,

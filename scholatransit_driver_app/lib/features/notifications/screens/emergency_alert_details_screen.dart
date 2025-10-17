@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
 
 class EmergencyAlertDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> alert;
@@ -151,7 +152,7 @@ class EmergencyAlertDetailsScreen extends StatelessWidget {
                       style: GoogleFonts.poppins(
                         fontSize: 18.sp,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: AppTheme.primaryColor,
                       ),
                     ),
                     SizedBox(height: 4.h),

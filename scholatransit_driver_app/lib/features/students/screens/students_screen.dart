@@ -56,6 +56,8 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           ? _NoActiveTripState()
           : tripState.isLoading
           ? const Center(child: CircularProgressIndicator())
+          : tripState.error != null
+          ? _ErrorState(error: tripState.error!)
           : tripState.students.isEmpty
           ? _EmptyState()
           : RefreshIndicator(
@@ -72,16 +74,13 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 itemCount: tripState.students.length,
                 itemBuilder: (context, index) {
                   final student = tripState.students[index];
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: 12.h),
-                    child: StudentCard(
-                      student: student,
-                      onStatusUpdate: (status) {
-                        ref
-                            .read(tripProvider.notifier)
-                            .updateStudentStatus(student.id, status);
-                      },
-                    ),
+                  return StudentCard(
+                    student: student,
+                    onStatusUpdate: (status) {
+                      ref
+                          .read(tripProvider.notifier)
+                          .updateStudentStatus(student.id, status);
+                    },
                   );
                 },
               ),
@@ -153,6 +152,52 @@ class _EmptyState extends StatelessWidget {
               context,
             ).textTheme.bodyMedium?.copyWith(color: AppTheme.textTertiary),
             textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends ConsumerWidget {
+  final String error;
+
+  const _ErrorState({required this.error});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64.w, color: AppTheme.errorColor),
+          SizedBox(height: 16.h),
+          Text(
+            'Error Loading Students',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(color: AppTheme.textSecondary),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            error,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textTertiary),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 16.h),
+          ElevatedButton(
+            onPressed: () {
+              // Retry loading students
+              final tripState = ref.read(tripProvider);
+              if (tripState.currentTrip != null) {
+                ref
+                    .read(tripProvider.notifier)
+                    .loadTripStudents(tripState.currentTrip!.id);
+              }
+            },
+            child: const Text('Retry'),
           ),
         ],
       ),

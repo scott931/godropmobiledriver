@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:geocoding/geocoding.dart' as geocoding;
 import '../../../core/config/app_config.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/models/trip_model.dart';
 import '../../../core/services/routing_service.dart';
@@ -1529,7 +1530,7 @@ class _TripDetailsCardState extends State<_TripDetailsCard> {
                             style: GoogleFonts.poppins(
                               fontSize: 16.sp,
                               fontWeight: FontWeight.w600,
-                              color: Colors.black,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                           SizedBox(height: 2.h),

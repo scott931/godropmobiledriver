@@ -1,3 +1,5 @@
+import 'user_role.dart';
+
 class EmailCompletionResponse {
   final bool success;
   final String message;
@@ -42,8 +44,9 @@ class User {
   final int id;
   final String username;
   final String email;
-  final String userType;
+  final UserRole userType;
   final bool isVerified;
+  final Map<String, dynamic>? profileData;
 
   const User({
     required this.id,
@@ -51,6 +54,7 @@ class User {
     required this.email,
     required this.userType,
     required this.isVerified,
+    this.profileData,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -58,8 +62,9 @@ class User {
       id: json['id'] as int,
       username: json['username'] as String,
       email: json['email'] as String,
-      userType: json['user_type'] as String,
+      userType: UserRole.fromString(json['user_type'] as String),
       isVerified: json['is_verified'] as bool,
+      profileData: json['profile_data'] as Map<String, dynamic>?,
     );
   }
 
@@ -68,10 +73,16 @@ class User {
       'id': id,
       'username': username,
       'email': email,
-      'user_type': userType,
+      'user_type': userType.apiValue,
       'is_verified': isVerified,
+      'profile_data': profileData,
     };
   }
+
+  bool get isDriver => userType == UserRole.driver;
+  bool get isParent => userType == UserRole.parent;
+  bool get isAdmin => userType == UserRole.admin;
+  bool get isSchoolStaff => userType == UserRole.schoolStaff;
 }
 
 class Tokens {

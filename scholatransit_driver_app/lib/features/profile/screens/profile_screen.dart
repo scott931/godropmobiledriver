@@ -159,14 +159,20 @@ class ProfileScreen extends ConsumerWidget {
                             label: 'Email',
                             value: driver.email,
                           ),
-                          if (driver.address != null) ...[
-                            SizedBox(height: 12.h),
-                            _InfoItem(
-                              icon: Icons.location_on,
-                              label: 'Address',
-                              value: driver.address!,
-                            ),
-                          ],
+                          SizedBox(height: 12.h),
+                          _InfoItem(
+                            icon: Icons.location_on,
+                            label: 'Address',
+                            value: driver.address ?? 'Not provided',
+                          ),
+                          SizedBox(height: 12.h),
+                          _InfoItem(
+                            icon: Icons.cake,
+                            label: 'Date of Birth',
+                            value:
+                                driver.dateOfBirth?.toString().split(' ')[0] ??
+                                'Not provided',
+                          ),
                         ],
                       ),
                     ),
@@ -175,75 +181,49 @@ class ProfileScreen extends ConsumerWidget {
                   SizedBox(height: 16.h),
 
                   // Emergency Contact
-                  if (driver.emergencyContact != null) ...[
-                    Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.w),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Emergency Contact',
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(fontWeight: FontWeight.bold),
-                            ),
-                            SizedBox(height: 16.h),
-                            _InfoItem(
-                              icon: Icons.person,
-                              label: 'Contact Name',
-                              value: driver.emergencyContact!,
-                            ),
-                            if (driver.emergencyPhone != null) ...[
-                              SizedBox(height: 12.h),
-                              _InfoItem(
-                                icon: Icons.phone,
-                                label: 'Phone',
-                                value: driver.emergencyPhone!,
-                              ),
-                            ],
-                          ],
-                        ),
+                  Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.w),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Emergency Contact',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 16.h),
+                          _InfoItem(
+                            icon: Icons.person,
+                            label: 'Contact Name',
+                            value: driver.emergencyContact ?? 'Not provided',
+                          ),
+                          SizedBox(height: 12.h),
+                          _InfoItem(
+                            icon: Icons.phone,
+                            label: 'Phone',
+                            value: driver.emergencyPhone ?? 'Not provided',
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 16.h),
-                  ],
+                  ),
+                  SizedBox(height: 16.h),
 
                   // Action Buttons
-                  Column(
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            // TODO: Edit profile
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Edit profile feature coming soon',
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.edit),
-                          label: const Text('Edit Profile'),
-                        ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _showLogoutDialog(context, ref);
+                      },
+                      icon: const Icon(Icons.logout),
+                      label: const Text('Logout'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.errorColor,
+                        foregroundColor: Colors.white,
                       ),
-                      SizedBox(height: 12.h),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            _showLogoutDialog(context, ref);
-                          },
-                          icon: const Icon(Icons.logout),
-                          label: const Text('Logout'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.errorColor,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
 
                   SizedBox(height: 24.h),

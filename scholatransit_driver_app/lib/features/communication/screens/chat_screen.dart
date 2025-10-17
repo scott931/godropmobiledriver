@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/models/message_model.dart';
 import '../../../core/models/conversation_model.dart';
+import '../../../core/services/communication_service.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/voice_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
@@ -22,141 +23,124 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
   final List<Message> _messages = [];
-  bool _isTyping = false;
+  final bool _isTyping = false;
   bool _isRecording = false;
+  bool _isLoading = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
     _loadMessages();
+    _markChatAsRead();
   }
 
-  void _loadMessages() {
-    // Sample messages to match the image
+  Future<void> _loadMessages() async {
     setState(() {
-      _messages.addAll([
-        Message(
-          id: 1,
-          conversationId: widget.conversation.id,
-          senderId: widget.conversation.studentId,
-          senderName: widget.conversation.studentName,
-          senderAvatar: widget.conversation.studentAvatar,
-          content: "Hello!",
-          type: MessageType.text,
-          timestamp: DateTime.now().subtract(const Duration(minutes: 10)),
-        ),
-        Message(
-          id: 2,
-          conversationId: widget.conversation.id,
-          senderId: widget.conversation.studentId,
-          senderName: widget.conversation.studentName,
-          senderAvatar: widget.conversation.studentAvatar,
-          content: "How are you?",
-          type: MessageType.text,
-          timestamp: DateTime.now().subtract(const Duration(minutes: 9)),
-        ),
-        Message(
-          id: 3,
-          conversationId: widget.conversation.id,
-          senderId: 999, // Current user
-          senderName: "You",
-          content: "Good .. Dude , Thanks",
-          type: MessageType.text,
-          timestamp: DateTime.now().subtract(const Duration(minutes: 8)),
-        ),
-        Message(
-          id: 4,
-          conversationId: widget.conversation.id,
-          senderId: widget.conversation.studentId,
-          senderName: widget.conversation.studentName,
-          senderAvatar: widget.conversation.studentAvatar,
-          content: "Please send me the lastest report",
-          type: MessageType.text,
-          timestamp: DateTime.now().subtract(const Duration(minutes: 7)),
-        ),
-        Message(
-          id: 5,
-          conversationId: widget.conversation.id,
-          senderId: widget.conversation.studentId,
-          senderName: widget.conversation.studentName,
-          senderAvatar: widget.conversation.studentAvatar,
-          content: "Ps:Thanks :)",
-          type: MessageType.text,
-          timestamp: DateTime.now().subtract(const Duration(minutes: 6)),
-        ),
-        Message(
-          id: 6,
-          conversationId: widget.conversation.id,
-          senderId: 999, // Current user
-          senderName: "You",
-          content: "", // Voice message
-          type: MessageType.voice,
-          timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-          voiceUrl: "sample_voice_url",
-          voiceDuration: 15,
-        ),
-        Message(
-          id: 7,
-          conversationId: widget.conversation.id,
-          senderId: widget.conversation.studentId,
-          senderName: widget.conversation.studentName,
-          senderAvatar: widget.conversation.studentAvatar,
-          content: "", // Voice message
-          type: MessageType.voice,
-          timestamp: DateTime.now().subtract(const Duration(minutes: 4)),
-          voiceUrl: "sample_voice_url",
-          voiceDuration: 12,
-        ),
-        Message(
-          id: 8,
-          conversationId: widget.conversation.id,
-          senderId: widget.conversation.studentId,
-          senderName: widget.conversation.studentName,
-          senderAvatar: widget.conversation.studentAvatar,
-          content: "Hello dude",
-          type: MessageType.text,
-          timestamp: DateTime.now().subtract(const Duration(minutes: 3)),
-        ),
-      ]);
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      final response = await CommunicationService.getChatDetails(
+        chatId: widget.conversation.id,
+      );
+      if (response.success && response.data != null) {
+        final chatData = response.data!;
+        final messagesList =
+            (chatData['messages'] as List?)
+                ?.map((message) => Message.fromJson(message))
+                .toList() ??
+            [];
+
+        setState(() {
+          _messages.clear();
+          _messages.addAll(messagesList);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _error = response.error ?? 'Failed to load messages';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load messages: $e';
+        _isLoading = false;
+      });
+    }
   }
 
-  void _sendMessage() {
+  Future<void> _markChatAsRead() async {
+    try {
+      await CommunicationService.markChatAsRead(chatId: widget.conversation.id);
+    } catch (e) {
+      // Silently handle read receipt errors
+      print('Failed to mark chat as read: $e');
+    }
+  }
+
+  Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
-    final message = Message(
-      id: _messages.length + 1,
+    final content = _messageController.text.trim();
+    _messageController.clear();
+
+    // Optimistically add message to UI
+    final tempMessage = Message(
+      id: DateTime.now().millisecondsSinceEpoch, // Temporary ID
       conversationId: widget.conversation.id,
       senderId: 999, // Current user
       senderName: "You",
-      content: _messageController.text.trim(),
+      content: content,
       type: MessageType.text,
       timestamp: DateTime.now(),
     );
 
     setState(() {
-      _messages.add(message);
+      _messages.add(tempMessage);
     });
 
-    _messageController.clear();
     _scrollToBottom();
 
-    // Simulate typing indicator
-    _showTypingIndicator();
-  }
+    try {
+      final response = await CommunicationService.sendTextMessage(
+        chatId: widget.conversation.id,
+        content: content,
+      );
 
-  void _showTypingIndicator() {
-    setState(() {
-      _isTyping = true;
-    });
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
+      if (response.success && response.data != null) {
+        // Replace temp message with real message from server
+        final realMessage = Message.fromJson(response.data!);
         setState(() {
-          _isTyping = false;
+          final index = _messages.indexWhere((m) => m.id == tempMessage.id);
+          if (index != -1) {
+            _messages[index] = realMessage;
+          }
         });
+      } else {
+        // Remove temp message on failure
+        setState(() {
+          _messages.removeWhere((m) => m.id == tempMessage.id);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(response.error ?? 'Failed to send message')),
+          );
+        }
       }
-    });
+    } catch (e) {
+      // Remove temp message on error
+      setState(() {
+        _messages.removeWhere((m) => m.id == tempMessage.id);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to send message: $e')));
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -275,50 +259,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-              itemCount: _messages.length + (_isTyping ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index == _messages.length && _isTyping) {
-                  return const TypingIndicator();
-                }
-
-                final message = _messages[index];
-                final isMe = message.senderId == 999;
-
-                // Add date separator for Friday 12, 2023
-                if (index == 6) {
-                  return Column(
-                    children: [
-                      Container(
-                        margin: EdgeInsets.symmetric(vertical: 16.h),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12.w,
-                          vertical: 6.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        child: Text(
-                          'Friday 12, 2023',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12.sp,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ),
-                      _buildMessageBubble(message, isMe),
-                    ],
-                  );
-                }
-
-                return _buildMessageBubble(message, isMe);
-              },
-            ),
-          ),
+          Expanded(child: _buildMessagesList()),
           ChatInputField(
             controller: _messageController,
             onSend: _sendMessage,
@@ -328,6 +269,62 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMessagesList() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.error_outline, size: 48.w, color: Colors.red),
+              SizedBox(height: 16.h),
+              Text(
+                _error!,
+                style: GoogleFonts.poppins(fontSize: 16.sp, color: Colors.red),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16.h),
+              ElevatedButton(
+                onPressed: _loadMessages,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_messages.isEmpty) {
+      return Center(
+        child: Text(
+          'No messages yet',
+          style: GoogleFonts.poppins(fontSize: 16.sp, color: Colors.grey[600]),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      itemCount: _messages.length + (_isTyping ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == _messages.length && _isTyping) {
+          return const TypingIndicator();
+        }
+
+        final message = _messages[index];
+        final isMe = message.senderId == 999;
+
+        return _buildMessageBubble(message, isMe);
+      },
     );
   }
 

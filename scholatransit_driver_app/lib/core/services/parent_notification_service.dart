@@ -1,396 +1,266 @@
 import 'dart:async';
-import '../config/app_config.dart';
-import '../models/eta_model.dart';
-import '../models/trip_model.dart';
-import '../models/student_model.dart';
+import '../models/parent_model.dart';
+import '../models/parent_trip_model.dart';
 import 'api_service.dart';
 
 class ParentNotificationService {
+  static final StreamController<Map<String, dynamic>> _notificationController =
+      StreamController<Map<String, dynamic>>.broadcast();
   static Timer? _notificationTimer;
-  static bool _isActive = false;
-  static Trip? _currentTrip;
-  static List<Student> _studentsOnTrip = [];
 
-  // Notification intervals
-  static const Duration _etaUpdateInterval = Duration(minutes: 5);
+  static Stream<Map<String, dynamic>> get notificationStream =>
+      _notificationController.stream;
 
-  // Callbacks
-  static Function(String)? _onNotificationSent;
-  static Function(String)? _onNotificationError;
-
-  /// Initialize parent notification service
-  static Future<void> init() async {
-    try {
-      print('📱 Parent Notification Service: Initialized successfully');
-    } catch (e) {
-      print('❌ Parent Notification Service: Failed to initialize: $e');
-    }
-  }
-
-  /// Start sending notifications to parents for a trip
-  static Future<bool> startParentNotifications({
-    required Trip trip,
-    required List<Student> students,
-    Function(String)? onNotificationSent,
-    Function(String)? onNotificationError,
+  /// Send child status update notification
+  static Future<ApiResponse<Map<String, dynamic>>> sendChildStatusUpdate({
+    required int parentId,
+    required int childId,
+    required ChildStatus status,
+    String? message,
+    Map<String, dynamic>? additionalData,
   }) async {
-    try {
-      if (_isActive) {
-        print('⚠️ Parent notifications already active');
-        return true;
-      }
-
-      print(
-        '📱 Parent Notification Service: Starting notifications for trip ${trip.tripId}',
-      );
-      print(
-        '📱 Parent Notification Service: Notifying parents of ${students.length} students',
-      );
-
-      _currentTrip = trip;
-      _studentsOnTrip = students;
-      _onNotificationSent = onNotificationSent;
-      _onNotificationError = onNotificationError;
-      _isActive = true;
-
-      // Send initial notification
-      await _sendInitialNotification();
-
-      // Start periodic notifications
-      _startPeriodicNotifications();
-
-      print('✅ Parent Notification Service: Started successfully');
-      return true;
-    } catch (e) {
-      print('❌ Parent Notification Service: Failed to start: $e');
-      _onNotificationError?.call('Failed to start parent notifications: $e');
-      return false;
-    }
+    return ApiService.post<Map<String, dynamic>>(
+      '/parent/notifications/child-status/',
+      data: {
+        'parent_id': parentId,
+        'child_id': childId,
+        'status': status.apiValue,
+        'message': message ?? _getStatusMessage(status),
+        'additional_data': additionalData,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
   }
 
-  /// Stop sending notifications to parents
-  static Future<void> stopParentNotifications() async {
-    try {
-      if (!_isActive) return;
-
-      print('📱 Parent Notification Service: Stopping notifications');
-
-      _notificationTimer?.cancel();
-      _notificationTimer = null;
-      _isActive = false;
-      _currentTrip = null;
-      _studentsOnTrip = [];
-      _onNotificationSent = null;
-      _onNotificationError = null;
-
-      print('✅ Parent Notification Service: Stopped successfully');
-    } catch (e) {
-      print('❌ Parent Notification Service: Error stopping: $e');
-    }
-  }
-
-  /// Send ETA update to parents
-  static Future<bool> sendETAUpdate({
-    required ETAInfo etaInfo,
-    required String studentName,
-    required String parentPhone,
-    required String parentEmail,
+  /// Send trip update notification
+  static Future<ApiResponse<Map<String, dynamic>>> sendTripUpdate({
+    required int parentId,
+    required int tripId,
+    required String updateType,
+    required String message,
+    Map<String, dynamic>? tripData,
   }) async {
-    try {
-      print(
-        '📱 Parent Notification Service: Sending ETA update for $studentName',
-      );
-
-      final notificationData = {
-        'student_name': studentName,
-        'parent_phone': parentPhone,
-        'parent_email': parentEmail,
-        'trip_id': _currentTrip?.tripId,
-        'vehicle_name': _currentTrip?.vehicleName ?? 'School Bus',
-        'route_name': _currentTrip?.routeName ?? 'Route',
-        'eta_info': {
-          'estimated_arrival': etaInfo.estimatedArrival.toIso8601String(),
-          'distance_km': (etaInfo.distance / 1000).toStringAsFixed(1),
-          'time_to_arrival': etaInfo.formattedTimeToArrival,
-          'is_delayed': etaInfo.isDelayed,
-          'delay_reason': etaInfo.delayReason,
-          'current_speed': etaInfo.currentSpeed?.toStringAsFixed(1),
-        },
-        'notification_type': 'eta_update',
-        'priority': etaInfo.isDelayed ? 'high' : 'normal',
-      };
-
-      final response = await ApiService.post<Map<String, dynamic>>(
-        AppConfig.parentNotificationEndpoint,
-        data: notificationData,
-      );
-
-      if (response.success) {
-        print('✅ Parent Notification Service: ETA update sent successfully');
-        _onNotificationSent?.call('ETA update sent to $studentName\'s parents');
-        return true;
-      } else {
-        print(
-          '❌ Parent Notification Service: Failed to send ETA update: ${response.error}',
-        );
-        _onNotificationError?.call(
-          'Failed to send ETA update: ${response.error}',
-        );
-        return false;
-      }
-    } catch (e) {
-      print('❌ Parent Notification Service: Error sending ETA update: $e');
-      _onNotificationError?.call('Error sending ETA update: $e');
-      return false;
-    }
+    return ApiService.post<Map<String, dynamic>>(
+      '/parent/notifications/trip-update/',
+      data: {
+        'parent_id': parentId,
+        'trip_id': tripId,
+        'update_type': updateType,
+        'message': message,
+        'trip_data': tripData,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
   }
 
-  /// Send distance update to parents
-  static Future<bool> sendDistanceUpdate({
-    required double remainingDistance,
-    required double distanceTraveled,
-    required String studentName,
-    required String parentPhone,
-    required String parentEmail,
+  /// Send emergency alert to parent
+  static Future<ApiResponse<Map<String, dynamic>>> sendEmergencyAlert({
+    required int parentId,
+    required String alertType,
+    required String message,
+    required String severity,
+    Map<String, dynamic>? alertData,
   }) async {
-    try {
-      print(
-        '📱 Parent Notification Service: Sending distance update for $studentName',
-      );
-
-      final notificationData = {
-        'student_name': studentName,
-        'parent_phone': parentPhone,
-        'parent_email': parentEmail,
-        'trip_id': _currentTrip?.tripId,
-        'vehicle_name': _currentTrip?.vehicleName ?? 'School Bus',
-        'route_name': _currentTrip?.routeName ?? 'Route',
-        'distance_info': {
-          'remaining_distance_km': (remainingDistance / 1000).toStringAsFixed(
-            1,
-          ),
-          'distance_traveled_km': (distanceTraveled / 1000).toStringAsFixed(1),
-          'progress_percentage': _calculateProgressPercentage(
-            remainingDistance,
-            distanceTraveled,
-          ),
-        },
-        'notification_type': 'distance_update',
-        'priority': 'normal',
-      };
-
-      final response = await ApiService.post<Map<String, dynamic>>(
-        AppConfig.parentNotificationEndpoint,
-        data: notificationData,
-      );
-
-      if (response.success) {
-        print(
-          '✅ Parent Notification Service: Distance update sent successfully',
-        );
-        _onNotificationSent?.call(
-          'Distance update sent to $studentName\'s parents',
-        );
-        return true;
-      } else {
-        print(
-          '❌ Parent Notification Service: Failed to send distance update: ${response.error}',
-        );
-        _onNotificationError?.call(
-          'Failed to send distance update: ${response.error}',
-        );
-        return false;
-      }
-    } catch (e) {
-      print('❌ Parent Notification Service: Error sending distance update: $e');
-      _onNotificationError?.call('Error sending distance update: $e');
-      return false;
-    }
+    return ApiService.post<Map<String, dynamic>>(
+      '/parent/notifications/emergency/',
+      data: {
+        'parent_id': parentId,
+        'alert_type': alertType,
+        'message': message,
+        'severity': severity,
+        'alert_data': alertData,
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
   }
 
-  /// Send arrival notification to parents
-  static Future<bool> sendArrivalNotification({
-    required String studentName,
-    required String parentPhone,
-    required String parentEmail,
-    required String arrivalLocation,
+  /// Send ETA notification
+  static Future<ApiResponse<Map<String, dynamic>>> sendETANotification({
+    required int parentId,
+    required int tripId,
+    required int etaMinutes,
+    required String stopName,
   }) async {
-    try {
-      print(
-        '📱 Parent Notification Service: Sending arrival notification for $studentName',
-      );
-
-      final notificationData = {
-        'student_name': studentName,
-        'parent_phone': parentPhone,
-        'parent_email': parentEmail,
-        'trip_id': _currentTrip?.tripId,
-        'vehicle_name': _currentTrip?.vehicleName ?? 'School Bus',
-        'route_name': _currentTrip?.routeName ?? 'Route',
-        'arrival_info': {
-          'arrival_time': DateTime.now().toIso8601String(),
-          'arrival_location': arrivalLocation,
-          'status': 'arrived',
-        },
-        'notification_type': 'arrival_notification',
-        'priority': 'high',
-      };
-
-      final response = await ApiService.post<Map<String, dynamic>>(
-        AppConfig.parentNotificationEndpoint,
-        data: notificationData,
-      );
-
-      if (response.success) {
-        print(
-          '✅ Parent Notification Service: Arrival notification sent successfully',
-        );
-        _onNotificationSent?.call(
-          'Arrival notification sent to $studentName\'s parents',
-        );
-        return true;
-      } else {
-        print(
-          '❌ Parent Notification Service: Failed to send arrival notification: ${response.error}',
-        );
-        _onNotificationError?.call(
-          'Failed to send arrival notification: ${response.error}',
-        );
-        return false;
-      }
-    } catch (e) {
-      print(
-        '❌ Parent Notification Service: Error sending arrival notification: $e',
-      );
-      _onNotificationError?.call('Error sending arrival notification: $e');
-      return false;
-    }
+    return ApiService.post<Map<String, dynamic>>(
+      '/parent/notifications/eta/',
+      data: {
+        'parent_id': parentId,
+        'trip_id': tripId,
+        'eta_minutes': etaMinutes,
+        'stop_name': stopName,
+        'message': _getETAMessage(etaMinutes, stopName),
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
   }
 
-  /// Send delay notification to parents
-  static Future<bool> sendDelayNotification({
-    required String studentName,
-    required String parentPhone,
-    required String parentEmail,
-    required String delayReason,
-    required int delayMinutes,
+  /// Get parent notifications
+  static Future<ApiResponse<List<Map<String, dynamic>>>>
+  getParentNotifications({
+    int? limit,
+    int? offset,
+    String? type,
+    bool? isRead,
   }) async {
-    try {
-      print(
-        '📱 Parent Notification Service: Sending delay notification for $studentName',
-      );
+    final queryParams = <String, dynamic>{};
+    if (limit != null) queryParams['limit'] = limit;
+    if (offset != null) queryParams['offset'] = offset;
+    if (type != null) queryParams['type'] = type;
+    if (isRead != null) queryParams['is_read'] = isRead;
 
-      final notificationData = {
-        'student_name': studentName,
-        'parent_phone': parentPhone,
-        'parent_email': parentEmail,
-        'trip_id': _currentTrip?.tripId,
-        'vehicle_name': _currentTrip?.vehicleName ?? 'School Bus',
-        'route_name': _currentTrip?.routeName ?? 'Route',
-        'delay_info': {
-          'delay_minutes': delayMinutes,
-          'delay_reason': delayReason,
-          'estimated_new_arrival': DateTime.now()
-              .add(Duration(minutes: delayMinutes))
-              .toIso8601String(),
-          'status': 'delayed',
-        },
-        'notification_type': 'delay_notification',
-        'priority': 'high',
-      };
-
-      final response = await ApiService.post<Map<String, dynamic>>(
-        AppConfig.parentNotificationEndpoint,
-        data: notificationData,
-      );
-
-      if (response.success) {
-        print(
-          '✅ Parent Notification Service: Delay notification sent successfully',
-        );
-        _onNotificationSent?.call(
-          'Delay notification sent to $studentName\'s parents',
-        );
-        return true;
-      } else {
-        print(
-          '❌ Parent Notification Service: Failed to send delay notification: ${response.error}',
-        );
-        _onNotificationError?.call(
-          'Failed to send delay notification: ${response.error}',
-        );
-        return false;
-      }
-    } catch (e) {
-      print(
-        '❌ Parent Notification Service: Error sending delay notification: $e',
-      );
-      _onNotificationError?.call('Error sending delay notification: $e');
-      return false;
-    }
+    return ApiService.get<List<Map<String, dynamic>>>(
+      '/parent/notifications/',
+      queryParameters: queryParams,
+    );
   }
 
-  /// Send initial notification when trip starts
-  static Future<void> _sendInitialNotification() async {
-    try {
-      for (final student in _studentsOnTrip) {
-        final notificationData = {
-          'student_name': student.fullName,
-          'parent_phone': student.parentPhone ?? '',
-          'parent_email': student.parentEmail ?? '',
-          'trip_id': _currentTrip?.tripId,
-          'vehicle_name': _currentTrip?.vehicleName ?? 'School Bus',
-          'route_name': _currentTrip?.routeName ?? 'Route',
-          'trip_info': {
-            'start_time': DateTime.now().toIso8601String(),
-            'start_location': _currentTrip?.startLocation ?? 'School',
-            'end_location': _currentTrip?.endLocation ?? 'Destination',
-            'status': 'started',
-          },
-          'notification_type': 'trip_started',
-          'priority': 'normal',
-        };
-
-        await ApiService.post<Map<String, dynamic>>(
-          AppConfig.parentNotificationEndpoint,
-          data: notificationData,
-        );
-      }
-
-      print('✅ Parent Notification Service: Initial notifications sent');
-    } catch (e) {
-      print(
-        '❌ Parent Notification Service: Error sending initial notifications: $e',
-      );
-    }
+  /// Mark notification as read
+  static Future<ApiResponse<Map<String, dynamic>>> markNotificationAsRead({
+    required int notificationId,
+  }) async {
+    return ApiService.post<Map<String, dynamic>>(
+      '/parent/notifications/$notificationId/read/',
+    );
   }
 
-  /// Start periodic notifications
-  static void _startPeriodicNotifications() {
-    _notificationTimer = Timer.periodic(_etaUpdateInterval, (timer) async {
-      if (!_isActive || _currentTrip == null) {
-        timer.cancel();
-        return;
-      }
+  /// Mark all notifications as read
+  static Future<ApiResponse<Map<String, dynamic>>> markAllNotificationsAsRead({
+    required int parentId,
+  }) async {
+    return ApiService.post<Map<String, dynamic>>(
+      '/parent/notifications/mark-all-read/',
+      data: {'parent_id': parentId},
+    );
+  }
 
-      // This would be called by the ETA service when updates are available
-      // The actual ETA calculation and notification sending would happen here
-      print('📱 Parent Notification Service: Periodic notification check');
+  /// Start real-time notification monitoring
+  static void startNotificationMonitoring(int parentId) {
+    _notificationTimer?.cancel();
+    _notificationTimer = Timer.periodic(const Duration(seconds: 30), (
+      timer,
+    ) async {
+      await _checkForNewNotifications(parentId);
     });
   }
 
-  /// Calculate progress percentage
-  static double _calculateProgressPercentage(
-    double remaining,
-    double traveled,
-  ) {
-    final total = remaining + traveled;
-    if (total == 0) return 0.0;
-    return (traveled / total) * 100;
+  /// Stop real-time notification monitoring
+  static void stopNotificationMonitoring() {
+    _notificationTimer?.cancel();
+    _notificationTimer = null;
   }
 
-  /// Get current notification status
-  static bool get isActive => _isActive;
-  static Trip? get currentTrip => _currentTrip;
-  static List<Student> get studentsOnTrip => _studentsOnTrip;
+  /// Check for new notifications
+  static Future<void> _checkForNewNotifications(int parentId) async {
+    try {
+      final response = await getParentNotifications(limit: 10, isRead: false);
+
+      if (response.success && response.data != null) {
+        for (final notification in response.data!) {
+          _notificationController.add(notification);
+        }
+      }
+    } catch (e) {
+      print('❌ Failed to check for notifications: $e');
+    }
+  }
+
+  /// Get status message for child status
+  static String _getStatusMessage(ChildStatus status) {
+    switch (status) {
+      case ChildStatus.waiting:
+        return 'Your child is waiting for the bus';
+      case ChildStatus.onBus:
+        return 'Your child is now on the bus';
+      case ChildStatus.pickedUp:
+        return 'Your child has been picked up';
+      case ChildStatus.droppedOff:
+        return 'Your child has been dropped off';
+      case ChildStatus.absent:
+        return 'Your child was absent today';
+    }
+  }
+
+  /// Get ETA message
+  static String _getETAMessage(int etaMinutes, String stopName) {
+    if (etaMinutes <= 0) {
+      return 'The bus has arrived at $stopName';
+    } else if (etaMinutes == 1) {
+      return 'The bus will arrive at $stopName in 1 minute';
+    } else if (etaMinutes < 5) {
+      return 'The bus will arrive at $stopName in $etaMinutes minutes';
+    } else {
+      return 'The bus is approximately $etaMinutes minutes away from $stopName';
+    }
+  }
+
+  /// Send delay notification
+  static Future<ApiResponse<Map<String, dynamic>>> sendDelayNotification({
+    required int parentId,
+    required int tripId,
+    required int delayMinutes,
+    required String reason,
+  }) async {
+    return ApiService.post<Map<String, dynamic>>(
+      '/parent/notifications/delay/',
+      data: {
+        'parent_id': parentId,
+        'trip_id': tripId,
+        'delay_minutes': delayMinutes,
+        'reason': reason,
+        'message':
+            'The bus is running $delayMinutes minutes late. Reason: $reason',
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+  }
+
+  /// Send route change notification
+  static Future<ApiResponse<Map<String, dynamic>>> sendRouteChangeNotification({
+    required int parentId,
+    required int tripId,
+    required String oldRoute,
+    required String newRoute,
+    String? reason,
+  }) async {
+    return ApiService.post<Map<String, dynamic>>(
+      '/parent/notifications/route-change/',
+      data: {
+        'parent_id': parentId,
+        'trip_id': tripId,
+        'old_route': oldRoute,
+        'new_route': newRoute,
+        'reason': reason,
+        'message':
+            'Route changed from $oldRoute to $newRoute${reason != null ? '. Reason: $reason' : ''}',
+        'timestamp': DateTime.now().toIso8601String(),
+      },
+    );
+  }
+
+  /// Get notification preferences
+  static Future<ApiResponse<Map<String, dynamic>>> getNotificationPreferences({
+    required int parentId,
+  }) async {
+    return ApiService.get<Map<String, dynamic>>(
+      '/parent/notifications/preferences/$parentId/',
+    );
+  }
+
+  /// Update notification preferences
+  static Future<ApiResponse<Map<String, dynamic>>>
+  updateNotificationPreferences({
+    required int parentId,
+    required Map<String, dynamic> preferences,
+  }) async {
+    return ApiService.put<Map<String, dynamic>>(
+      '/parent/notifications/preferences/$parentId/',
+      data: preferences,
+    );
+  }
+
+  /// Dispose resources
+  static Future<void> dispose() async {
+    _notificationTimer?.cancel();
+    await _notificationController.close();
+  }
 }

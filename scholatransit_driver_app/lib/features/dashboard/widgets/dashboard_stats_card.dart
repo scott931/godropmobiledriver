@@ -67,7 +67,7 @@ class DashboardStatsCard extends StatelessWidget {
               style: GoogleFonts.poppins(
                 fontSize: 28.sp,
                 fontWeight: FontWeight.bold,
-                color: Colors.black,
+                color: AppTheme.primaryColor,
               ),
             ),
             SizedBox(height: 4.h),

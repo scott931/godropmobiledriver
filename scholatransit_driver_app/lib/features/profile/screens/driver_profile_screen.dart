@@ -16,37 +16,6 @@ class DriverProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _addressController = TextEditingController();
-  final _emergencyContactController = TextEditingController();
-  final _emergencyPhoneController = TextEditingController();
-
-  bool _isEditing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Load driver data after the first frame to avoid blocking the UI
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadDriverData();
-    });
-  }
-
-  void _loadDriverData() {
-    final driver = ref.read(authProvider).driver;
-    if (driver != null) {
-      _firstNameController.text = driver.firstName;
-      _lastNameController.text = driver.lastName;
-      _phoneController.text = driver.phone;
-      _addressController.text = driver.address ?? '';
-      _emergencyContactController.text = driver.emergencyContact ?? '';
-      _emergencyPhoneController.text = driver.emergencyPhone ?? '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -135,18 +104,6 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
               await ref.read(authProvider.notifier).loadDriverProfile();
             },
           ),
-          if (!_isEditing)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => setState(() => _isEditing = true),
-            ),
-          if (_isEditing) ...[
-            IconButton(icon: const Icon(Icons.check), onPressed: _saveProfile),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: _cancelEditing,
-            ),
-          ],
         ],
       ),
       body: SingleChildScrollView(
@@ -162,34 +119,13 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
             _buildInfoSection(
               title: 'Personal Information',
               children: [
-                _buildInfoField(
-                  label: 'First Name',
-                  value: _firstNameController.text,
-                  controller: _firstNameController,
-                  enabled: _isEditing,
-                ),
-                _buildInfoField(
-                  label: 'Last Name',
-                  value: _lastNameController.text,
-                  controller: _lastNameController,
-                  enabled: _isEditing,
-                ),
-                _buildInfoField(
-                  label: 'Email',
-                  value: driver.email,
-                  enabled: false, // Email cannot be changed
-                ),
-                _buildInfoField(
-                  label: 'Phone',
-                  value: _phoneController.text,
-                  controller: _phoneController,
-                  enabled: _isEditing,
-                ),
+                _buildInfoField(label: 'First Name', value: driver.firstName),
+                _buildInfoField(label: 'Last Name', value: driver.lastName),
+                _buildInfoField(label: 'Email', value: driver.email),
+                _buildInfoField(label: 'Phone', value: driver.phone),
                 _buildInfoField(
                   label: 'Address',
-                  value: _addressController.text,
-                  controller: _addressController,
-                  enabled: _isEditing,
+                  value: driver.address ?? 'Not provided',
                   maxLines: 2,
                 ),
               ],
@@ -204,14 +140,12 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                 _buildInfoField(
                   label: 'License Number',
                   value: driver.licenseNumber,
-                  enabled: false, // License number cannot be changed
                 ),
                 _buildInfoField(
                   label: 'Date of Birth',
                   value:
                       driver.dateOfBirth?.toString().split(' ')[0] ??
                       'Not provided',
-                  enabled: false,
                 ),
               ],
             ),
@@ -224,15 +158,11 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
               children: [
                 _buildInfoField(
                   label: 'Contact Name',
-                  value: _emergencyContactController.text,
-                  controller: _emergencyContactController,
-                  enabled: _isEditing,
+                  value: driver.emergencyContact ?? 'Not provided',
                 ),
                 _buildInfoField(
                   label: 'Contact Phone',
-                  value: _emergencyPhoneController.text,
-                  controller: _emergencyPhoneController,
-                  enabled: _isEditing,
+                  value: driver.emergencyPhone ?? 'Not provided',
                 ),
               ],
             ),
@@ -240,20 +170,12 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
             SizedBox(height: 24.h),
 
             // Action Buttons
-            if (!_isEditing) ...[
-              _buildActionButton(
-                icon: Icons.security,
-                title: 'Change Password',
-                onTap: () => _showChangePasswordDialog(),
-              ),
-              SizedBox(height: 12.h),
-              _buildActionButton(
-                icon: Icons.logout,
-                title: 'Sign Out',
-                onTap: () => _showLogoutDialog(),
-                isDestructive: true,
-              ),
-            ],
+            _buildActionButton(
+              icon: Icons.logout,
+              title: 'Sign Out',
+              onTap: () => _showLogoutDialog(),
+              isDestructive: true,
+            ),
 
             SizedBox(height: 24.h),
           ],
@@ -300,8 +222,6 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
   Widget _buildInfoField({
     required String label,
     required String value,
-    TextEditingController? controller,
-    bool enabled = true,
     int maxLines = 1,
   }) {
     return Padding(
@@ -317,38 +237,23 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
             ),
           ),
           SizedBox(height: 4.h),
-          if (enabled && controller != null)
-            TextFormField(
-              controller: controller,
-              maxLines: maxLines,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 12.w,
-                  vertical: 8.h,
-                ),
-              ),
-            )
-          else
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-              decoration: BoxDecoration(
-                color: AppTheme.backgroundColor,
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: AppTheme.borderColor),
-              ),
-              child: Text(
-                value.isEmpty ? 'Not provided' : value,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: value.isEmpty
-                      ? AppTheme.textTertiary
-                      : AppTheme.textPrimary,
-                ),
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+            decoration: BoxDecoration(
+              color: AppTheme.backgroundColor,
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: AppTheme.borderColor),
+            ),
+            child: Text(
+              value.isEmpty ? 'Not provided' : value,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: value.isEmpty
+                    ? AppTheme.textTertiary
+                    : AppTheme.textPrimary,
               ),
             ),
+          ),
         ],
       ),
     );
@@ -380,93 +285,6 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
     );
   }
 
-  void _saveProfile() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      final updates = {
-        'first_name': _firstNameController.text,
-        'last_name': _lastNameController.text,
-        'phone': _phoneController.text,
-        'address': _addressController.text,
-        'emergency_contact': _emergencyContactController.text,
-        'emergency_phone': _emergencyPhoneController.text,
-      };
-
-      await ref.read(authProvider.notifier).updateProfile(updates);
-
-      if (mounted) {
-        setState(() => _isEditing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully'),
-            backgroundColor: AppTheme.successColor,
-          ),
-        );
-      }
-    }
-  }
-
-  void _cancelEditing() {
-    _loadDriverData();
-    setState(() => _isEditing = false);
-  }
-
-  void _showChangePasswordDialog() {
-    final currentPasswordController = TextEditingController();
-    final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Change Password'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: currentPasswordController,
-              decoration: const InputDecoration(
-                labelText: 'Current Password',
-                border: OutlineInputBorder(),
-              ),
-              obscureText: true,
-            ),
-            SizedBox(height: 16.h),
-            TextField(
-              controller: newPasswordController,
-              decoration: const InputDecoration(
-                labelText: 'New Password',
-                border: OutlineInputBorder(),
-              ),
-              obscureText: true,
-            ),
-            SizedBox(height: 16.h),
-            TextField(
-              controller: confirmPasswordController,
-              decoration: const InputDecoration(
-                labelText: 'Confirm New Password',
-                border: OutlineInputBorder(),
-              ),
-              obscureText: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => context.pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              // Implement password change logic
-              context.pop();
-            },
-            child: const Text('Change'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -489,17 +307,6 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _phoneController.dispose();
-    _addressController.dispose();
-    _emergencyContactController.dispose();
-    _emergencyPhoneController.dispose();
-    super.dispose();
   }
 }
 
