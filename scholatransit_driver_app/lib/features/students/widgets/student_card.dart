@@ -15,265 +15,127 @@ class StudentCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => context.go('/students/${student.id}'),
       child: Container(
-        margin: EdgeInsets.only(bottom: 16.h),
+        margin: EdgeInsets.only(bottom: 12.h),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16.r),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.white, _getStatusColor().withOpacity(0.05)],
-          ),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.r),
           boxShadow: [
             BoxShadow(
-              color: _getStatusColor().withOpacity(0.1),
+              color: Colors.black.withOpacity(0.08),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16.r),
-          child: Column(
+        child: Padding(
+          padding: EdgeInsets.all(16.w),
+          child: Row(
             children: [
-              // Header Section with Gradient
+              // Simple Avatar
               Container(
-                padding: EdgeInsets.all(20.w),
+                width: 48.w,
+                height: 48.w,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      _getStatusColor().withOpacity(0.1),
-                      _getStatusColor().withOpacity(0.05),
-                    ],
-                  ),
+                  shape: BoxShape.circle,
+                  color: _getStatusColor().withOpacity(0.1),
                 ),
-                child: Row(
-                  children: [
-                    // Enhanced Avatar
-                    Container(
-                      width: 60.w,
-                      height: 60.w,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            _getStatusColor(),
-                            _getStatusColor().withOpacity(0.8),
-                          ],
+                child: student.profileImage != null
+                    ? ClipOval(
+                        child: Image.network(
+                          student.profileImage!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              _buildAvatarFallback(),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _getStatusColor().withOpacity(0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: student.profileImage != null
-                          ? ClipOval(
-                              child: Image.network(
-                                student.profileImage!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _buildAvatarFallback(),
-                              ),
-                            )
-                          : _buildAvatarFallback(),
-                    ),
-                    SizedBox(width: 16.w),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            student.fullName,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.textPrimary,
-                                ),
-                          ),
-                          SizedBox(height: 4.h),
-                          if (student.grade != null)
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 8.w,
-                                vertical: 4.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.primaryColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8.r),
-                              ),
-                              child: Text(
-                                'Grade ${student.grade}',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: AppTheme.primaryColor,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                            ),
-                        ],
+                      )
+                    : _buildAvatarFallback(),
+              ),
+              SizedBox(width: 12.w),
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      student.fullName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
                       ),
                     ),
-                    // Status Badge
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 12.w,
-                        vertical: 6.h,
+                    SizedBox(height: 4.h),
+                    if (student.grade != null)
+                      Text(
+                        'Grade ${student.grade}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(),
-                        borderRadius: BorderRadius.circular(20.r),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _getStatusColor().withOpacity(0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                    if (student.school != null) ...[
+                      SizedBox(height: 2.h),
+                      Text(
+                        student.school!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _getStatusIcon(),
-                            color: Colors.white,
-                            size: 14.sp,
-                          ),
-                          SizedBox(width: 4.w),
-                          Text(
-                            _getStatusText(),
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-
-              // Content Section
-              Padding(
-                padding: EdgeInsets.all(20.w),
-                child: Column(
-                  children: [
-                    // Quick Info Row
+              // Status and Actions
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Status Badge
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 4.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(),
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Text(
+                      _getStatusText(),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  // Action Buttons
+                  if (onStatusUpdate != null && _canUpdateStatus()) ...[
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (student.school != null) ...[
-                          Expanded(
-                            child: _InfoChip(
-                              icon: Icons.school_outlined,
-                              label: 'School',
-                              value: student.school!,
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                          SizedBox(width: 8.w),
-                        ],
-                        if (student.parentName != null)
-                          Expanded(
-                            child: _InfoChip(
-                              icon: Icons.person_outline,
-                              label: 'Parent',
-                              value: student.parentName!,
-                              color: AppTheme.successColor,
-                            ),
-                          ),
+                        _SimpleButton(
+                          onPressed: () => onStatusUpdate!(StudentStatus.onBus),
+                          label: 'On Bus',
+                          color: AppTheme.primaryColor,
+                        ),
+                        SizedBox(width: 8.w),
+                        _SimpleButton(
+                          onPressed: () =>
+                              onStatusUpdate!(StudentStatus.droppedOff),
+                          label: 'Dropped',
+                          color: AppTheme.successColor,
+                        ),
                       ],
                     ),
-
-                    if (student.school != null && student.parentName != null)
-                      SizedBox(height: 12.h),
-
-                    // Last Seen Info
-                    if (student.lastSeen != null) ...[
-                      Container(
-                        padding: EdgeInsets.all(12.w),
-                        decoration: BoxDecoration(
-                          color: AppTheme.backgroundColor,
-                          borderRadius: BorderRadius.circular(12.r),
-                          border: Border.all(
-                            color: AppTheme.borderColor,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              size: 16.sp,
-                              color: AppTheme.textSecondary,
-                            ),
-                            SizedBox(width: 8.w),
-                            Text(
-                              'Last seen: ${_formatDateTime(student.lastSeen!)}',
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: AppTheme.textSecondary,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 16.h),
-                    ],
-
-                    // Action Buttons
-                    if (onStatusUpdate != null && _canUpdateStatus()) ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _ActionButton(
-                              onPressed: () =>
-                                  onStatusUpdate!(StudentStatus.onBus),
-                              icon: Icons.directions_bus,
-                              label: 'On Bus',
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                          SizedBox(width: 12.w),
-                          Expanded(
-                            child: _ActionButton(
-                              onPressed: () =>
-                                  onStatusUpdate!(StudentStatus.droppedOff),
-                              icon: Icons.location_on,
-                              label: 'Dropped Off',
-                              color: AppTheme.successColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ] else if (onStatusUpdate != null) ...[
-                      // View Details Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: _ActionButton(
-                          onPressed: () =>
-                              context.go('/students/${student.id}'),
-                          icon: Icons.visibility,
-                          label: 'View Details',
-                          color: AppTheme.primaryColor,
-                          isOutlined: true,
-                        ),
-                      ),
-                    ],
+                  ] else if (onStatusUpdate != null) ...[
+                    _SimpleButton(
+                      onPressed: () => context.go('/students/${student.id}'),
+                      label: 'View',
+                      color: AppTheme.primaryColor,
+                      isOutlined: true,
+                    ),
                   ],
-                ),
+                ],
               ),
             ],
           ),
@@ -287,9 +149,9 @@ class StudentCard extends StatelessWidget {
       child: Text(
         student.firstName[0].toUpperCase(),
         style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 24.sp,
+          color: _getStatusColor(),
+          fontWeight: FontWeight.w600,
+          fontSize: 18.sp,
         ),
       ),
     );
@@ -307,21 +169,6 @@ class StudentCard extends StatelessWidget {
         return AppTheme.studentDroppedOff;
       case StudentStatus.absent:
         return AppTheme.errorColor;
-    }
-  }
-
-  IconData _getStatusIcon() {
-    switch (student.status) {
-      case StudentStatus.waiting:
-        return Icons.schedule;
-      case StudentStatus.onBus:
-        return Icons.directions_bus;
-      case StudentStatus.pickedUp:
-        return Icons.check_circle;
-      case StudentStatus.droppedOff:
-        return Icons.location_on;
-      case StudentStatus.absent:
-        return Icons.cancel;
     }
   }
 
@@ -344,87 +191,16 @@ class StudentCard extends StatelessWidget {
     return student.status == StudentStatus.waiting ||
         student.status == StudentStatus.onBus;
   }
-
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else {
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-    }
-  }
 }
 
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _InfoChip({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(12.w),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: color.withOpacity(0.2), width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16.sp, color: color),
-              SizedBox(width: 6.w),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.textPrimary,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
+class _SimpleButton extends StatelessWidget {
   final VoidCallback onPressed;
-  final IconData icon;
   final String label;
   final Color color;
   final bool isOutlined;
 
-  const _ActionButton({
+  const _SimpleButton({
     required this.onPressed,
-    required this.icon,
     required this.label,
     required this.color,
     this.isOutlined = false,
@@ -433,34 +209,34 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isOutlined) {
-      return OutlinedButton.icon(
+      return TextButton(
         onPressed: onPressed,
-        icon: Icon(icon, size: 18.sp),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
+        style: TextButton.styleFrom(
           foregroundColor: color,
-          side: BorderSide(color: color, width: 1.5),
-          padding: EdgeInsets.symmetric(vertical: 12.h),
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.r),
+            borderRadius: BorderRadius.circular(8.r),
+            side: BorderSide(color: color, width: 1),
           ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
         ),
       );
     }
 
-    return ElevatedButton.icon(
+    return TextButton(
       onPressed: onPressed,
-      icon: Icon(icon, size: 18.sp),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
+      style: TextButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
-        padding: EdgeInsets.symmetric(vertical: 12.h),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12.r),
-        ),
-        elevation: 2,
-        shadowColor: color.withOpacity(0.3),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
       ),
     );
   }
