@@ -127,10 +127,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return true;
       } else {
         print('🔐 DEBUG: Login failed - ${response.error}');
-        state = state.copyWith(
-          isLoading: false,
-          error: response.error ?? 'Login failed',
-        );
+
+        // Check if this is an OTP sending failure that we should handle gracefully
+        if (response.error != null && response.error!.contains('OTP')) {
+          state = state.copyWith(isLoading: false, error: response.error!);
+        } else {
+          state = state.copyWith(
+            isLoading: false,
+            error: response.error ?? 'Login failed',
+          );
+        }
         return false;
       }
     } catch (e) {
@@ -286,10 +292,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
         print('🔐 DEBUG: Profile loaded successfully');
       } else {
         print('🔐 DEBUG: ERROR - Profile API failed: ${response.error}');
-        state = state.copyWith(
-          isLoading: false,
-          error: 'Failed to load profile: ${response.error}',
-        );
+
+        // Check if it's an authentication error (401)
+        if (response.statusCode == 401) {
+          print('🔐 DEBUG: Authentication error - user needs to login again');
+          // Only logout if we get a 401, indicating the token is invalid
+          await logout();
+        } else {
+          // For other errors, just show the error without logging out
+          state = state.copyWith(
+            isLoading: false,
+            error: 'Failed to load profile: ${response.error}',
+          );
+        }
       }
     } catch (e) {
       print('🔐 DEBUG: ERROR - Exception loading profile: $e');
@@ -403,16 +418,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
             await StorageService.saveDriverId(user['id'] as int);
           }
 
+          // Create driver object from user data
+          final driver = Driver.fromJson(user);
+
           state = state.copyWith(
             isLoading: false,
             isAuthenticated: true,
+            driver: driver,
             error: null,
             otpId: null,
           );
+          print('🔐 DEBUG: OTP verification completed with user data');
           return true;
         }
 
         // Fallback: if no user in response, try loading profile endpoint
+        print('🔐 DEBUG: No user data in OTP response, loading profile...');
         await _loadDriverProfile();
         state = state.copyWith(otpId: null);
         return true;
@@ -475,16 +496,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
             await StorageService.saveDriverId(user['id'] as int);
           }
 
+          // Create driver object from user data
+          final driver = Driver.fromJson(user);
+
           state = state.copyWith(
             isLoading: false,
             isAuthenticated: true,
+            driver: driver,
             error: null,
             otpId: null,
+          );
+          print(
+            '🔐 DEBUG: Registration OTP verification completed with user data',
           );
           return true;
         }
 
         // Fallback: if no user in response, try loading profile endpoint
+        print(
+          '🔐 DEBUG: No user data in registration OTP response, loading profile...',
+        );
         await _loadDriverProfile();
         state = state.copyWith(otpId: null);
         return true;

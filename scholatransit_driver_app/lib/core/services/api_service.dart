@@ -48,10 +48,8 @@ class ApiService {
         handler.next(options);
       },
       onError: (error, handler) async {
-        if (error.response?.statusCode == 401) {
-          // Handle token refresh or logout
-          await _handleUnauthorized();
-        }
+        // Don't automatically clear tokens on 401 - let the calling code handle it
+        // This prevents unwanted logouts when retrying profile loading
         handler.next(error);
       },
     );
@@ -107,12 +105,6 @@ class ApiService {
         handler.next(error);
       },
     );
-  }
-
-  static Future<void> _handleUnauthorized() async {
-    // Clear stored tokens and redirect to login
-    await StorageService.clearAuthTokens();
-    // Navigate to login screen
   }
 
   // Generic HTTP methods
@@ -210,9 +202,12 @@ class ApiService {
 
         // Handle specific error messages from the API
         if (data is Map<String, dynamic>) {
+          // First check for direct message field
           if (data.containsKey('message')) {
             return data['message'] as String;
           }
+
+          // Check for error field with nested structure
           if (data.containsKey('error')) {
             final errorData = data['error'];
             if (errorData is Map<String, dynamic>) {
@@ -222,8 +217,17 @@ class ApiService {
                   return nonFieldErrors.first.toString();
                 }
               }
+              // Check for message in error object
+              if (errorData.containsKey('message')) {
+                return errorData['message'] as String;
+              }
             }
             return errorData.toString();
+          }
+
+          // Check for detail field (common in some APIs)
+          if (data.containsKey('detail')) {
+            return data['detail'] as String;
           }
         }
 

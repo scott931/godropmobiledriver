@@ -17,6 +17,21 @@ class DriverProfileScreen extends ConsumerStatefulWidget {
 
 class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
   @override
+  void initState() {
+    super.initState();
+    // Automatically load profile data when the screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authState = ref.read(authProvider);
+      // Only load if we're authenticated but don't have driver data yet
+      if (authState.isAuthenticated &&
+          authState.driver == null &&
+          !authState.isLoading) {
+        ref.read(authProvider.notifier).loadDriverProfile();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final driver = authState.driver;
