@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/services/communication_service.dart';
 import '../../../core/models/conversation_model.dart';
+import 'whatsapp_redirect_screen.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -358,9 +359,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   void _navigateToChat(Conversation conversation) {
+    // Redirect to WhatsApp instead of the built-in chat
     context.go(
-      '/conversations/chat/${conversation.id}',
-      extra: {'conversation': conversation},
+      '/conversations/whatsapp-redirect',
+      extra: {
+        'contactName': conversation.studentName,
+        'contactType': 'parent',
+        'phoneNumber': conversation
+            .parentPhone, // You'll need to add this to your Conversation model
+      },
     );
   }
 

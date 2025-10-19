@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/parent_auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
@@ -36,10 +37,32 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final parentAuthState = ref.watch(parentAuthProvider);
 
+    // Listen for successful authentication from both providers
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.isAuthenticated) {
+      if (next.isAuthenticated && next.driver != null) {
+        print(
+          '📱 DEBUG: Driver authentication successful, navigating to dashboard',
+        );
         context.go('/dashboard');
+      }
+      if (next.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.error!),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    });
+
+    ref.listen<ParentAuthState>(parentAuthProvider, (previous, next) {
+      if (next.isAuthenticated && next.parent != null) {
+        print(
+          '📱 DEBUG: Parent authentication successful, navigating to parent dashboard',
+        );
+        context.go('/parent/dashboard');
       }
       if (next.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -265,14 +288,29 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       return;
     }
 
-    // Try login OTP first (most common case), then fall back to registration methods
+    // Try driver OTP verification first
     if (!mounted) return;
-    final loginSuccess = await ref
+    final driverSuccess = await ref
         .read(authProvider.notifier)
         .verifyLoginOtp(otpCode: otpCode.trim());
 
-    // If login OTP fails, try email completion for registration
-    if (!loginSuccess && mounted) {
+    if (driverSuccess) {
+      return; // Success, navigation handled by listener
+    }
+
+    // If driver OTP fails, try parent OTP verification
+    if (mounted) {
+      final parentSuccess = await ref
+          .read(parentAuthProvider.notifier)
+          .verifyOtp(otpCode.trim());
+
+      if (parentSuccess) {
+        return; // Success, navigation handled by listener
+      }
+    }
+
+    // If both fail, try driver registration methods as fallback
+    if (mounted) {
       final emailCompletionSuccess = await ref
           .read(authProvider.notifier)
           .completeEmailRegistration(otpCode: otpCode.trim());

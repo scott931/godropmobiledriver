@@ -20,6 +20,7 @@ class Conversation {
   final Message? lastMessage;
   final int unreadCount;
   final bool isOnline;
+  final String? parentPhone;
 
   const Conversation({
     required this.id,
@@ -41,6 +42,7 @@ class Conversation {
     this.lastMessage,
     this.unreadCount = 0,
     this.isOnline = false,
+    this.parentPhone,
   });
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
@@ -70,6 +72,7 @@ class Conversation {
           : null,
       unreadCount: json['unread_count'] as int? ?? 0,
       isOnline: json['is_online'] as bool? ?? false,
+      parentPhone: json['parent_phone'] as String?,
     );
   }
 
@@ -94,6 +97,7 @@ class Conversation {
       'last_message': lastMessage?.toJson(),
       'unread_count': unreadCount,
       'is_online': isOnline,
+      'parent_phone': parentPhone,
     };
   }
 
@@ -117,6 +121,7 @@ class Conversation {
     Message? lastMessage,
     int? unreadCount,
     bool? isOnline,
+    String? parentPhone,
   }) {
     return Conversation(
       id: id ?? this.id,
@@ -138,6 +143,7 @@ class Conversation {
       lastMessage: lastMessage ?? this.lastMessage,
       unreadCount: unreadCount ?? this.unreadCount,
       isOnline: isOnline ?? this.isOnline,
+      parentPhone: parentPhone ?? this.parentPhone,
     );
   }
 }

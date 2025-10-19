@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/parent_auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -30,9 +31,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final parentAuthState = ref.watch(parentAuthProvider);
 
-    // Listen for errors only; OTP screen will handle post-verification navigation
+    // Listen for errors from both auth providers
     ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.error!),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
+    });
+
+    ref.listen<ParentAuthState>(parentAuthProvider, (previous, next) {
       if (next.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -326,15 +339,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      final success = await ref
-          .read(authProvider.notifier)
-          .login(_emailController.text.trim(), _passwordController.text);
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
 
-      if (mounted) {
-        if (success) {
+      // Check if widget is still mounted before proceeding
+      if (!mounted) return;
+
+      // Try driver login first
+      final driverSuccess = await ref
+          .read(authProvider.notifier)
+          .login(email, password);
+
+      if (driverSuccess) {
+        if (mounted) {
           context.go('/otp');
-        } else {
-          // Error is handled by the listener above
+        }
+        return;
+      }
+
+      // If driver login fails, try parent login
+      if (mounted) {
+        final parentSuccess = await ref
+            .read(parentAuthProvider.notifier)
+            .login(email, password);
+
+        if (mounted) {
+          if (parentSuccess) {
+            context.go('/otp');
+          } else {
+            // Show generic error if both fail
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Invalid email or password. Please check your credentials.',
+                ),
+                backgroundColor: AppTheme.errorColor,
+              ),
+            );
+          }
         }
       }
     }

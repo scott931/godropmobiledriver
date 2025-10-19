@@ -32,7 +32,9 @@ import '../../features/parent/screens/parent_profile_screen.dart';
 import '../widgets/simple_bottom_navigation.dart';
 import '../providers/auth_provider.dart';
 import '../providers/parent_auth_provider.dart';
-import '../models/user_role.dart';
+import '../../features/communication/screens/whatsapp_redirect_screen.dart';
+import '../../features/communication/screens/whatsapp_test_screen.dart';
+import '../../features/communication/screens/whatsapp_debug_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -153,6 +155,28 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             },
           ),
           GoRoute(
+            path: '/conversations/whatsapp-redirect',
+            name: 'whatsapp-redirect',
+            builder: (context, state) {
+              final extra = state.extra as Map<String, dynamic>;
+              return WhatsAppRedirectScreen(
+                contactName: extra['contactName'] as String,
+                contactType: extra['contactType'] as String,
+                phoneNumber: extra['phoneNumber'] as String?,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/whatsapp-test',
+            name: 'whatsapp-test',
+            builder: (context, state) => const WhatsAppTestScreen(),
+          ),
+          GoRoute(
+            path: '/whatsapp-debug',
+            name: 'whatsapp-debug',
+            builder: (context, state) => const WhatsAppDebugScreen(),
+          ),
+          GoRoute(
             path: '/emergency',
             name: 'emergency',
             builder: (context, state) => const EmergencyScreen(),
@@ -165,7 +189,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/profile',
             name: 'profile',
-            builder: (context, state) => const DriverProfileScreen(),
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+              final parentAuthState = ref.watch(parentAuthProvider);
+
+              // Check if user is authenticated as driver
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const DriverProfileScreen();
+              }
+              // Check if user is authenticated as parent
+              else if (parentAuthState.isAuthenticated &&
+                  parentAuthState.parent != null) {
+                return const ParentProfileScreen();
+              }
+              // Default to driver profile screen
+              return const DriverProfileScreen();
+            },
           ),
           GoRoute(
             path: '/settings',

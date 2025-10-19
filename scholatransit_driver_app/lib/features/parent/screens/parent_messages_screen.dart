@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../../core/providers/parent_provider.dart';
+import '../../../core/services/whatsapp_service.dart';
 
 class ParentMessagesScreen extends ConsumerWidget {
   const ParentMessagesScreen({super.key});
@@ -234,15 +234,63 @@ class ParentMessagesScreen extends ConsumerWidget {
     );
   }
 
-  void _contactDriver(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Contacting driver...')));
+  void _contactDriver(BuildContext context) async {
+    final phoneNumber = WhatsAppService.getDefaultDriverPhone();
+
+    if (!WhatsAppService.isValidPhoneNumber(phoneNumber)) {
+      _showInvalidPhoneError(context, 'Driver');
+      return;
+    }
+
+    final success = await WhatsAppService.launchWhatsAppWithMessage(
+      phoneNumber: phoneNumber,
+      message:
+          'Hello! This is regarding my child\'s school bus transportation.',
+    );
+
+    if (!success) {
+      _showWhatsAppError(context);
+    }
   }
 
-  void _contactAdmin(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Contacting admin...')));
+  void _contactAdmin(BuildContext context) async {
+    final phoneNumber = WhatsAppService.getDefaultAdminPhone();
+
+    if (!WhatsAppService.isValidPhoneNumber(phoneNumber)) {
+      _showInvalidPhoneError(context, 'Admin');
+      return;
+    }
+
+    final success = await WhatsAppService.launchWhatsAppWithMessage(
+      phoneNumber: phoneNumber,
+      message: 'Hello! I need assistance with school transportation.',
+    );
+
+    if (!success) {
+      _showWhatsAppError(context);
+    }
+  }
+
+  void _showWhatsAppError(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'WhatsApp is not installed. Please install WhatsApp to continue.',
+        ),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _showInvalidPhoneError(BuildContext context, String contactType) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$contactType phone number is not available. Please contact your administrator.',
+        ),
+        backgroundColor: Colors.orange,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 }
