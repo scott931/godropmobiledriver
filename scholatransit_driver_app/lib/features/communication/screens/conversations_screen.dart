@@ -33,8 +33,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   Future<void> _loadRecentLogs() async {
     try {
-      await SimpleCommunicationLogService.init();
+      // Ensure service is initialized
+      if (!SimpleCommunicationLogService.isInitialized) {
+        await SimpleCommunicationLogService.init();
+      }
+
+      // Force reload from storage
+      await SimpleCommunicationLogService.reloadLogs();
       final recentLogs = SimpleCommunicationLogService.getRecentLogs(limit: 5);
+
       if (mounted) {
         setState(() {
           _recentLogs = recentLogs;

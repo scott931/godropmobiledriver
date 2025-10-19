@@ -34,15 +34,24 @@ class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await SimpleCommunicationLogService.init();
+      // Ensure service is initialized
+      if (!SimpleCommunicationLogService.isInitialized) {
+        await SimpleCommunicationLogService.init();
+      }
+
+      // Force reload from storage
+      await SimpleCommunicationLogService.reloadLogs();
       final allLogs = SimpleCommunicationLogService.getAllLogs();
 
       setState(() {
         _logs = allLogs;
         _isLoading = false;
       });
+
+      print('Loaded ${_logs.length} communication logs');
     } catch (e) {
       setState(() => _isLoading = false);
+      print('Error loading logs: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -78,16 +87,51 @@ class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
     List<CommunicationLog> logs,
   ) {
     final lowercaseQuery = query.toLowerCase();
-    return logs
-        .where(
-          (log) =>
-              log.contactName.toLowerCase().contains(lowercaseQuery) ||
-              log.phoneNumber.contains(query) ||
-              (log.studentName?.toLowerCase().contains(lowercaseQuery) ??
-                  false) ||
-              (log.message?.toLowerCase().contains(lowercaseQuery) ?? false),
-        )
-        .toList();
+    final trimmedQuery = query.trim();
+
+    return logs.where((log) {
+      // Search in contact name
+      if (log.contactName.toLowerCase().contains(lowercaseQuery)) return true;
+
+      // Search in phone number (with and without formatting)
+      final cleanPhone = log.phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+      final cleanQuery = trimmedQuery.replaceAll(RegExp(r'[^\d+]'), '');
+      if (log.phoneNumber.contains(trimmedQuery) ||
+          cleanPhone.contains(cleanQuery))
+        return true;
+
+      // Search in student name
+      if (log.studentName?.toLowerCase().contains(lowercaseQuery) ?? false)
+        return true;
+
+      // Search in message content
+      if (log.message?.toLowerCase().contains(lowercaseQuery) ?? false)
+        return true;
+
+      // Search in error message
+      if (log.errorMessage?.toLowerCase().contains(lowercaseQuery) ?? false)
+        return true;
+
+      // Search in communication type
+      if (log.type.displayName.toLowerCase().contains(lowercaseQuery))
+        return true;
+
+      // Search in driver ID
+      if (log.driverId.toLowerCase().contains(lowercaseQuery)) return true;
+
+      // Search in timestamp (date/time)
+      final dateStr = log.timestamp.toString().toLowerCase();
+      if (dateStr.contains(lowercaseQuery)) return true;
+
+      // Search in success status
+      final statusStr = log.success ? 'success' : 'failed';
+      if (statusStr.contains(lowercaseQuery)) return true;
+
+      // Search in log ID
+      if (log.id.toLowerCase().contains(lowercaseQuery)) return true;
+
+      return false;
+    }).toList();
   }
 
   @override
@@ -112,12 +156,23 @@ class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
         ),
         actions: [
           IconButton(
+            onPressed: _loadLogs,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh logs',
+          ),
+          IconButton(
             onPressed: _showFilterDialog,
             icon: const Icon(Icons.filter_list),
           ),
           IconButton(
             onPressed: _showStatistics,
             icon: const Icon(Icons.analytics),
+          ),
+          // Debug button - remove in production
+          IconButton(
+            onPressed: _addTestLogs,
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'Add test logs (debug)',
           ),
         ],
       ),
@@ -131,23 +186,56 @@ class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
               onChanged: (value) {
                 setState(() {});
               },
+              style: GoogleFonts.poppins(
+                fontSize: 16.sp,
+                color: const Color(0xFF1E293B),
+                fontWeight: FontWeight.w500,
+              ),
               decoration: InputDecoration(
-                hintText: 'Search by name, phone, student, or message...',
-                prefixIcon: const Icon(Icons.search),
+                hintText:
+                    'Search by name, phone, student, message, type, status, date...',
+                hintStyle: GoogleFonts.poppins(
+                  fontSize: 16.sp,
+                  color: const Color(0xFF64748B),
+                  fontWeight: FontWeight.w400,
+                ),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF64748B)),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
                         onPressed: () {
                           _searchController.clear();
                           setState(() {});
                         },
-                        icon: const Icon(Icons.clear),
+                        icon: const Icon(Icons.clear, color: Color(0xFF64748B)),
                       )
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.r),
+                  borderSide: const BorderSide(
+                    color: Color(0xFFE2E8F0),
+                    width: 1.5,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                  borderSide: const BorderSide(
+                    color: Color(0xFFE2E8F0),
+                    width: 1.5,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                  borderSide: const BorderSide(
+                    color: Color(0xFF3B82F6),
+                    width: 2.0,
+                  ),
                 ),
                 filled: true,
-                fillColor: const Color(0xFFF8FAFC),
+                fillColor: Colors.white,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16.w,
+                  vertical: 16.h,
+                ),
               ),
             ),
           ),
@@ -542,5 +630,24 @@ class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
         ],
       ),
     );
+  }
+
+  // Debug method - remove in production
+  Future<void> _addTestLogs() async {
+    try {
+      await SimpleCommunicationLogService.addTestLogs();
+      await _loadLogs(); // Refresh the display
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Test logs added successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error adding test logs: $e')));
+      }
+    }
   }
 }
