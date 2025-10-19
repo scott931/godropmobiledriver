@@ -571,6 +571,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         print(
           '⏱️ Route duration: ${(routeInfo.duration / 60).toStringAsFixed(1)} min',
         );
+
+        // Store route information for UI display
+        if (mounted) {
+          setState(() {
+            _remainingDistance = routeInfo.distance; // in meters
+            _totalTripDistance = routeInfo.distance; // in meters
+            _remainingTime = Duration(seconds: routeInfo.duration.round());
+            _distanceTraveled = 0.0; // Reset traveled distance
+            _progressPercentage = 0.0; // Reset progress
+          });
+        }
       } else {
         // Fallback to straight line if routing fails
         print('⚠️ Routing service failed, using straight line as fallback');
@@ -662,6 +673,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         print(
           '⏱️ Route duration: ${(routeInfo.duration / 60).toStringAsFixed(1)} min',
         );
+
+        // Store route information for UI display
+        if (mounted) {
+          setState(() {
+            _remainingDistance = routeInfo.distance; // in meters
+            _totalTripDistance = routeInfo.distance; // in meters
+            _remainingTime = Duration(seconds: routeInfo.duration.round());
+            _distanceTraveled = 0.0; // Reset traveled distance
+            _progressPercentage = 0.0; // Reset progress
+          });
+        }
       } else {
         // Fallback to straight line if routing fails
         print('⚠️ Routing service failed, using straight line as fallback');

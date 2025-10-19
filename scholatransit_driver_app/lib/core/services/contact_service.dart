@@ -9,13 +9,29 @@ class ContactService {
     if (_isInitialized) return true;
 
     try {
-      // Request contact permission
+      // Check current permission status first
+      final currentStatus = await Permission.contacts.status;
+      print('Current contact permission status: $currentStatus');
+
+      if (currentStatus.isGranted) {
+        _isInitialized = true;
+        return true;
+      }
+
+      // Request contact permission if not granted
       final status = await Permission.contacts.request();
+      print('Contact permission request result: $status');
+
       if (status.isGranted) {
         _isInitialized = true;
         return true;
+      } else if (status.isPermanentlyDenied) {
+        print(
+          'Contact permission permanently denied. User needs to enable it in settings.',
+        );
+        return false;
       } else {
-        print('Contact permission denied');
+        print('Contact permission denied by user');
         return false;
       }
     } catch (e) {
@@ -34,6 +50,17 @@ class ContactService {
   static Future<bool> requestPermission() async {
     final status = await Permission.contacts.request();
     return status.isGranted;
+  }
+
+  /// Check if permission is permanently denied
+  static Future<bool> isPermissionPermanentlyDenied() async {
+    final status = await Permission.contacts.status;
+    return status.isPermanentlyDenied;
+  }
+
+  /// Open app settings for permission management
+  static Future<void> openAppSettings() async {
+    await openAppSettings();
   }
 
   /// Get all contacts from device

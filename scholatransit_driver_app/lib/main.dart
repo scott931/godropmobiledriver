@@ -51,6 +51,9 @@ Future<void> _requestPermissions() async {
 
   // Request camera permission (for QR scanning)
   await Permission.camera.request();
+
+  // Request contact permission (for parent contact selection)
+  await Permission.contacts.request();
 }
 
 class GoDropApp extends ConsumerWidget {
