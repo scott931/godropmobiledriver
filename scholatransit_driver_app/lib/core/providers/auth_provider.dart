@@ -48,24 +48,37 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
+  bool _isCheckingAuth = false;
+
   AuthNotifier() : super(const AuthState()) {
     _checkAuthStatus();
   }
 
   Future<void> _checkAuthStatus() async {
+    if (_isCheckingAuth) {
+      print('🔐 DEBUG: Auth check already in progress, skipping...');
+      return;
+    }
+
+    _isCheckingAuth = true;
     print('🔐 DEBUG: Checking authentication status...');
-    final token = StorageService.getAuthToken();
-    final driverId = StorageService.getDriverId();
 
-    print('🔐 DEBUG: Token exists: ${token != null}');
-    print('🔐 DEBUG: Driver ID: $driverId');
-    print('🔐 DEBUG: Current registration email: ${state.registrationEmail}');
+    try {
+      final token = StorageService.getAuthToken();
+      final driverId = StorageService.getDriverId();
 
-    if (token != null && driverId != null) {
-      print('🔐 DEBUG: Found existing auth, loading profile...');
-      await _loadDriverProfile();
-    } else {
-      print('🔐 DEBUG: No authentication found - user needs to login');
+      print('🔐 DEBUG: Token exists: ${token != null}');
+      print('🔐 DEBUG: Driver ID: $driverId');
+      print('🔐 DEBUG: Current registration email: ${state.registrationEmail}');
+
+      if (token != null && driverId != null) {
+        print('🔐 DEBUG: Found existing auth, loading profile...');
+        await _loadDriverProfile();
+      } else {
+        print('🔐 DEBUG: No authentication found - user needs to login');
+      }
+    } finally {
+      _isCheckingAuth = false;
     }
   }
 

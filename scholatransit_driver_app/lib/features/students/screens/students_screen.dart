@@ -35,9 +35,37 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
       appBar: AppBar(
         title: const Text('Students'),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.qr_code_scanner),
-            onPressed: () => context.go('/students/qr-scanner'),
+            onSelected: (value) {
+              if (value == 'camera') {
+                context.go('/students/qr-scanner');
+              } else if (value == 'manual') {
+                context.go('/students/simple-qr-scanner');
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'camera',
+                child: Row(
+                  children: [
+                    Icon(Icons.camera_alt),
+                    SizedBox(width: 8),
+                    Text('Camera Scanner'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'manual',
+                child: Row(
+                  children: [
+                    Icon(Icons.keyboard),
+                    SizedBox(width: 8),
+                    Text('Manual Entry'),
+                  ],
+                ),
+              ),
+            ],
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -86,11 +114,24 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
               ),
             ),
       floatingActionButton: tripState.currentTrip != null
-          ? FloatingActionButton.extended(
-              onPressed: () => context.go('/students/qr-scanner'),
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Scan QR'),
-              backgroundColor: AppTheme.primaryColor,
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton(
+                  onPressed: () => context.go('/students/simple-qr-scanner'),
+                  heroTag: 'manual',
+                  backgroundColor: Colors.green,
+                  child: const Icon(Icons.keyboard),
+                ),
+                SizedBox(height: 8.h),
+                FloatingActionButton.extended(
+                  onPressed: () => context.go('/students/qr-scanner'),
+                  heroTag: 'camera',
+                  icon: const Icon(Icons.qr_code_scanner),
+                  label: const Text('Camera Scan'),
+                  backgroundColor: AppTheme.primaryColor,
+                ),
+              ],
             )
           : null,
     );

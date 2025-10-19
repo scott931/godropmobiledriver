@@ -1,9 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/parent_model.dart';
-import '../models/user_role.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
-import '../config/app_config.dart';
 
 class ParentAuthState {
   final bool isLoading;
@@ -42,23 +40,36 @@ class ParentAuthState {
 }
 
 class ParentAuthNotifier extends StateNotifier<ParentAuthState> {
+  bool _isCheckingAuth = false;
+
   ParentAuthNotifier() : super(const ParentAuthState()) {
     _checkAuthStatus();
   }
 
   Future<void> _checkAuthStatus() async {
+    if (_isCheckingAuth) {
+      print('🔐 DEBUG: Parent auth check already in progress, skipping...');
+      return;
+    }
+
+    _isCheckingAuth = true;
     print('🔐 DEBUG: Checking parent authentication status...');
-    final token = StorageService.getAuthToken();
-    final parentId = StorageService.getInt('parent_id');
 
-    print('🔐 DEBUG: Token exists: ${token != null}');
-    print('🔐 DEBUG: Parent ID: $parentId');
+    try {
+      final token = StorageService.getAuthToken();
+      final parentId = StorageService.getInt('parent_id');
 
-    if (token != null && parentId != null) {
-      print('🔐 DEBUG: Found existing parent auth, loading profile...');
-      await _loadParentProfile();
-    } else {
-      print('🔐 DEBUG: No parent authentication found - user needs to login');
+      print('🔐 DEBUG: Token exists: ${token != null}');
+      print('🔐 DEBUG: Parent ID: $parentId');
+
+      if (token != null && parentId != null) {
+        print('🔐 DEBUG: Found existing parent auth, loading profile...');
+        await _loadParentProfile();
+      } else {
+        print('🔐 DEBUG: No parent authentication found - user needs to login');
+      }
+    } finally {
+      _isCheckingAuth = false;
     }
   }
 

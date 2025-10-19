@@ -13,6 +13,7 @@ import '../../features/trips/screens/trip_details_screen.dart';
 import '../../features/students/screens/students_screen.dart';
 import '../../features/students/screens/student_details_screen.dart';
 import '../../features/students/screens/qr_scanner_screen.dart';
+import '../../features/students/screens/simple_qr_scanner_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/notifications/screens/alert_details_screen.dart';
 import '../../features/communication/screens/conversations_screen.dart';
@@ -35,6 +36,7 @@ import '../providers/parent_auth_provider.dart';
 import '../../features/communication/screens/whatsapp_redirect_screen.dart';
 import '../../features/communication/screens/whatsapp_test_screen.dart';
 import '../../features/communication/screens/whatsapp_debug_screen.dart';
+import '../../features/communication/screens/contact_demo_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -88,8 +90,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   parentAuthState.parent != null) {
                 return const ParentDashboardScreen();
               }
-              // Default to driver dashboard
-              return const DashboardScreen();
+              // If not authenticated, redirect to login
+              else {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
             },
           ),
           GoRoute(
@@ -101,7 +110,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/trips/details/:tripId',
             name: 'trip-details',
             builder: (context, state) {
-              final tripId = int.parse(state.pathParameters['tripId']!);
+              final tripIdParam = state.pathParameters['tripId'];
+              if (tripIdParam == null) {
+                return const Scaffold(
+                  body: Center(child: Text('Invalid trip ID')),
+                );
+              }
+              final tripId = int.tryParse(tripIdParam);
+              if (tripId == null) {
+                return const Scaffold(
+                  body: Center(child: Text('Invalid trip ID format')),
+                );
+              }
               return TripDetailsScreen(tripId: tripId);
             },
           ),
@@ -111,17 +131,33 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const StudentsScreen(),
           ),
           GoRoute(
-            path: '/students/:studentId',
-            name: 'student-details',
-            builder: (context, state) {
-              final studentId = int.parse(state.pathParameters['studentId']!);
-              return StudentDetailsScreen(studentId: studentId);
-            },
-          ),
-          GoRoute(
             path: '/students/qr-scanner',
             name: 'qr-scanner',
             builder: (context, state) => const QRScannerScreen(),
+          ),
+          GoRoute(
+            path: '/students/simple-qr-scanner',
+            name: 'simple-qr-scanner',
+            builder: (context, state) => const SimpleQRScannerScreen(),
+          ),
+          GoRoute(
+            path: '/students/:studentId',
+            name: 'student-details',
+            builder: (context, state) {
+              final studentIdParam = state.pathParameters['studentId'];
+              if (studentIdParam == null) {
+                return const Scaffold(
+                  body: Center(child: Text('Invalid student ID')),
+                );
+              }
+              final studentId = int.tryParse(studentIdParam);
+              if (studentId == null) {
+                return const Scaffold(
+                  body: Center(child: Text('Invalid student ID format')),
+                );
+              }
+              return StudentDetailsScreen(studentId: studentId);
+            },
           ),
           GoRoute(
             path: '/map',
@@ -177,6 +213,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const WhatsAppDebugScreen(),
           ),
           GoRoute(
+            path: '/contact-demo',
+            name: 'contact-demo',
+            builder: (context, state) => const ContactDemoScreen(),
+          ),
+          GoRoute(
             path: '/emergency',
             name: 'emergency',
             builder: (context, state) => const EmergencyScreen(),
@@ -202,8 +243,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   parentAuthState.parent != null) {
                 return const ParentProfileScreen();
               }
-              // Default to driver profile screen
-              return const DriverProfileScreen();
+              // If not authenticated, redirect to login
+              else {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
             },
           ),
           GoRoute(

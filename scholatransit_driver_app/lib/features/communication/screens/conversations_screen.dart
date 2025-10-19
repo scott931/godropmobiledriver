@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_contacts/flutter_contacts.dart';
 import '../../../core/services/whatsapp_service_with_logging.dart';
 import '../../../core/services/phone_call_service.dart';
 import '../../../core/services/simple_communication_log_service.dart';
+import '../../../core/services/contact_service.dart';
+import '../../../core/widgets/contact_picker_widget.dart';
 import '../../../core/models/communication_log_model.dart';
 import 'communication_log_screen.dart';
 
@@ -155,87 +158,126 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   padding: EdgeInsets.all(24.w),
                   child: Column(
                     children: [
-                      // Phone input field with enhanced design
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(16.r),
-                          border: Border.all(
-                            color: const Color(0xFFE2E8F0),
-                            width: 1,
-                          ),
-                        ),
-                        child: TextField(
-                          controller: _parentPhoneController,
-                          keyboardType: TextInputType.phone,
-                          onChanged: (value) {
-                            // Auto-add +254 prefix for Kenyan numbers
-                            if (value.isNotEmpty && !value.startsWith('+')) {
-                              if (value.startsWith('254')) {
-                                _parentPhoneController.text = '+$value';
-                                _parentPhoneController
-                                    .selection = TextSelection.fromPosition(
-                                  TextPosition(
-                                    offset: _parentPhoneController.text.length,
+                      // Phone input field with contact picker
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(16.r),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8F0),
+                                  width: 1,
+                                ),
+                              ),
+                              child: TextField(
+                                controller: _parentPhoneController,
+                                keyboardType: TextInputType.phone,
+                                onChanged: (value) {
+                                  // Auto-add +254 prefix for Kenyan numbers
+                                  if (value.isNotEmpty &&
+                                      !value.startsWith('+')) {
+                                    if (value.startsWith('254')) {
+                                      _parentPhoneController.text = '+$value';
+                                      _parentPhoneController.selection =
+                                          TextSelection.fromPosition(
+                                            TextPosition(
+                                              offset: _parentPhoneController
+                                                  .text
+                                                  .length,
+                                            ),
+                                          );
+                                    } else if (value.startsWith('0') &&
+                                        value.length > 1) {
+                                      // Convert 07xxxxxxxx to +2547xxxxxxxx
+                                      String newValue =
+                                          '+254${value.substring(1)}';
+                                      _parentPhoneController.text = newValue;
+                                      _parentPhoneController.selection =
+                                          TextSelection.fromPosition(
+                                            TextPosition(
+                                              offset: _parentPhoneController
+                                                  .text
+                                                  .length,
+                                            ),
+                                          );
+                                    } else if (value.length >= 9 &&
+                                        !value.startsWith('+')) {
+                                      // Auto-add +254 for 9+ digit numbers
+                                      String newValue = '+254$value';
+                                      _parentPhoneController.text = newValue;
+                                      _parentPhoneController.selection =
+                                          TextSelection.fromPosition(
+                                            TextPosition(
+                                              offset: _parentPhoneController
+                                                  .text
+                                                  .length,
+                                            ),
+                                          );
+                                    }
+                                  }
+                                },
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: 'Phone Number',
+                                  hintText: 'e.g., 0712345678 or +254712345678',
+                                  hintStyle: GoogleFonts.poppins(
+                                    fontSize: 14.sp,
+                                    color: const Color(0xFF94A3B8),
                                   ),
-                                );
-                              } else if (value.startsWith('0') &&
-                                  value.length > 1) {
-                                // Convert 07xxxxxxxx to +2547xxxxxxxx
-                                String newValue = '+254${value.substring(1)}';
-                                _parentPhoneController.text = newValue;
-                                _parentPhoneController
-                                    .selection = TextSelection.fromPosition(
-                                  TextPosition(
-                                    offset: _parentPhoneController.text.length,
+                                  labelStyle: GoogleFonts.poppins(
+                                    fontSize: 14.sp,
+                                    color: const Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                );
-                              } else if (value.length >= 9 &&
-                                  !value.startsWith('+')) {
-                                // Auto-add +254 for 9+ digit numbers
-                                String newValue = '+254$value';
-                                _parentPhoneController.text = newValue;
-                                _parentPhoneController
-                                    .selection = TextSelection.fromPosition(
-                                  TextPosition(
-                                    offset: _parentPhoneController.text.length,
+                                  prefixIcon: Container(
+                                    padding: EdgeInsets.all(12.w),
+                                    child: Icon(
+                                      Icons.phone_outlined,
+                                      color: const Color(0xFF10B981),
+                                      size: 20.w,
+                                    ),
                                   ),
-                                );
-                              }
-                            }
-                          },
-                          style: GoogleFonts.poppins(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF1E293B),
-                          ),
-                          decoration: InputDecoration(
-                            labelText: 'Phone Number',
-                            hintText: 'e.g., 0712345678 or +254712345678',
-                            hintStyle: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              color: const Color(0xFF94A3B8),
-                            ),
-                            labelStyle: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              color: const Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
-                            ),
-                            prefixIcon: Container(
-                              padding: EdgeInsets.all(12.w),
-                              child: Icon(
-                                Icons.phone_outlined,
-                                color: const Color(0xFF10B981),
-                                size: 20.w,
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16.w,
+                                    vertical: 16.h,
+                                  ),
+                                ),
                               ),
                             ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16.w,
-                              vertical: 16.h,
+                          ),
+                          SizedBox(width: 8.w),
+                          // Contact picker button
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6),
+                              borderRadius: BorderRadius.circular(12.r),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF3B82F6,
+                                  ).withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              onPressed: _showContactPicker,
+                              icon: const Icon(
+                                Icons.contacts,
+                                color: Colors.white,
+                              ),
+                              tooltip: 'Pick from contacts',
                             ),
                           ),
-                        ),
+                        ],
                       ),
 
                       SizedBox(height: 16.h),
@@ -261,7 +303,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                             SizedBox(width: 8.w),
                             Expanded(
                               child: Text(
-                                'Enter phone number with or without +254 prefix. We\'ll format it automatically.',
+                                'Enter phone number manually or tap the contacts button to pick from your contacts.',
                                 style: GoogleFonts.poppins(
                                   fontSize: 12.sp,
                                   color: const Color(0xFF0369A1),
@@ -468,87 +510,126 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   padding: EdgeInsets.all(24.w),
                   child: Column(
                     children: [
-                      // Phone input field with enhanced design
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(16.r),
-                          border: Border.all(
-                            color: const Color(0xFFE2E8F0),
-                            width: 1,
-                          ),
-                        ),
-                        child: TextField(
-                          controller: _parentPhoneController,
-                          keyboardType: TextInputType.phone,
-                          onChanged: (value) {
-                            // Auto-add +254 prefix for Kenyan numbers
-                            if (value.isNotEmpty && !value.startsWith('+')) {
-                              if (value.startsWith('254')) {
-                                _parentPhoneController.text = '+$value';
-                                _parentPhoneController
-                                    .selection = TextSelection.fromPosition(
-                                  TextPosition(
-                                    offset: _parentPhoneController.text.length,
+                      // Phone input field with contact picker
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(16.r),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E8F0),
+                                  width: 1,
+                                ),
+                              ),
+                              child: TextField(
+                                controller: _parentPhoneController,
+                                keyboardType: TextInputType.phone,
+                                onChanged: (value) {
+                                  // Auto-add +254 prefix for Kenyan numbers
+                                  if (value.isNotEmpty &&
+                                      !value.startsWith('+')) {
+                                    if (value.startsWith('254')) {
+                                      _parentPhoneController.text = '+$value';
+                                      _parentPhoneController.selection =
+                                          TextSelection.fromPosition(
+                                            TextPosition(
+                                              offset: _parentPhoneController
+                                                  .text
+                                                  .length,
+                                            ),
+                                          );
+                                    } else if (value.startsWith('0') &&
+                                        value.length > 1) {
+                                      // Convert 07xxxxxxxx to +2547xxxxxxxx
+                                      String newValue =
+                                          '+254${value.substring(1)}';
+                                      _parentPhoneController.text = newValue;
+                                      _parentPhoneController.selection =
+                                          TextSelection.fromPosition(
+                                            TextPosition(
+                                              offset: _parentPhoneController
+                                                  .text
+                                                  .length,
+                                            ),
+                                          );
+                                    } else if (value.length >= 9 &&
+                                        !value.startsWith('+')) {
+                                      // Auto-add +254 for 9+ digit numbers
+                                      String newValue = '+254$value';
+                                      _parentPhoneController.text = newValue;
+                                      _parentPhoneController.selection =
+                                          TextSelection.fromPosition(
+                                            TextPosition(
+                                              offset: _parentPhoneController
+                                                  .text
+                                                  .length,
+                                            ),
+                                          );
+                                    }
+                                  }
+                                },
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF1E293B),
+                                ),
+                                decoration: InputDecoration(
+                                  labelText: 'Phone Number',
+                                  hintText: 'e.g., 0712345678 or +254712345678',
+                                  hintStyle: GoogleFonts.poppins(
+                                    fontSize: 14.sp,
+                                    color: const Color(0xFF94A3B8),
                                   ),
-                                );
-                              } else if (value.startsWith('0') &&
-                                  value.length > 1) {
-                                // Convert 07xxxxxxxx to +2547xxxxxxxx
-                                String newValue = '+254${value.substring(1)}';
-                                _parentPhoneController.text = newValue;
-                                _parentPhoneController
-                                    .selection = TextSelection.fromPosition(
-                                  TextPosition(
-                                    offset: _parentPhoneController.text.length,
+                                  labelStyle: GoogleFonts.poppins(
+                                    fontSize: 14.sp,
+                                    color: const Color(0xFF64748B),
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                );
-                              } else if (value.length >= 9 &&
-                                  !value.startsWith('+')) {
-                                // Auto-add +254 for 9+ digit numbers
-                                String newValue = '+254$value';
-                                _parentPhoneController.text = newValue;
-                                _parentPhoneController
-                                    .selection = TextSelection.fromPosition(
-                                  TextPosition(
-                                    offset: _parentPhoneController.text.length,
+                                  prefixIcon: Container(
+                                    padding: EdgeInsets.all(12.w),
+                                    child: Icon(
+                                      Icons.phone_outlined,
+                                      color: const Color(0xFF10B981),
+                                      size: 20.w,
+                                    ),
                                   ),
-                                );
-                              }
-                            }
-                          },
-                          style: GoogleFonts.poppins(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF1E293B),
-                          ),
-                          decoration: InputDecoration(
-                            labelText: 'Phone Number',
-                            hintText: 'e.g., 0712345678 or +254712345678',
-                            hintStyle: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              color: const Color(0xFF94A3B8),
-                            ),
-                            labelStyle: GoogleFonts.poppins(
-                              fontSize: 14.sp,
-                              color: const Color(0xFF64748B),
-                              fontWeight: FontWeight.w500,
-                            ),
-                            prefixIcon: Container(
-                              padding: EdgeInsets.all(12.w),
-                              child: Icon(
-                                Icons.phone_outlined,
-                                color: const Color(0xFF10B981),
-                                size: 20.w,
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16.w,
+                                    vertical: 16.h,
+                                  ),
+                                ),
                               ),
                             ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 16.w,
-                              vertical: 16.h,
+                          ),
+                          SizedBox(width: 8.w),
+                          // Contact picker button
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF3B82F6),
+                              borderRadius: BorderRadius.circular(12.r),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF3B82F6,
+                                  ).withOpacity(0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: IconButton(
+                              onPressed: _showContactPicker,
+                              icon: const Icon(
+                                Icons.contacts,
+                                color: Colors.white,
+                              ),
+                              tooltip: 'Pick from contacts',
                             ),
                           ),
-                        ),
+                        ],
                       ),
 
                       SizedBox(height: 16.h),
@@ -574,7 +655,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                             SizedBox(width: 8.w),
                             Expanded(
                               child: Text(
-                                'Enter phone number with or without +254 prefix. We\'ll format it automatically.',
+                                'Enter phone number manually or tap the contacts button to pick from your contacts.',
                                 style: GoogleFonts.poppins(
                                   fontSize: 12.sp,
                                   color: const Color(0xFF0369A1),
@@ -692,6 +773,21 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
         _makePhoneCall(phoneNumber);
       }
     });
+  }
+
+  void _showContactPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => ContactPickerWidget(
+        title: 'Select Contact',
+        hintText: 'Search contacts...',
+        onContactSelected: (Contact contact) {
+          final phoneNumber = ContactService.getPrimaryPhoneNumber(contact);
+          final formattedPhone = ContactService.formatPhoneNumber(phoneNumber);
+          _parentPhoneController.text = formattedPhone;
+        },
+      ),
+    );
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
@@ -895,6 +991,20 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               },
               icon: const Icon(Icons.history, color: Color(0xFF3B82F6)),
               tooltip: 'View Communication Log',
+            ),
+          ),
+          Container(
+            margin: EdgeInsets.only(right: 8.w),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            child: IconButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/contact-demo');
+              },
+              icon: const Icon(Icons.contacts, color: Color(0xFF10B981)),
+              tooltip: 'Contact Picker Demo',
             ),
           ),
         ],

@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/parent_auth_provider.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen>
+class _SplashScreenState extends ConsumerState<SplashScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -47,13 +50,38 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _navigateToNextScreen() {
-    // Simple 3-second delay then navigate to login
-    Future.delayed(const Duration(seconds: 3), () {
+    // Wait for authentication status to be determined, then navigate appropriately
+    Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
-        print('🚀 DEBUG: Splash screen timeout, navigating to login');
-        context.go('/login');
+        _checkAuthenticationAndNavigate();
       }
     });
+  }
+
+  void _checkAuthenticationAndNavigate() {
+    final authState = ref.read(authProvider);
+    final parentAuthState = ref.read(parentAuthProvider);
+
+    print('🚀 DEBUG: Checking authentication status...');
+    print('🚀 DEBUG: Driver authenticated: ${authState.isAuthenticated}');
+    print('🚀 DEBUG: Parent authenticated: ${parentAuthState.isAuthenticated}');
+
+    // Check if user is authenticated as driver
+    if (authState.isAuthenticated && authState.driver != null) {
+      print('🚀 DEBUG: Driver authenticated, navigating to dashboard');
+      context.go('/dashboard');
+    }
+    // Check if user is authenticated as parent
+    else if (parentAuthState.isAuthenticated &&
+        parentAuthState.parent != null) {
+      print('🚀 DEBUG: Parent authenticated, navigating to parent dashboard');
+      context.go('/parent/dashboard');
+    }
+    // If not authenticated, go to login
+    else {
+      print('🚀 DEBUG: Not authenticated, navigating to login');
+      context.go('/login');
+    }
   }
 
   @override
@@ -64,6 +92,25 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Listen for authentication state changes
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next.isAuthenticated && next.driver != null && mounted) {
+        print(
+          '🚀 DEBUG: Driver authentication detected during splash, navigating to dashboard',
+        );
+        context.go('/dashboard');
+      }
+    });
+
+    ref.listen<ParentAuthState>(parentAuthProvider, (previous, next) {
+      if (next.isAuthenticated && next.parent != null && mounted) {
+        print(
+          '🚀 DEBUG: Parent authentication detected during splash, navigating to parent dashboard',
+        );
+        context.go('/parent/dashboard');
+      }
+    });
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(

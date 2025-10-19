@@ -1102,6 +1102,14 @@ class TripNotifier extends StateNotifier<TripState> {
 
   Future<bool> checkInStudent(String studentId) async {
     try {
+      print('🔍 Trip Provider: Checking in student with ID: $studentId');
+
+      // Validate student ID format
+      if (studentId.isEmpty) {
+        print('❌ Trip Provider: Empty student ID provided');
+        return false;
+      }
+
       final response = await ApiService.post<Map<String, dynamic>>(
         AppConfig.studentAttendanceEndpoint,
         data: {
@@ -1112,14 +1120,21 @@ class TripNotifier extends StateNotifier<TripState> {
       );
 
       if (response.success) {
+        print('✅ Trip Provider: Student check-in API call successful');
         // Reload students to get updated status
         if (state.currentTrip != null) {
+          print('🔄 Trip Provider: Reloading students for current trip');
           await loadTripStudents(state.currentTrip!.id);
         }
         return true;
+      } else {
+        print(
+          '❌ Trip Provider: Student check-in API call failed: ${response.error}',
+        );
+        return false;
       }
-      return false;
     } catch (e) {
+      print('💥 Trip Provider: Exception during student check-in: $e');
       return false;
     }
   }
