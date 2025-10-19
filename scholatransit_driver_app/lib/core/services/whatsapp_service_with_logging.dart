@@ -1,5 +1,5 @@
 import 'package:url_launcher/url_launcher.dart';
-import '../services/communication_log_service.dart';
+import '../services/simple_communication_log_service.dart';
 import '../models/communication_log_model.dart';
 
 class WhatsAppService {
@@ -10,12 +10,16 @@ class WhatsAppService {
     String? contactName,
     String? studentName,
   }) async {
+    bool success = false;
+    String? errorMessage;
+
     try {
       // Validate phone number
       if (phoneNumber.isEmpty ||
           phoneNumber == '+1234567890' ||
           phoneNumber == '+1987654321') {
         print('Invalid or placeholder phone number: $phoneNumber');
+        errorMessage = 'Invalid or placeholder phone number';
         return false;
       }
 
@@ -24,6 +28,7 @@ class WhatsAppService {
 
       if (formattedPhoneNumber.isEmpty) {
         print('Failed to format phone number: $phoneNumber');
+        errorMessage = 'Failed to format phone number';
         return false;
       }
 
@@ -44,36 +49,56 @@ class WhatsAppService {
         );
         if (result) {
           print('WhatsApp launched successfully');
-          return true;
+          success = true;
         }
       } catch (e) {
         print('Primary WhatsApp launch failed: $e');
+        errorMessage = 'Primary WhatsApp launch failed: $e';
       }
 
       // Try alternative method with whatsapp:// protocol
-      try {
-        final alternativeUrl =
-            'whatsapp://send?phone=$formattedPhoneNumber${encodedMessage.isNotEmpty ? '&text=$encodedMessage' : ''}';
-        final altUri = Uri.parse(alternativeUrl);
-        final result = await launchUrl(
-          altUri,
-          mode: LaunchMode.externalApplication,
-        );
-        if (result) {
-          print('WhatsApp launched successfully with alternative method');
-          return true;
+      if (!success) {
+        try {
+          final alternativeUrl =
+              'whatsapp://send?phone=$formattedPhoneNumber${encodedMessage.isNotEmpty ? '&text=$encodedMessage' : ''}';
+          final altUri = Uri.parse(alternativeUrl);
+          final result = await launchUrl(
+            altUri,
+            mode: LaunchMode.externalApplication,
+          );
+          if (result) {
+            print('WhatsApp launched successfully with alternative method');
+            success = true;
+          }
+        } catch (e2) {
+          print('Alternative WhatsApp launch also failed: $e2');
+          errorMessage = 'Alternative WhatsApp launch also failed: $e2';
         }
-      } catch (e2) {
-        print('Alternative WhatsApp launch also failed: $e2');
       }
 
       // If both methods fail, return false
-      print('All WhatsApp launch methods failed');
-      return false;
+      if (!success) {
+        print('All WhatsApp launch methods failed');
+        errorMessage = 'All WhatsApp launch methods failed';
+      }
     } catch (e) {
       print('Error launching WhatsApp: $e');
-      return false;
+      errorMessage = e.toString();
+      success = false;
+    } finally {
+      // Log the communication attempt
+      await SimpleCommunicationLogService.logCommunication(
+        phoneNumber: phoneNumber,
+        contactName: contactName ?? 'Unknown Contact',
+        type: CommunicationType.whatsapp,
+        success: success,
+        message: message,
+        errorMessage: errorMessage,
+        studentName: studentName,
+      );
     }
+
+    return success;
   }
 
   /// Format phone number for WhatsApp
@@ -117,8 +142,15 @@ class WhatsAppService {
   static Future<bool> launchWhatsAppWithMessage({
     required String phoneNumber,
     required String message,
+    String? contactName,
+    String? studentName,
   }) async {
-    return launchWhatsApp(phoneNumber: phoneNumber, message: message);
+    return launchWhatsApp(
+      phoneNumber: phoneNumber,
+      message: message,
+      contactName: contactName,
+      studentName: studentName,
+    );
   }
 
   /// Check if WhatsApp is available on the device
@@ -159,23 +191,27 @@ class WhatsAppService {
     return '+1234567890'; // Replace with real parent phone
   }
 
-  /// Check if phone number is valid for WhatsApp
+  /// Validate if a phone number is suitable for WhatsApp
   static bool isValidPhoneNumber(String phoneNumber) {
     if (phoneNumber.isEmpty) return false;
 
     // Check if it's a placeholder number
-    if (phoneNumber == '+1234567890' || phoneNumber == '+1987654321') {
+    if (phoneNumber == '+1234567890' ||
+        phoneNumber == '+1987654321' ||
+        phoneNumber == '1234567890' ||
+        phoneNumber == '1987654321') {
       return false;
     }
 
-    final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
+    // Check minimum length (at least 10 digits)
+    String cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
+    if (cleanNumber.length < 10) return false;
 
-    // Kenyan numbers should be 12 digits (254 + 9 digits)
-    if (phoneNumber.startsWith('+254') || cleanNumber.startsWith('254')) {
-      return cleanNumber.length >= 12;
+    // For Kenyan numbers, check specific length
+    if (phoneNumber.startsWith('+254') || phoneNumber.startsWith('254')) {
+      return cleanNumber.length >= 12; // 254XXXXXXXXX
     }
 
-    // Other international numbers should be at least 10 digits
-    return cleanNumber.length >= 10;
+    return true;
   }
 }
