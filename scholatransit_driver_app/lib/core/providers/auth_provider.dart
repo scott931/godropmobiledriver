@@ -261,12 +261,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
       print(
         '🔐 DEBUG: Loading driver profile from ${AppConfig.profileEndpoint}',
       );
+
+      // Check if we have a token before making the request
+      final token = StorageService.getAuthToken();
+      print(
+        '🔐 DEBUG: Current auth token exists: ${token != null && token.isNotEmpty}',
+      );
+
       final response = await ApiService.get<Map<String, dynamic>>(
         AppConfig.profileEndpoint,
       );
 
       print('🔐 DEBUG: Profile API Response - Success: ${response.success}');
       print('🔐 DEBUG: Profile API Response - Error: ${response.error}');
+      print(
+        '🔐 DEBUG: Profile API Response - Status Code: ${response.statusCode}',
+      );
       print('🔐 DEBUG: Profile API Response - Data: ${response.data}');
 
       if (response.success && response.data != null) {
@@ -434,9 +444,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
         // Fallback: if no user in response, try loading profile endpoint
         print('🔐 DEBUG: No user data in OTP response, loading profile...');
-        await _loadDriverProfile();
-        state = state.copyWith(otpId: null);
-        return true;
+        try {
+          await _loadDriverProfile();
+          // Only return true if profile loading succeeded
+          if (state.isAuthenticated) {
+            state = state.copyWith(otpId: null);
+            return true;
+          } else {
+            // Profile loading failed, don't proceed
+            return false;
+          }
+        } catch (e) {
+          print('🔐 DEBUG: Profile loading failed: $e');
+          state = state.copyWith(
+            isLoading: false,
+            error: 'Failed to load profile after OTP verification: $e',
+          );
+          return false;
+        }
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -516,9 +541,25 @@ class AuthNotifier extends StateNotifier<AuthState> {
         print(
           '🔐 DEBUG: No user data in registration OTP response, loading profile...',
         );
-        await _loadDriverProfile();
-        state = state.copyWith(otpId: null);
-        return true;
+        try {
+          await _loadDriverProfile();
+          // Only return true if profile loading succeeded
+          if (state.isAuthenticated) {
+            state = state.copyWith(otpId: null);
+            return true;
+          } else {
+            // Profile loading failed, don't proceed
+            return false;
+          }
+        } catch (e) {
+          print('🔐 DEBUG: Registration profile loading failed: $e');
+          state = state.copyWith(
+            isLoading: false,
+            error:
+                'Failed to load profile after registration OTP verification: $e',
+          );
+          return false;
+        }
       } else {
         state = state.copyWith(
           isLoading: false,

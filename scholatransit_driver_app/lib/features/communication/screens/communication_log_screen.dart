@@ -14,14 +14,20 @@ class CommunicationLogScreen extends StatefulWidget {
 class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
   List<CommunicationLog> _logs = [];
   bool _isLoading = true;
-  String _searchQuery = '';
   CommunicationType? _selectedType;
   bool _showSuccessfulOnly = false;
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadLogs();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLogs() async {
@@ -49,8 +55,9 @@ class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
     var filtered = _logs;
 
     // Filter by search query
-    if (_searchQuery.isNotEmpty) {
-      filtered = SimpleCommunicationLogService.searchLogs(_searchQuery);
+    final searchQuery = _searchController.text;
+    if (searchQuery.isNotEmpty) {
+      filtered = _searchLogs(searchQuery, filtered);
     }
 
     // Filter by type
@@ -64,6 +71,23 @@ class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
     }
 
     return filtered;
+  }
+
+  List<CommunicationLog> _searchLogs(
+    String query,
+    List<CommunicationLog> logs,
+  ) {
+    final lowercaseQuery = query.toLowerCase();
+    return logs
+        .where(
+          (log) =>
+              log.contactName.toLowerCase().contains(lowercaseQuery) ||
+              log.phoneNumber.contains(query) ||
+              (log.studentName?.toLowerCase().contains(lowercaseQuery) ??
+                  false) ||
+              (log.message?.toLowerCase().contains(lowercaseQuery) ?? false),
+        )
+        .toList();
   }
 
   @override
@@ -103,14 +127,22 @@ class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
           Container(
             padding: EdgeInsets.all(16.w),
             child: TextField(
+              controller: _searchController,
               onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
+                setState(() {});
               },
               decoration: InputDecoration(
-                hintText: 'Search by name or phone number...',
+                hintText: 'Search by name, phone, student, or message...',
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {});
+                        },
+                        icon: const Icon(Icons.clear),
+                      )
+                    : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12.r),
                 ),

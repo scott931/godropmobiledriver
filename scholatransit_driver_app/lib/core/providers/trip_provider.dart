@@ -2,10 +2,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/trip_model.dart';
 import '../models/student_model.dart';
+import '../models/parent_model.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../services/eta_service.dart';
 import '../services/eta_notification_service.dart';
+import '../services/notification_service.dart';
+import '../services/parent_notification_service.dart';
 import '../config/app_config.dart';
 
 class TripState {
@@ -906,12 +909,158 @@ class TripNotifier extends StateNotifier<TripState> {
         }).toList();
 
         state = state.copyWith(students: updatedStudents);
+
+        // Send automated notifications
+        await _sendStatusUpdateNotifications(studentId, status);
+
         return true;
       }
 
       return false;
     } catch (e) {
+      print('❌ Trip Provider: Error updating student status: $e');
       return false;
+    }
+  }
+
+  /// Send automated notifications when student status changes
+  Future<void> _sendStatusUpdateNotifications(
+    int studentId,
+    StudentStatus status,
+  ) async {
+    try {
+      // Find the student to get their details
+      final student = state.students.firstWhere(
+        (s) => s.id == studentId,
+        orElse: () => throw Exception('Student not found'),
+      );
+
+      print(
+        '📱 Trip Provider: Sending status update notifications for ${student.fullName} - ${status.name}',
+      );
+
+      // Send local notification to driver
+      await _sendLocalStatusNotification(student, status);
+
+      // Send parent notification if parent contact info is available
+      await _sendParentStatusNotification(student, status);
+
+      print('✅ Trip Provider: Status update notifications sent successfully');
+    } catch (e) {
+      print('❌ Trip Provider: Error sending status update notifications: $e');
+    }
+  }
+
+  /// Send local notification to driver
+  Future<void> _sendLocalStatusNotification(
+    Student student,
+    StudentStatus status,
+  ) async {
+    try {
+      final statusMessage = _getStatusDisplayMessage(status);
+      await NotificationService.showStudentStatusNotification(
+        studentName: student.fullName,
+        status: statusMessage,
+        tripId: state.currentTrip?.id.toString(),
+      );
+      print(
+        '📱 Trip Provider: Local notification sent for ${student.fullName}',
+      );
+    } catch (e) {
+      print('❌ Trip Provider: Error sending local notification: $e');
+    }
+  }
+
+  /// Send notification to parent
+  Future<void> _sendParentStatusNotification(
+    Student student,
+    StudentStatus status,
+  ) async {
+    try {
+      // Only send if parent contact info is available
+      if (student.parentPhone == null && student.parentEmail == null) {
+        print(
+          '⚠️ Trip Provider: No parent contact info for ${student.fullName}',
+        );
+        return;
+      }
+
+      // Convert StudentStatus to ChildStatus for parent notification
+      final childStatus = _convertToChildStatus(status);
+
+      // For now, we'll use a placeholder parent ID since we don't have parent data
+      // In a real implementation, you'd need to fetch or store parent IDs
+      const parentId = 1; // This should be fetched from student data or API
+
+      await ParentNotificationService.sendChildStatusUpdate(
+        parentId: parentId,
+        childId: student.id,
+        status: childStatus,
+        additionalData: {
+          'trip_id': state.currentTrip?.id,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
+
+      print(
+        '📱 Trip Provider: Parent notification sent for ${student.fullName}',
+      );
+    } catch (e) {
+      print('❌ Trip Provider: Error sending parent notification: $e');
+    }
+  }
+
+  /// Convert StudentStatus to ChildStatus for parent notifications
+  ChildStatus _convertToChildStatus(StudentStatus status) {
+    switch (status) {
+      case StudentStatus.waiting:
+        return ChildStatus.waiting;
+      case StudentStatus.onBus:
+        return ChildStatus.onBus;
+      case StudentStatus.pickedUp:
+        return ChildStatus.pickedUp;
+      case StudentStatus.droppedOff:
+        return ChildStatus.droppedOff;
+      case StudentStatus.absent:
+        return ChildStatus.absent;
+    }
+  }
+
+  /// Get display message for status
+  String _getStatusDisplayMessage(StudentStatus status) {
+    switch (status) {
+      case StudentStatus.waiting:
+        return 'Waiting for pickup';
+      case StudentStatus.onBus:
+        return 'On the way';
+      case StudentStatus.pickedUp:
+        return 'Picked up';
+      case StudentStatus.droppedOff:
+        return 'Dropped off';
+      case StudentStatus.absent:
+        return 'Absent';
+    }
+  }
+
+  /// Parse string status to StudentStatus enum
+  StudentStatus? _parseStringToStudentStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'waiting':
+        return StudentStatus.waiting;
+      case 'onbus':
+      case 'on_bus':
+        return StudentStatus.onBus;
+      case 'pickedup':
+      case 'picked_up':
+        return StudentStatus.pickedUp;
+      case 'droppedoff':
+      case 'dropped_off':
+        return StudentStatus.droppedOff;
+      case 'absent':
+        return StudentStatus.absent;
+      default:
+        print('⚠️ Trip Provider: Unknown status string: $status');
+        return null;
     }
   }
 
@@ -936,8 +1085,17 @@ class TripNotifier extends StateNotifier<TripState> {
         },
       );
 
+      if (response.success) {
+        // Convert string status to StudentStatus enum and send notifications
+        final studentStatus = _parseStringToStudentStatus(status);
+        if (studentStatus != null) {
+          await _sendStatusUpdateNotifications(studentId, studentStatus);
+        }
+      }
+
       return response.success;
     } catch (e) {
+      print('❌ Trip Provider: Error in trackingUpdateStudentStatus: $e');
       return false;
     }
   }
