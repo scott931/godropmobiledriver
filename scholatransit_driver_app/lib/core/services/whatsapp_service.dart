@@ -32,12 +32,40 @@ class WhatsAppService {
       print('Launching WhatsApp with URL: $whatsappUrl');
       final uri = Uri.parse(whatsappUrl);
 
-      if (await canLaunchUrl(uri)) {
-        return await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        print('Cannot launch WhatsApp URL');
-        return false;
+      // Try to launch WhatsApp directly
+      try {
+        final result = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (result) {
+          print('WhatsApp launched successfully');
+          return true;
+        }
+      } catch (e) {
+        print('Primary WhatsApp launch failed: $e');
       }
+
+      // Try alternative method with whatsapp:// protocol
+      try {
+        final alternativeUrl =
+            'whatsapp://send?phone=$formattedPhoneNumber${encodedMessage.isNotEmpty ? '&text=$encodedMessage' : ''}';
+        final altUri = Uri.parse(alternativeUrl);
+        final result = await launchUrl(
+          altUri,
+          mode: LaunchMode.externalApplication,
+        );
+        if (result) {
+          print('WhatsApp launched successfully with alternative method');
+          return true;
+        }
+      } catch (e2) {
+        print('Alternative WhatsApp launch also failed: $e2');
+      }
+
+      // If both methods fail, return false
+      print('All WhatsApp launch methods failed');
+      return false;
     } catch (e) {
       print('Error launching WhatsApp: $e');
       return false;
@@ -87,6 +115,26 @@ class WhatsAppService {
     required String message,
   }) async {
     return launchWhatsApp(phoneNumber: phoneNumber, message: message);
+  }
+
+  /// Check if WhatsApp is available on the device
+  static Future<bool> isWhatsAppAvailable() async {
+    try {
+      // Try multiple methods to check WhatsApp availability
+      final testUri1 = Uri.parse('whatsapp://send?phone=1234567890');
+      final testUri2 = Uri.parse('https://wa.me/1234567890');
+
+      // Try both methods
+      final canLaunch1 = await canLaunchUrl(testUri1);
+      final canLaunch2 = await canLaunchUrl(testUri2);
+
+      // Return true if either method works
+      return canLaunch1 || canLaunch2;
+    } catch (e) {
+      print('Error checking WhatsApp availability: $e');
+      // Assume it's available and let the launch method handle errors
+      return true;
+    }
   }
 
   /// Get default driver phone number (you can modify this based on your data)

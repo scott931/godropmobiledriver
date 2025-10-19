@@ -9,7 +9,6 @@ import '../../../core/providers/trip_provider.dart';
 import '../../../core/widgets/notification_badge.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/location_service_resolver.dart';
-import '../../communication/screens/whatsapp_debug_screen.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -207,26 +206,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     size: 20,
                   ),
                   onPressed: () => context.go('/notifications'),
-                ),
-              ),
-            ),
-            Container(
-              margin: EdgeInsets.only(right: 8.w),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.bug_report,
-                  color: Colors.orange,
-                  size: 20,
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const WhatsAppDebugScreen(),
-                  ),
                 ),
               ),
             ),
