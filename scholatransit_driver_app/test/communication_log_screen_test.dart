@@ -21,7 +21,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: Container(
+            body: SizedBox(
               width: 400,
               height: 600,
               child: const CommunicationLogScreen(),

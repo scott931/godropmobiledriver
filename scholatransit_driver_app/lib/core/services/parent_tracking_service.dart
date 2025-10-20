@@ -141,8 +141,9 @@ class ParentTrackingService {
     int? limit,
   }) async {
     final queryParams = <String, dynamic>{};
-    if (startDate != null)
+    if (startDate != null) {
       queryParams['start_date'] = startDate.toIso8601String();
+    }
     if (endDate != null) queryParams['end_date'] = endDate.toIso8601String();
     if (limit != null) queryParams['limit'] = limit;
 

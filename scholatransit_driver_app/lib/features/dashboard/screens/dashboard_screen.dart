@@ -598,11 +598,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
                 child: FloatingActionButton(
                   onPressed: () => context.go('/trips'),
-                  child: const Icon(Icons.add, color: Colors.white),
                   backgroundColor: const Color(0xFF0052CC),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16.r),
                   ),
+                  child: const Icon(Icons.add, color: Colors.white),
                 ),
               ),
             ),

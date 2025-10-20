@@ -280,7 +280,7 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: onTap,

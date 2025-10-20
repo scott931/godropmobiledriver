@@ -136,7 +136,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Waveform visualization
-                        Container(
+                        SizedBox(
                           height: 20.h,
                           child: AnimatedBuilder(
                             animation: _animationController,

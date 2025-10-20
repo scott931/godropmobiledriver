@@ -8,7 +8,6 @@ import '../../../core/providers/location_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/models/trip_model.dart';
 import '../../../core/theme/app_theme.dart';
-import '../widgets/trip_card.dart';
 
 class TripsScreen extends ConsumerStatefulWidget {
   const TripsScreen({super.key});

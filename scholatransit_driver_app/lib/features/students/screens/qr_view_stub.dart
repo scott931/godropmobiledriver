@@ -45,15 +45,20 @@ class Barcode {
 }
 
 class QRView extends StatelessWidget {
+  @override
   final Key? key;
   final void Function(QRViewController) onQRViewCreated;
   final QrScannerOverlayShape? overlay;
 
-  const QRView({this.key, required this.onQRViewCreated, this.overlay});
+  const QRView({
+    super.key,
+    this.key,
+    required this.onQRViewCreated,
+    this.overlay,
+  });
 
   @override
   Widget build(BuildContext context) {
     return const SizedBox.shrink();
   }
 }
-

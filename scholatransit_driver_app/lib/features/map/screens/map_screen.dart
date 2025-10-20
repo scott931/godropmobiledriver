@@ -1234,12 +1234,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (places.isNotEmpty) {
         final p = places.first;
         final street = [p.street, p.thoroughfare, p.subLocality]
-            .where((e) => e != null && e!.trim().isNotEmpty)
+            .where((e) => e != null && e.trim().isNotEmpty)
             .map((e) => e!.trim())
             .toList()
             .join(', ');
         final city = [p.locality, p.administrativeArea]
-            .where((e) => e != null && e!.trim().isNotEmpty)
+            .where((e) => e != null && e.trim().isNotEmpty)
             .map((e) => e!.trim())
             .toList()
             .join(', ');
@@ -1620,7 +1620,7 @@ class _TripDetailsCardState extends State<_TripDetailsCard> {
                       ),
                       const Spacer(),
                       Text(
-                        '${_formatTime(currentTrip.actualStart)}',
+                        _formatTime(currentTrip.actualStart),
                         style: GoogleFonts.poppins(
                           fontSize: 12.sp,
                           color: Colors.grey[600],

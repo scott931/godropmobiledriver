@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../../../core/providers/parent_provider.dart';
 
 class ParentEmergencyScreen extends ConsumerWidget {
   const ParentEmergencyScreen({super.key});

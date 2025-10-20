@@ -912,7 +912,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
               ),
               SizedBox(height: 4.h),
               Text(
-                '${trip.routeName ?? 'Unknown Route'}',
+                trip.routeName ?? 'Unknown Route',
                 style: GoogleFonts.poppins(
                   fontSize: 12.sp,
                   color: Colors.grey[600],

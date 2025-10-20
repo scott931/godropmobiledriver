@@ -9,6 +9,7 @@ import '../services/eta_service.dart';
 import '../services/eta_notification_service.dart';
 import '../services/notification_service.dart';
 import '../services/parent_notification_service.dart';
+import '../services/location_service.dart';
 import '../config/app_config.dart';
 
 class TripState {
@@ -890,12 +891,49 @@ class TripNotifier extends StateNotifier<TripState> {
 
   Future<bool> updateStudentStatus(int studentId, StudentStatus status) async {
     try {
+      final currentTrip = state.currentTrip;
+      if (currentTrip == null) {
+        print('❌ Trip Provider: No current trip available for status update');
+        return false;
+      }
+
+      // Get current location
+      String locationWkt = 'POINT(0 0)'; // Default fallback
+      try {
+        final position = await LocationService.getCurrentPosition();
+        if (position != null) {
+          locationWkt = 'POINT(${position.longitude} ${position.latitude})';
+          print(
+            '📍 Trip Provider: Using current location: ${position.latitude}, ${position.longitude}',
+          );
+        } else {
+          print(
+            '⚠️ Trip Provider: Could not get current location, using default',
+          );
+        }
+      } catch (e) {
+        print('⚠️ Trip Provider: Error getting location: $e, using default');
+      }
+
+      print(
+        '📤 Trip Provider: Updating student status for student $studentId to ${status.name}',
+      );
+      print(
+        '📤 Trip Provider: Using endpoint: ${AppConfig.trackingStudentStatusUpdateEndpoint}',
+      );
+      print(
+        '📤 Trip Provider: Data: {student: $studentId, vehicle: ${currentTrip.vehicleId ?? 0}, route: ${currentTrip.routeId ?? 0}, status: ${status.name}, location: $locationWkt}',
+      );
+
       final response = await ApiService.post<Map<String, dynamic>>(
-        AppConfig.studentStatusEndpoint,
+        AppConfig.trackingStudentStatusUpdateEndpoint,
         data: {
-          'student_id': studentId,
+          'student': studentId,
+          'vehicle': currentTrip.vehicleId ?? 0,
+          'route': currentTrip.routeId ?? 0,
           'status': status.name,
-          'trip_id': state.currentTrip?.id,
+          'location': locationWkt,
+          'notes': 'Status updated via driver app',
         },
       );
 
@@ -1342,8 +1380,9 @@ class TripNotifier extends StateNotifier<TripState> {
     if (state.currentTrip == null) return;
 
     final currentTrip = state.currentTrip!;
-    if (currentTrip.endLatitude == null || currentTrip.endLongitude == null)
+    if (currentTrip.endLatitude == null || currentTrip.endLongitude == null) {
       return;
+    }
 
     // This would typically get current location from location service
     // For now, we'll use the trip's start coordinates as current location

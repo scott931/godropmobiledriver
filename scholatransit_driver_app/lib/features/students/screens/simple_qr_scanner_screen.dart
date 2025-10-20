@@ -115,31 +115,31 @@ class _SimpleQRScannerScreenState extends ConsumerState<SimpleQRScannerScreen> {
                   onPressed: () {
                     _qrCodeController.text = 'SCHOLATRANSIT_12345';
                   },
-                  child: const Text('SCHOLATRANSIT_'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                   ),
+                  child: const Text('SCHOLATRANSIT_'),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     _qrCodeController.text = '12345';
                   },
-                  child: const Text('Numeric'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
                   ),
+                  child: const Text('Numeric'),
                 ),
                 ElevatedButton(
                   onPressed: () {
                     _qrCodeController.text = '{"student_id": "12345"}';
                   },
-                  child: const Text('JSON'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                     foregroundColor: Colors.white,
                   ),
+                  child: const Text('JSON'),
                 ),
               ],
             ),

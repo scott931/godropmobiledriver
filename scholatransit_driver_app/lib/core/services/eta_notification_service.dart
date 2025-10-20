@@ -122,7 +122,7 @@ class ETANotificationService {
       await _scheduleNotification(
         id: '${trip.id}_delay_update',
         title: 'Delay Update',
-        body: 'Trip is now ${delayMinutes} minutes late',
+        body: 'Trip is now $delayMinutes minutes late',
         scheduledDate: now.add(Duration(minutes: 10)),
         payload: 'eta_delay_update_${trip.tripId}',
       );
@@ -190,13 +190,13 @@ class ETANotificationService {
   /// Get delay message based on delay duration
   static String _getDelayMessage(int delayMinutes, Trip trip) {
     if (delayMinutes <= 5) {
-      return 'Minor delay of ${delayMinutes} minutes due to traffic';
+      return 'Minor delay of $delayMinutes minutes due to traffic';
     } else if (delayMinutes <= 15) {
-      return 'Moderate delay of ${delayMinutes} minutes. Traffic conditions are affecting your route';
+      return 'Moderate delay of $delayMinutes minutes. Traffic conditions are affecting your route';
     } else if (delayMinutes <= 30) {
-      return 'Significant delay of ${delayMinutes} minutes due to heavy traffic';
+      return 'Significant delay of $delayMinutes minutes due to heavy traffic';
     } else {
-      return 'Major delay of ${delayMinutes} minutes. Consider alternative routes if available';
+      return 'Major delay of $delayMinutes minutes. Consider alternative routes if available';
     }
   }
 
@@ -221,7 +221,7 @@ class ETANotificationService {
 
       if (timeDifference > 5) {
         print(
-          '🔄 ETA Notification Service: ETA changed by ${timeDifference} minutes, updating notifications',
+          '🔄 ETA Notification Service: ETA changed by $timeDifference minutes, updating notifications',
         );
 
         // Cancel existing notifications

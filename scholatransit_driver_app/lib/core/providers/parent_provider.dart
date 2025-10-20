@@ -3,7 +3,6 @@ import '../models/parent_model.dart';
 import '../models/parent_trip_model.dart';
 import '../services/parent_tracking_service.dart';
 import '../services/parent_notification_service.dart';
-import '../services/parent_communication_service.dart';
 
 class ParentState {
   final bool isLoading;

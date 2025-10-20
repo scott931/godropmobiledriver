@@ -10,8 +10,6 @@ import '../../../core/models/parent_trip_model.dart';
 import '../../../core/models/parent_model.dart';
 import '../widgets/bus_tracking_card.dart';
 import '../widgets/child_status_card.dart';
-import '../widgets/route_info_card.dart';
-import '../widgets/attendance_summary_card.dart';
 
 class ParentDashboardScreen extends ConsumerStatefulWidget {
   const ParentDashboardScreen({super.key});

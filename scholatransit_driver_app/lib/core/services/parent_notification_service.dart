@@ -1,6 +1,5 @@
 import 'dart:async';
 import '../models/parent_model.dart';
-import '../models/parent_trip_model.dart';
 import 'api_service.dart';
 
 class ParentNotificationService {

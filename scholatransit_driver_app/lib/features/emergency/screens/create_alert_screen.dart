@@ -559,7 +559,7 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
   }
 
   Widget _buildModernAlertTypeSelector() {
-    return Container(
+    return SizedBox(
       height: 120.h,
       child: GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

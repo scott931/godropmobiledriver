@@ -509,11 +509,11 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
               onPressed: () {
                 studentIdController.text = '12345';
               },
-              child: const Text('Test with: 12345'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
               ),
+              child: const Text('Test with: 12345'),
             ),
           ],
         ),

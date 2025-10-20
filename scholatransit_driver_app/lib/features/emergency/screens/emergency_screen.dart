@@ -843,17 +843,15 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
               ],
             ),
             SizedBox(height: 20.h),
-            ...contacts
-                .map(
-                  (contact) => _buildEnhancedContactItem(
-                    icon: contact['icon'] as IconData,
-                    label: contact['label'] as String,
-                    number: contact['number'] as String,
-                    color: contact['color'] as Color,
-                    description: contact['description'] as String,
-                  ),
-                )
-                .toList(),
+            ...contacts.map(
+              (contact) => _buildEnhancedContactItem(
+                icon: contact['icon'] as IconData,
+                label: contact['label'] as String,
+                number: contact['number'] as String,
+                color: contact['color'] as Color,
+                description: contact['description'] as String,
+              ),
+            ),
           ],
         ),
       ),
@@ -1035,8 +1033,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
             else
               ...emergencyState.alerts
                   .take(3)
-                  .map((alert) => _buildAlertHistoryItem(alert))
-                  .toList(),
+                  .map((alert) => _buildAlertHistoryItem(alert)),
           ],
         ),
       ),

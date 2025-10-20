@@ -5,8 +5,12 @@ allprojects {
         maven {
             url = uri("https://api.mapbox.com/downloads/v2/releases/maven")
             credentials {
+                // Uses token from gradle.properties (MAPBOX_DOWNLOADS_TOKEN)
                 username = "mapbox"
-                password = (project.findProperty("MAPBOX_DOWNLOADS_TOKEN") as String?) ?: ""
+                password = providers.gradleProperty("MAPBOX_DOWNLOADS_TOKEN").orNull
+            }
+            authentication {
+                create<BasicAuthentication>("basic")
             }
         }
     }

@@ -1,6 +1,4 @@
 import 'package:url_launcher/url_launcher.dart';
-import '../services/communication_log_service.dart';
-import '../models/communication_log_model.dart';
 
 class WhatsAppService {
   /// Launch WhatsApp with a specific phone number

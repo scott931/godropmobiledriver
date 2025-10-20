@@ -94,7 +94,7 @@ class FleetStudentCountCard extends ConsumerWidget {
                       tripName: trip.routeName ?? 'Trip ${trip.tripId}',
                       studentCount: entry.value,
                     );
-                  }).toList(),
+                  }),
                 ],
               );
             },

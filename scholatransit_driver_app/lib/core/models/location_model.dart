@@ -32,7 +32,8 @@ class VehicleLocation {
   });
 
   factory VehicleLocation.fromJson(Map<String, dynamic> json) {
-    double? _toDouble(dynamic v) => v == null ? null : double.tryParse(v.toString());
+    double? toDouble(dynamic v) =>
+        v == null ? null : double.tryParse(v.toString());
     return VehicleLocation(
       id: json['id'] ?? 0,
       vehicleId: json['vehicle'] ?? 0,
@@ -41,15 +42,13 @@ class VehicleLocation {
       routeName: json['route_name'] ?? '',
       tripId: json['trip'],
       locationWkt: json['location'],
-      latitude: _toDouble(json['latitude']) ?? 0,
-      longitude: _toDouble(json['longitude']) ?? 0,
-      speed: _toDouble(json['speed']),
-      heading: _toDouble(json['heading']),
-      accuracy: _toDouble(json['accuracy']),
-      altitude: _toDouble(json['altitude']),
+      latitude: toDouble(json['latitude']) ?? 0,
+      longitude: toDouble(json['longitude']) ?? 0,
+      speed: toDouble(json['speed']),
+      heading: toDouble(json['heading']),
+      accuracy: toDouble(json['accuracy']),
+      altitude: toDouble(json['altitude']),
       timestamp: DateTime.parse(json['timestamp']),
     );
   }
 }
-
-

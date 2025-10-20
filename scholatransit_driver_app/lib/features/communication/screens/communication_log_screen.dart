@@ -97,24 +97,29 @@ class _CommunicationLogScreenState extends State<CommunicationLogScreen> {
       final cleanPhone = log.phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
       final cleanQuery = trimmedQuery.replaceAll(RegExp(r'[^\d+]'), '');
       if (log.phoneNumber.contains(trimmedQuery) ||
-          cleanPhone.contains(cleanQuery))
+          cleanPhone.contains(cleanQuery)) {
         return true;
+      }
 
       // Search in student name
-      if (log.studentName?.toLowerCase().contains(lowercaseQuery) ?? false)
+      if (log.studentName?.toLowerCase().contains(lowercaseQuery) ?? false) {
         return true;
+      }
 
       // Search in message content
-      if (log.message?.toLowerCase().contains(lowercaseQuery) ?? false)
+      if (log.message?.toLowerCase().contains(lowercaseQuery) ?? false) {
         return true;
+      }
 
       // Search in error message
-      if (log.errorMessage?.toLowerCase().contains(lowercaseQuery) ?? false)
+      if (log.errorMessage?.toLowerCase().contains(lowercaseQuery) ?? false) {
         return true;
+      }
 
       // Search in communication type
-      if (log.type.displayName.toLowerCase().contains(lowercaseQuery))
+      if (log.type.displayName.toLowerCase().contains(lowercaseQuery)) {
         return true;
+      }
 
       // Search in driver ID
       if (log.driverId.toLowerCase().contains(lowercaseQuery)) return true;

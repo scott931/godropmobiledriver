@@ -162,12 +162,10 @@ class AppTheme {
         secondaryContainer: secondaryVariant,
         error: errorColor,
         surface: surfaceColor,
-        background: backgroundColor,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onError: Colors.white,
         onSurface: textPrimary,
-        onBackground: textPrimary,
       ),
 
       // App Bar Theme
@@ -387,12 +385,10 @@ class AppTheme {
         secondaryContainer: secondaryColor,
         error: errorColor,
         surface: Color(0xFF1E293B),
-        background: Color(0xFF0F172A),
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onError: Colors.white,
         onSurface: Colors.white,
-        onBackground: Colors.white,
       ),
 
       // App Bar Theme (Dark Blue)
