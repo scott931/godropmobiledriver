@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/models/message_model.dart';
+import '../../../core/config/app_config.dart';
 
 class VoiceMessageBubble extends StatefulWidget {
   final Message message;
@@ -39,15 +40,46 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble>
     super.dispose();
   }
 
+  String _getVoiceUrl() {
+    // Get voice URL from voiceUrl or attachmentUrl
+    final url = widget.message.voiceUrl ?? widget.message.attachmentUrl;
+    if (url == null || url.isEmpty) return '';
+
+    // If URL is already absolute, return as is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+
+    // If URL is relative, prepend base URL
+    final baseUrl = AppConfig.baseUrl;
+    if (url.startsWith('/')) {
+      return '$baseUrl$url';
+    }
+    return '$baseUrl/$url';
+  }
+
   void _togglePlay() {
+    final voiceUrl = _getVoiceUrl();
+
+    // TODO: Implement audio playback using an audio player package (e.g., audioplayers or just_audio)
+    // For now, just toggle the UI state
+    print('🔊 Voice message URL: $voiceUrl');
+    print('🔊 Voice duration: ${widget.message.voiceDuration} seconds');
+
     setState(() {
       _isPlaying = !_isPlaying;
     });
 
     if (_isPlaying) {
       _animationController.repeat();
+      // TODO: Start audio playback here
+      // Example with audioplayers:
+      // AudioPlayer().play(UrlSource(voiceUrl));
     } else {
       _animationController.stop();
+      // TODO: Stop audio playback here
+      // Example with audioplayers:
+      // AudioPlayer().stop();
     }
 
     widget.onPlay?.call();
@@ -72,13 +104,13 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble>
           if (!widget.isMe) ...[
             CircleAvatar(
               radius: 16.r,
-              backgroundImage: widget.message.senderAvatar != null
-                  ? NetworkImage(widget.message.senderAvatar!)
+              backgroundImage: widget.message.displayAvatar != null
+                  ? NetworkImage(widget.message.displayAvatar!)
                   : null,
-              child: widget.message.senderAvatar == null
+              child: widget.message.displayAvatar == null
                   ? Text(
-                      widget.message.senderName.isNotEmpty
-                          ? widget.message.senderName[0].toUpperCase()
+                      widget.message.displaySenderName.isNotEmpty
+                          ? widget.message.displaySenderName[0].toUpperCase()
                           : '?',
                       style: GoogleFonts.poppins(
                         color: Colors.white,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_drop/features/communication/screens/communication_log_screen.dart';
 
 void main() {
@@ -17,14 +18,19 @@ void main() {
     testWidgets('should build without LateInitializationError', (
       WidgetTester tester,
     ) async {
-      // Test with a minimal setup to avoid layout issues
+      // Test with ScreenUtil initialized to avoid LateInitializationError
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: SizedBox(
-              width: 400,
-              height: 600,
-              child: const CommunicationLogScreen(),
+        ScreenUtilInit(
+          designSize: const Size(375, 812),
+          minTextAdapt: true,
+          splitScreenMode: true,
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 400,
+                height: 600,
+                child: const CommunicationLogScreen(),
+              ),
             ),
           ),
         ),

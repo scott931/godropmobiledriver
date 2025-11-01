@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scholatransit_driver_app/core/services/contact_service.dart';
+import 'package:go_drop/core/services/contact_service.dart';
 
 void main() {
   group('ContactService', () {

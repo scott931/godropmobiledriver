@@ -9,6 +9,7 @@ import '../../../core/services/contact_service.dart';
 import '../../../core/widgets/contact_picker_widget.dart';
 import '../../../core/models/communication_log_model.dart';
 import 'communication_log_screen.dart';
+import 'chat_list_screen.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -1014,8 +1015,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   }
 
   Widget _buildBody() {
-    // Always show WhatsApp options instead of loading/error states
-    return _buildWhatsAppOptions();
+    // Show chat list screen
+    return const ChatListScreen();
   }
 
   Widget _buildWhatsAppOptions() {

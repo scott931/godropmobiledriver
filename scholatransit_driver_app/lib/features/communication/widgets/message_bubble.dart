@@ -24,13 +24,13 @@ class MessageBubble extends StatelessWidget {
           if (!isMe) ...[
             CircleAvatar(
               radius: 16.r,
-              backgroundImage: message.senderAvatar != null
-                  ? NetworkImage(message.senderAvatar!)
+              backgroundImage: message.displayAvatar != null
+                  ? NetworkImage(message.displayAvatar!)
                   : null,
-              child: message.senderAvatar == null
+              child: message.displayAvatar == null
                   ? Text(
-                      message.senderName.isNotEmpty
-                          ? message.senderName[0].toUpperCase()
+                      message.displaySenderName.isNotEmpty
+                          ? message.displaySenderName[0].toUpperCase()
                           : '?',
                       style: GoogleFonts.poppins(
                         color: Colors.white,

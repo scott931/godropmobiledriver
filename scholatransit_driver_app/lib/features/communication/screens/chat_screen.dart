@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../core/models/message_model.dart';
 import '../../../core/models/conversation_model.dart';
 import '../../../core/services/communication_service.dart';
+import '../../../core/services/storage_service.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/voice_message_bubble.dart';
+import '../widgets/image_message_bubble.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/chat_input_field.dart';
 
@@ -23,6 +25,8 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
   final List<Message> _messages = [];
+  Conversation? _chatDetails;
+  int? _currentUserId;
   final bool _isTyping = false;
   bool _isRecording = false;
   bool _isLoading = false;
@@ -31,11 +35,19 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _getCurrentUserId();
+    _loadChatDetails();
     _markChatAsRead();
   }
 
-  Future<void> _loadMessages() async {
+  void _getCurrentUserId() {
+    final profile = StorageService.getUserProfile();
+    if (profile != null) {
+      _currentUserId = profile['id'] as int?;
+    }
+  }
+
+  Future<void> _loadChatDetails() async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -46,18 +58,85 @@ class _ChatScreenState extends State<ChatScreen> {
         chatId: widget.conversation.id,
       );
       if (response.success && response.data != null) {
-        final chatData = response.data!;
-        final messagesList =
-            (chatData['messages'] as List?)
-                ?.map((message) => Message.fromJson(message))
-                .toList() ??
-            [];
+        // Handle both direct Map and wrapped response
+        Map<String, dynamic> chatData;
+        if (response.data is Map<String, dynamic>) {
+          chatData = response.data as Map<String, dynamic>;
+          // Check if it's wrapped (has 'data' or 'results' key)
+          if (chatData.containsKey('data') && chatData['data'] is Map<String, dynamic>) {
+            chatData = chatData['data'] as Map<String, dynamic>;
+          }
+        } else {
+          // Fallback - create empty chat data
+          chatData = {'id': widget.conversation.id};
+        }
+
+        // Debug: Log the structure before parsing
+        print('🔍 DEBUG: Chat data structure - messages type: ${chatData['messages']?.runtimeType}');
+        if (chatData['messages'] is List) {
+          final msgs = chatData['messages'] as List;
+          if (msgs.isNotEmpty) {
+            print('🔍 DEBUG: First message item type: ${msgs.first.runtimeType}');
+            print('🔍 DEBUG: First message item: ${msgs.first}');
+          }
+        }
+
+        final chat = Conversation.fromJson(chatData);
+        var messagesList = chat.messages ?? [];
+
+        // If no messages in chat details, try loading them separately
+        if (messagesList.isEmpty) {
+          try {
+            final messagesResponse = await CommunicationService.getChatMessages(
+              chatId: widget.conversation.id,
+            );
+
+            if (messagesResponse.success && messagesResponse.data != null) {
+              // Handle both direct List and wrapped response
+              List<dynamic> messagesData;
+              if (messagesResponse.data is List) {
+                messagesData = messagesResponse.data as List;
+              } else if (messagesResponse.data is Map<String, dynamic>) {
+                final data = messagesResponse.data as Map<String, dynamic>;
+                if (data.containsKey('results')) {
+                  messagesData = data['results'] as List? ?? [];
+                } else if (data.containsKey('data')) {
+                  messagesData = data['data'] as List? ?? [];
+                } else {
+                  messagesData = [];
+                }
+              } else {
+                messagesData = [];
+              }
+
+              messagesList = messagesData
+                  .where((m) => m != null && m is Map<String, dynamic>)
+                  .map((m) {
+                    try {
+                      return Message.fromJson(m as Map<String, dynamic>);
+                    } catch (e) {
+                      print('Error parsing message: $e, data: $m');
+                      return null;
+                    }
+                  })
+                  .whereType<Message>() // Remove nulls from failed parsing
+                  .toList();
+            }
+          } catch (e) {
+            // Silently handle - messages might not be available separately
+            print('Could not load messages separately: $e');
+          }
+        }
 
         setState(() {
+          _chatDetails = chat;
           _messages.clear();
           _messages.addAll(messagesList);
           _isLoading = false;
         });
+
+        // Scroll to bottom after loading
+        _scrollToBottom();
       } else {
         setState(() {
           _error = response.error ?? 'Failed to load messages';
@@ -189,14 +268,19 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             CircleAvatar(
               radius: 18.r,
-              backgroundImage: widget.conversation.studentAvatar != null
-                  ? NetworkImage(widget.conversation.studentAvatar!)
-                  : null,
-              child: widget.conversation.studentAvatar == null
+              backgroundImage: _chatDetails?.otherParticipant.profilePicture != null
+                  ? NetworkImage(_chatDetails!.otherParticipant.profilePicture!)
+                  : (widget.conversation.displayAvatar.isNotEmpty
+                      ? NetworkImage(widget.conversation.displayAvatar)
+                      : null),
+              child: _chatDetails?.otherParticipant.profilePicture == null &&
+                      widget.conversation.displayAvatar.isEmpty
                   ? Text(
-                      widget.conversation.studentName.isNotEmpty
-                          ? widget.conversation.studentName[0].toUpperCase()
-                          : '?',
+                      _chatDetails?.displayName.isNotEmpty == true
+                          ? _chatDetails!.displayName[0].toUpperCase()
+                          : widget.conversation.displayName.isNotEmpty
+                              ? widget.conversation.displayName[0].toUpperCase()
+                              : '?',
                       style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
@@ -210,7 +294,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.conversation.studentName,
+                    _chatDetails?.displayName ?? widget.conversation.displayName,
                     style: GoogleFonts.poppins(
                       fontSize: 16.sp,
                       fontWeight: FontWeight.w600,
@@ -219,17 +303,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   Row(
                     children: [
-                      Container(
-                        width: 8.w,
-                        height: 8.w,
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
+                      if (_chatDetails?.otherParticipant.isOnline == true ||
+                          widget.conversation.isOnline)
+                        Container(
+                          width: 8.w,
+                          height: 8.w,
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 4.w),
+                      if (_chatDetails?.otherParticipant.isOnline == true ||
+                          widget.conversation.isOnline)
+                        SizedBox(width: 4.w),
                       Text(
-                        'Active Now',
+                        _chatDetails?.otherParticipant.lastSeen ??
+                        widget.conversation.otherParticipant.lastSeen ??
+                        'Offline',
                         style: GoogleFonts.poppins(
                           fontSize: 12.sp,
                           color: Colors.grey[600],
@@ -293,7 +383,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               SizedBox(height: 16.h),
               ElevatedButton(
-                onPressed: _loadMessages,
+                onPressed: _loadChatDetails,
                 child: const Text('Retry'),
               ),
             ],
@@ -321,7 +411,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
 
         final message = _messages[index];
-        final isMe = message.senderId == 999;
+        final isMe = message.displaySenderId == _currentUserId;
 
         return _buildMessageBubble(message, isMe);
       },
@@ -336,6 +426,13 @@ class _ChatScreenState extends State<ChatScreen> {
         onPlay: () {
           // Handle voice message play
         },
+      );
+    }
+
+    if (message.type == MessageType.image) {
+      return ImageMessageBubble(
+        message: message,
+        isMe: isMe,
       );
     }
 

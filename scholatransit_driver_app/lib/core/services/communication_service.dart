@@ -2,11 +2,12 @@ import 'api_service.dart';
 
 class CommunicationService {
   /// List all chats for the authenticated user
-  static Future<ApiResponse<Map<String, dynamic>>> listChats({
+  /// Returns a List of chats (or wrapped response)
+  static Future<ApiResponse<dynamic>> listChats({
     int? page,
     int? pageSize,
   }) async {
-    return ApiService.get<Map<String, dynamic>>(
+    return ApiService.get<dynamic>(
       '/communication/chats/',
       queryParameters: {
         if (page != null) 'page': page,
@@ -39,48 +40,46 @@ class CommunicationService {
     return ApiService.post<Map<String, dynamic>>(path);
   }
 
-  /// Create a general chat (any authenticated user)
-  static Future<ApiResponse<Map<String, dynamic>>> createGeneralChat({
-    required String title,
-    required List<int> participantIds,
-    String? description,
+  /// Create a new chat (POST /communication/chats/)
+  static Future<ApiResponse<Map<String, dynamic>>> createChat({
+    required String chatType,
+    required int otherUserId,
+    int? studentId,
   }) async {
-    final path = '/communication/general/';
+    final path = '/communication/chats/';
     return ApiService.post<Map<String, dynamic>>(
       path,
       data: {
-        'title': title,
-        'description': description,
-        'participant_ids': participantIds,
+        'chat_type': chatType,
+        'other_user_id': otherUserId,
+        if (studentId != null) 'student': studentId,
       },
     );
   }
 
   /// Get chat details (any participant)
-  static Future<ApiResponse<Map<String, dynamic>>> getChatDetails({
+  /// Handles both direct Map and wrapped response
+  static Future<ApiResponse<dynamic>> getChatDetails({
     required int chatId,
   }) async {
     final path = '/communication/chats/$chatId/';
-    return ApiService.get<Map<String, dynamic>>(path);
+    return ApiService.get<dynamic>(path);
+  }
+
+  /// Get messages in chat
+  /// Handles both direct List and wrapped response
+  static Future<ApiResponse<dynamic>> getChatMessages({
+    required int chatId,
+  }) async {
+    final path = '/communication/chats/$chatId/messages/';
+    return ApiService.get<dynamic>(path);
   }
 
   /// Send text message
   static Future<ApiResponse<Map<String, dynamic>>> sendTextMessage({
     required int chatId,
     required String content,
-  }) async {
-    final path = '/communication/chats/$chatId/messages/';
-    return ApiService.post<Map<String, dynamic>>(
-      path,
-      data: {'content': content},
-    );
-  }
-
-  /// Send voice message
-  static Future<ApiResponse<Map<String, dynamic>>> sendVoiceMessage({
-    required int chatId,
-    required String content,
-    required String attachment,
+    String? messageType,
     int? replyTo,
   }) async {
     final path = '/communication/chats/$chatId/messages/';
@@ -88,7 +87,26 @@ class CommunicationService {
       path,
       data: {
         'content': content,
-        'attachment': attachment,
+        'message_type': messageType ?? 'text',
+        if (replyTo != null) 'reply_to': replyTo,
+      },
+    );
+  }
+
+  /// Send voice message
+  static Future<ApiResponse<Map<String, dynamic>>> sendVoiceMessage({
+    required int chatId,
+    required String content,
+    String? attachment,
+    int? replyTo,
+  }) async {
+    final path = '/communication/chats/$chatId/messages/';
+    return ApiService.post<Map<String, dynamic>>(
+      path,
+      data: {
+        'message_type': 'voice',
+        'content': content,
+        if (attachment != null) 'attachment': attachment,
         if (replyTo != null) 'reply_to': replyTo,
       },
     );
@@ -98,7 +116,7 @@ class CommunicationService {
   static Future<ApiResponse<Map<String, dynamic>>> sendImageMessage({
     required int chatId,
     required String content,
-    required String attachment,
+    String? attachment,
     int? replyTo,
   }) async {
     final path = '/communication/chats/$chatId/messages/';
@@ -107,7 +125,7 @@ class CommunicationService {
       data: {
         'message_type': 'image',
         'content': content,
-        'attachment': attachment,
+        if (attachment != null) 'attachment': attachment,
         if (replyTo != null) 'reply_to': replyTo,
       },
     );
@@ -118,16 +136,17 @@ class CommunicationService {
     required int chatId,
     required int replyToMessageId,
     required String content,
+    String? messageType,
     String? attachment,
   }) async {
     final path = '/communication/chats/$chatId/messages/';
     return ApiService.post<Map<String, dynamic>>(
       path,
       data: {
-        'message_type': 'text',
+        'message_type': messageType ?? 'text',
         'content': content,
-        'attachment': attachment,
         'reply_to': replyToMessageId,
+        if (attachment != null) 'attachment': attachment,
       },
     );
   }
