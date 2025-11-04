@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'api_service.dart';
 
 class CommunicationService {
@@ -94,37 +96,92 @@ class CommunicationService {
   }
 
   /// Send voice message
+  /// If attachment is a file path, it will be uploaded as multipart/form-data
   static Future<ApiResponse<Map<String, dynamic>>> sendVoiceMessage({
     required int chatId,
-    required String content,
+    String? content,
     String? attachment,
     int? replyTo,
+    int? voiceDuration, // Duration in seconds
   }) async {
     final path = '/communication/chats/$chatId/messages/';
+
+    // If attachment is provided and is a file path, use multipart/form-data
+    if (attachment != null && attachment.isNotEmpty) {
+      final file = File(attachment);
+      if (await file.exists()) {
+        // Use FormData for file upload
+        final formData = FormData.fromMap({
+          'message_type': 'voice',
+          'content': (content != null && content.isNotEmpty) ? content : 'Voice message',
+          'attachment': await MultipartFile.fromFile(
+            file.path,
+            filename: file.path.split(Platform.pathSeparator).last,
+          ),
+          if (voiceDuration != null && voiceDuration > 0) 'voice_duration': voiceDuration,
+          if (replyTo != null) 'reply_to': replyTo,
+        });
+
+        return ApiService.post<Map<String, dynamic>>(
+          path,
+          data: formData,
+          // Dio will automatically set Content-Type to multipart/form-data with boundary
+        );
+      }
+    }
+
+    // Fallback to JSON if no file or file doesn't exist
     return ApiService.post<Map<String, dynamic>>(
       path,
       data: {
         'message_type': 'voice',
-        'content': content,
+        'content': (content != null && content.isNotEmpty) ? content : 'Voice message',
         if (attachment != null) 'attachment': attachment,
+        if (voiceDuration != null && voiceDuration > 0) 'voice_duration': voiceDuration,
         if (replyTo != null) 'reply_to': replyTo,
       },
     );
   }
 
   /// Send image message
+  /// If attachment is a file path, it will be uploaded as multipart/form-data
   static Future<ApiResponse<Map<String, dynamic>>> sendImageMessage({
     required int chatId,
-    required String content,
+    String? content,
     String? attachment,
     int? replyTo,
   }) async {
     final path = '/communication/chats/$chatId/messages/';
+
+    // If attachment is provided and is a file path, use multipart/form-data
+    if (attachment != null && attachment.isNotEmpty) {
+      final file = File(attachment);
+      if (await file.exists()) {
+        // Use FormData for file upload
+        final formData = FormData.fromMap({
+          'message_type': 'image',
+          'content': (content != null && content.isNotEmpty) ? content : 'Image',
+          'attachment': await MultipartFile.fromFile(
+            file.path,
+            filename: file.path.split(Platform.pathSeparator).last,
+          ),
+          if (replyTo != null) 'reply_to': replyTo,
+        });
+
+        return ApiService.post<Map<String, dynamic>>(
+          path,
+          data: formData,
+          // Dio will automatically set Content-Type to multipart/form-data with boundary
+        );
+      }
+    }
+
+    // Fallback to JSON if no file or file doesn't exist
     return ApiService.post<Map<String, dynamic>>(
       path,
       data: {
         'message_type': 'image',
-        'content': content,
+        'content': (content != null && content.isNotEmpty) ? content : 'Image',
         if (attachment != null) 'attachment': attachment,
         if (replyTo != null) 'reply_to': replyTo,
       },
@@ -190,5 +247,14 @@ class CommunicationService {
       path,
       queryParameters: {'q': query},
     );
+  }
+
+  /// Delete a message
+  static Future<ApiResponse<Map<String, dynamic>>> deleteMessage({
+    required int chatId,
+    required int messageId,
+  }) async {
+    final path = '/communication/chats/$chatId/messages/$messageId/';
+    return ApiService.delete<Map<String, dynamic>>(path);
   }
 }

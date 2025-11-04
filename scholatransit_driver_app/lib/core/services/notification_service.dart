@@ -200,6 +200,37 @@ class NotificationService {
   static Future<void> unsubscribeFromTopic(String topic) async {
     // FCM is disabled, no-op
   }
+
+  /// Show notification for a new message
+  static Future<void> showMessageNotification({
+    required String senderName,
+    required String messageContent,
+    required int chatId,
+    String? chatName,
+  }) async {
+    try {
+      // Truncate message if too long
+      final truncatedMessage = messageContent.length > 100
+          ? '${messageContent.substring(0, 100)}...'
+          : messageContent;
+
+      final title = chatName ?? senderName;
+      final body = messageContent.isEmpty
+          ? 'New message'
+          : truncatedMessage;
+
+      await showLocalNotification(
+        title: title,
+        body: body,
+        payload: 'chat_$chatId', // Payload to navigate to chat when tapped
+        id: chatId, // Use chatId as notification ID to avoid duplicates
+      );
+
+      print('🔔 Notification shown for message from $senderName in chat $chatId');
+    } catch (e) {
+      print('❌ Failed to show message notification: $e');
+    }
+  }
 }
 
 // FCM is disabled, no background handler needed

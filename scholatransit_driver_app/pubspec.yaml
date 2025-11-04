@@ -47,6 +47,10 @@ dependencies:
   connectivity_plus: ^6.0.5
   url_launcher: ^6.2.5
   flutter_contacts: ^1.1.7+1
+  image_picker: ^1.0.7
+  record: 4.4.4
+  path_provider: ^2.1.2
+  audioplayers: ^6.1.0
 
   # UI Components
   flutter_screenutil: ^5.9.3

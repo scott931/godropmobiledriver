@@ -123,28 +123,118 @@ class Message {
       timestamp = DateTime.now();
     }
 
-    // Parse attachment
+    // Parse attachment - check multiple possible fields
     String? attachmentUrl;
     String? attachmentType;
+    String? voiceUrl;
+
     try {
+      // Determine message type early to prioritize correctly
+      final messageTypeStr = json['message_type'] as String? ?? json['type'] as String?;
+      final isVoiceMessage = messageTypeStr == 'voice';
+      final isImageMessage = messageTypeStr == 'image';
+
+      // PRIORITY 1: Check attachment field FIRST (most common in chat details response)
+      // The API returns attachment URLs directly in the 'attachment' field as a string
+      // Can be null, empty string, or full URL string
       if (json['attachment'] != null) {
         if (json['attachment'] is String) {
-          attachmentUrl = json['attachment'] as String;
+          final url = json['attachment'] as String;
+          // Check for valid URL (not null, not empty, not the string "null")
+          if (url.isNotEmpty &&
+              url != 'null' &&
+              url.toLowerCase() != 'none' &&
+              (url.startsWith('http://') || url.startsWith('https://'))) {
+            attachmentUrl = url;
+            // If voice message, also set voiceUrl
+            if (isVoiceMessage) {
+              voiceUrl = url;
+            }
+            print('✅ Found attachment URL in attachment field: $url');
+          } else if (url.isNotEmpty && url != 'null' && url.toLowerCase() != 'none') {
+            // Relative URL - will be handled by URL construction in widgets
+            attachmentUrl = url;
+            if (isVoiceMessage) {
+              voiceUrl = url;
+            }
+            print('✅ Found relative attachment URL in attachment field: $url');
+          } else {
+            print('⚠️ Attachment field exists but is invalid: "$url"');
+          }
         } else if (json['attachment'] is Map<String, dynamic>) {
-          attachmentUrl = (json['attachment'] as Map<String, dynamic>)['url'] as String?;
-          attachmentType = (json['attachment'] as Map<String, dynamic>)['type'] as String?;
+          final attachmentMap = json['attachment'] as Map<String, dynamic>;
+          final url = attachmentMap['url'] as String? ??
+                      attachmentMap['file'] as String? ??
+                      attachmentMap['attachment'] as String?;
+          if (url != null && url.isNotEmpty) {
+            attachmentUrl = url;
+            // If voice message, also set voiceUrl
+            if (isVoiceMessage) {
+              voiceUrl = url;
+            }
+            print('✅ Found attachment URL in attachment map: $url');
+          }
+          attachmentType = attachmentMap['type'] as String?;
         } else if (json['attachment'] is int) {
-          // Attachment might be an ID reference
+          // Attachment might be an ID reference - skip
           print('⚠️ DEBUG: attachment is an int (ID): ${json['attachment']}');
-          attachmentUrl = null;
         } else {
           print('⚠️ DEBUG: attachment is unexpected type: ${json['attachment'].runtimeType}');
         }
       }
+
+      // PRIORITY 2: Check voice_url for voice messages (only if not already found)
+      if (isVoiceMessage && voiceUrl == null) {
+        if (json['voice_url'] != null && json['voice_url'] is String) {
+          final url = json['voice_url'] as String;
+          if (url.isNotEmpty) {
+            voiceUrl = url;
+            if (attachmentUrl == null) {
+              attachmentUrl = url; // Also set attachmentUrl for backward compatibility
+            }
+            print('✅ Found voice URL in voice_url field: $url');
+          }
+        }
+      }
+
+      // PRIORITY 3: Check attachment_url (fallback - some API responses use this)
+      if (attachmentUrl == null && json['attachment_url'] != null && json['attachment_url'] is String) {
+        final url = json['attachment_url'] as String;
+        if (url.isNotEmpty) {
+          attachmentUrl = url;
+          // If voice message and no voice_url yet, use attachment_url
+          if (isVoiceMessage) {
+            voiceUrl = url;
+          }
+          print('✅ Found attachment URL in attachment_url field: $url');
+        }
+      }
+
+      // If still no URL and message type suggests it should have one, log warning with full JSON
+      if (attachmentUrl == null && voiceUrl == null) {
+        if (isVoiceMessage || isImageMessage || messageTypeStr == 'file') {
+          print('⚠️ WARNING: ${messageTypeStr} message has no attachment URL');
+          print('   Message JSON keys: ${json.keys.toList()}');
+          print('   URL-related fields: ${json.keys.where((k) => k.toLowerCase().contains('attach') || k.toLowerCase().contains('url')).toList()}');
+          print('   Full JSON: $json');
+        }
+      } else {
+        // Debug: log successful URL parsing
+        if (isVoiceMessage) {
+          print('✅ Voice message URL parsed:');
+          print('   voiceUrl: $voiceUrl');
+          print('   attachmentUrl: $attachmentUrl');
+        } else if (isImageMessage) {
+          print('✅ Image message URL parsed:');
+          print('   attachmentUrl: $attachmentUrl');
+        }
+      }
     } catch (e) {
       print('⚠️ ERROR: Failed to parse attachment: $e');
+      print('   JSON keys: ${json.keys.toList()}');
       attachmentUrl = null;
       attachmentType = null;
+      voiceUrl = null;
     }
 
     // Parse reply fields
@@ -193,6 +283,46 @@ class Message {
       messageId = DateTime.now().millisecondsSinceEpoch;
     }
 
+    // Parse voice duration - check multiple possible fields
+    int? parsedVoiceDuration;
+    try {
+      // Try voice_duration first
+      if (json['voice_duration'] != null) {
+        if (json['voice_duration'] is int) {
+          parsedVoiceDuration = json['voice_duration'] as int;
+        } else if (json['voice_duration'] is String) {
+          parsedVoiceDuration = int.tryParse(json['voice_duration'] as String);
+        } else if (json['voice_duration'] is double) {
+          parsedVoiceDuration = (json['voice_duration'] as double).round();
+        }
+      }
+      // Try duration as fallback
+      if (parsedVoiceDuration == null && json['duration'] != null) {
+        if (json['duration'] is int) {
+          parsedVoiceDuration = json['duration'] as int;
+        } else if (json['duration'] is String) {
+          parsedVoiceDuration = int.tryParse(json['duration'] as String);
+        } else if (json['duration'] is double) {
+          parsedVoiceDuration = (json['duration'] as double).round();
+        }
+      }
+
+      // Debug logging for voice messages
+      final messageTypeStr = json['message_type'] as String? ?? json['type'] as String?;
+      if (messageTypeStr == 'voice') {
+        print('📊 Parsing voice duration:');
+        print('   voice_duration field: ${json['voice_duration']} (type: ${json['voice_duration']?.runtimeType})');
+        print('   duration field: ${json['duration']} (type: ${json['duration']?.runtimeType})');
+        print('   Parsed duration: $parsedVoiceDuration');
+        if (parsedVoiceDuration == null) {
+          print('   ⚠️ No duration found - available fields: ${json.keys.where((k) => k.toLowerCase().contains('duration') || k.toLowerCase().contains('time')).toList()}');
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error parsing voice duration: $e');
+      parsedVoiceDuration = null;
+    }
+
     return Message(
       id: messageId,
       conversationId: conversationId,
@@ -204,9 +334,9 @@ class Message {
       type: messageType,
       timestamp: timestamp,
       isRead: json['is_read'] as bool? ?? false,
-      voiceUrl: json['voice_url'] as String? ?? attachmentUrl,
-      voiceDuration: json['voice_duration'] as int?,
-      attachmentUrl: attachmentUrl ?? json['attachment_url'] as String?,
+      voiceUrl: voiceUrl ?? json['voice_url'] as String? ?? attachmentUrl,
+      voiceDuration: parsedVoiceDuration,
+      attachmentUrl: attachmentUrl ?? json['attachment_url'] as String? ?? voiceUrl,
       attachmentType: attachmentType ?? json['attachment_type'] as String? ??
                       (messageType == MessageType.image ? 'image' :
                        messageType == MessageType.voice ? 'audio' :

@@ -962,54 +962,6 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: Text(
-          'Conversations',
-          style: GoogleFonts.poppins(
-            fontSize: 20.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
-          ),
-        ),
-        actions: [
-          Container(
-            margin: EdgeInsets.only(right: 8.w),
-            decoration: BoxDecoration(
-              color: const Color(0xFF3B82F6).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CommunicationLogScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.history, color: Color(0xFF3B82F6)),
-              tooltip: 'View Communication Log',
-            ),
-          ),
-          Container(
-            margin: EdgeInsets.only(right: 8.w),
-            decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-            child: IconButton(
-              onPressed: () {
-                Navigator.pushNamed(context, '/contact-demo');
-              },
-              icon: const Icon(Icons.contacts, color: Color(0xFF10B981)),
-              tooltip: 'Contact Picker Demo',
-            ),
-          ),
-        ],
-      ),
       body: _buildBody(),
     );
   }

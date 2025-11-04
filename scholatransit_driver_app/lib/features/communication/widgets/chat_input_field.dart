@@ -8,6 +8,7 @@ class ChatInputField extends StatefulWidget {
   final VoidCallback onVoiceRecord;
   final VoidCallback onVoiceStop;
   final bool isRecording;
+  final VoidCallback? onAttachment;
 
   const ChatInputField({
     super.key,
@@ -16,6 +17,7 @@ class ChatInputField extends StatefulWidget {
     required this.onVoiceRecord,
     required this.onVoiceStop,
     required this.isRecording,
+    this.onAttachment,
   });
 
   @override
@@ -23,107 +25,131 @@ class ChatInputField extends StatefulWidget {
 }
 
 class _ChatInputFieldState extends State<ChatInputField> {
-  bool _isRecording = false;
-
   void _handleVoicePress() {
-    if (_isRecording) {
+    if (widget.isRecording) {
       widget.onVoiceStop();
-      setState(() {
-        _isRecording = false;
-      });
     } else {
       widget.onVoiceRecord();
-      setState(() {
-        _isRecording = true;
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final blueColor = const Color(0xFF4A90E2);
+
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
-      ),
-      child: Row(
-        children: [
-          // Attachment button
-          Container(
-            width: 40.w,
-            height: 40.w,
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.home_outlined,
-              color: Colors.grey[600],
-              size: 20.sp,
-            ),
-          ),
-          SizedBox(width: 12.w),
-          // Text input field
-          Expanded(
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(20.r),
+      color: Colors.white,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Microphone icon on the left
+              GestureDetector(
+                onTap: _handleVoicePress,
+                child: Container(
+                  padding: EdgeInsets.all(8.w),
+                  child: Icon(
+                    widget.isRecording ? Icons.mic : Icons.mic_outlined,
+                    color: Colors.grey[600],
+                    size: 24.sp,
+                  ),
+                ),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: widget.controller,
-                      decoration: InputDecoration(
-                        hintText: 'Send Message',
-                        hintStyle: GoogleFonts.poppins(
-                          fontSize: 14.sp,
-                          color: Colors.grey[500],
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
+
+              SizedBox(width: 8.w),
+
+              // Input field in the middle
+              Expanded(
+                child: Container(
+                  constraints: BoxConstraints(minHeight: 48.h),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(24.r),
+                  ),
+                  child: TextField(
+                    controller: widget.controller,
+                    decoration: InputDecoration(
+                      hintText: 'Type here...',
+                      hintStyle: GoogleFonts.poppins(
+                        fontSize: 15.sp,
+                        color: Colors.grey[500],
+                        fontWeight: FontWeight.w400,
                       ),
-                      style: GoogleFonts.poppins(
-                        fontSize: 14.sp,
-                        color: Colors.black87,
+                      filled: true,
+                      fillColor: Colors.grey[200],
+                      border: InputBorder.none,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24.r),
+                        borderSide: BorderSide.none,
                       ),
-                      maxLines: null,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => widget.onSend(),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24.r),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16.w,
+                        vertical: 12.h,
+                      ),
+                    ),
+                    style: GoogleFonts.poppins(
+                      fontSize: 15.sp,
+                      color: Colors.black,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    maxLines: 5,
+                    minLines: 1,
+                    textInputAction: TextInputAction.newline,
+                    keyboardType: TextInputType.multiline,
+                    cursorColor: blueColor,
+                    cursorWidth: 2,
+                  ),
+                ),
+              ),
+
+              SizedBox(width: 8.w),
+
+              // Attachment icon
+              GestureDetector(
+                onTap: widget.onAttachment,
+                child: Container(
+                  padding: EdgeInsets.all(8.w),
+                  child: Icon(
+                    Icons.attach_file,
+                    color: Colors.grey[600],
+                    size: 24.sp,
+                  ),
+                ),
+              ),
+
+              SizedBox(width: 8.w),
+
+              // Blue circular send button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.onSend,
+                  borderRadius: BorderRadius.circular(24.r),
+                  child: Container(
+                    width: 48.w,
+                    height: 48.w,
+                    decoration: BoxDecoration(
+                      color: blueColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.send_rounded,
+                      color: Colors.white,
+                      size: 22.sp,
                     ),
                   ),
-                  SizedBox(width: 8.w),
-                  Icon(
-                    Icons.emoji_emotions_outlined,
-                    color: Colors.grey[500],
-                    size: 20.sp,
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-          SizedBox(width: 12.w),
-          // Voice recording button
-          GestureDetector(
-            onTap: _handleVoicePress,
-            child: Container(
-              width: 40.w,
-              height: 40.w,
-              decoration: BoxDecoration(
-                color: _isRecording ? Colors.red : const Color(0xFF8B5CF6),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _isRecording ? Icons.stop : Icons.mic,
-                color: Colors.white,
-                size: 20.sp,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

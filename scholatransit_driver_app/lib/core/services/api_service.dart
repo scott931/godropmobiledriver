@@ -45,6 +45,14 @@ class ApiService {
             options.headers['Authorization'] = 'Bearer $token';
           }
         }
+
+        // Don't override Content-Type if it's already set (e.g., for FormData)
+        // Dio will automatically set multipart/form-data with boundary for FormData
+        if (options.data is FormData) {
+          // Remove Content-Type header to let Dio set it automatically with boundary
+          options.headers.remove('Content-Type');
+        }
+
         handler.next(options);
       },
       onError: (error, handler) async {

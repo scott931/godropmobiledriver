@@ -18,9 +18,25 @@ class ImageMessageBubble extends StatelessWidget {
   });
 
   String _getImageUrl() {
-    // Get image URL from attachmentUrl or fallback to content if it's a URL
-    final url = message.attachmentUrl ?? (message.content.isNotEmpty ? message.content : null);
-    if (url == null || url.isEmpty) return '';
+    // Get image URL from attachmentUrl - only use content if it's a valid URL
+    String? url = message.attachmentUrl ?? message.voiceUrl;
+
+    // Only use content as URL if attachmentUrl is null/empty AND content looks like a URL
+    if ((url == null || url.isEmpty) && message.content.isNotEmpty) {
+      // Check if content is a valid URL (starts with http:// or https://)
+      if (message.content.startsWith('http://') || message.content.startsWith('https://')) {
+        url = message.content;
+      } else {
+        // Content is not a URL, don't use it
+        print('⚠️ Image message has no valid URL');
+        return '';
+      }
+    }
+
+    if (url == null || url.isEmpty) {
+      print('⚠️ Image URL is null or empty');
+      return '';
+    }
 
     // If URL is already absolute, return as is
     if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -28,11 +44,23 @@ class ImageMessageBubble extends StatelessWidget {
     }
 
     // If URL is relative, prepend base URL
-    final baseUrl = AppConfig.baseUrl;
-    if (url.startsWith('/')) {
-      return '$baseUrl$url';
+    final baseUrl = AppConfig.baseUrl.trim();
+    // Remove trailing slash from baseUrl if present
+    final cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final finalUrl = url.startsWith('/') ? '$cleanBaseUrl$url' : '$cleanBaseUrl/$url';
+    print('🖼️ Final image URL: $finalUrl');
+    print('   Original URL: $url');
+    print('   Base URL: $cleanBaseUrl');
+    print('   Message ID: ${message.id}');
+    print('   Message Type: ${message.type}');
+    print('   Timestamp: ${message.timestamp}');
+
+    // Verify URL format
+    if (finalUrl.contains('scaled_') && !finalUrl.contains('http')) {
+      print('⚠️ WARNING: URL might be malformed');
     }
-    return '$baseUrl/$url';
+
+    return finalUrl;
   }
 
   Map<String, String> _getAuthHeaders() {
@@ -180,22 +208,90 @@ class ImageMessageBubble extends StatelessWidget {
                         width: double.infinity,
                         fit: BoxFit.cover,
                         httpHeaders: _getAuthHeaders(),
+                        // Cache settings for better performance
+                        maxWidthDiskCache: 1000,
+                        maxHeightDiskCache: 1000,
+                        memCacheWidth: 1000,
+                        memCacheHeight: 1000,
+                        // Retry on error
+                        fadeInDuration: Duration(milliseconds: 300),
+                        fadeOutDuration: Duration(milliseconds: 100),
+                        // Use cache key to force refresh if needed
+                        cacheKey: imageUrl,
                         errorWidget: (context, url, error) {
+                          print('❌ Image load error for URL: $url');
+                          print('   Error: $error');
+                          print('   Error type: ${error.runtimeType}');
+                          print('   Error toString: ${error.toString()}');
+                          print('   Message attachmentUrl: ${message.attachmentUrl}');
+                          print('   Message content: ${message.content}');
+                          print('   Message ID: ${message.id}');
+                          print('   Auth headers: ${_getAuthHeaders()}');
+
+                          // Check for different error types
+                          final errorStr = error.toString().toLowerCase();
+                          final is404 = errorStr.contains('404') || errorStr.contains('notfound');
+                          final is401 = errorStr.contains('401') || errorStr.contains('unauthorized');
+                          final is403 = errorStr.contains('403') || errorStr.contains('forbidden');
+                          final isNetwork = errorStr.contains('network') ||
+                                           errorStr.contains('connection') ||
+                                           errorStr.contains('socket') ||
+                                           errorStr.contains('timeout');
+
+                          String errorMessage;
+                          IconData errorIcon;
+
+                          if (is401 || is403) {
+                            errorMessage = 'Authentication failed. Please check your login.';
+                            errorIcon = Icons.lock_outline;
+                          } else if (is404) {
+                            errorMessage = 'Image not found (404)';
+                            errorIcon = Icons.image_not_supported;
+                          } else if (isNetwork) {
+                            errorMessage = 'Network error. Please check your connection.';
+                            errorIcon = Icons.wifi_off;
+                          } else {
+                            errorMessage = 'Failed to load image';
+                            errorIcon = Icons.broken_image;
+                          }
+
                           return Container(
                             height: 200.h,
                             color: Colors.grey[300],
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.broken_image, size: 48.w, color: Colors.grey[600]),
+                                Icon(
+                                  errorIcon,
+                                  size: 48.w,
+                                  color: Colors.grey[600],
+                                ),
                                 SizedBox(height: 8.h),
-                                Text(
-                                  'Failed to load image',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 12.sp,
-                                    color: Colors.grey[600],
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                                  child: Text(
+                                    errorMessage,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12.sp,
+                                      color: Colors.grey[600],
+                                    ),
+                                    textAlign: TextAlign.center,
                                   ),
                                 ),
+                                if (is404) ...[
+                                  SizedBox(height: 4.h),
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w),
+                                    child: Text(
+                                      'The image may still be processing. Please wait and refresh.',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 10.sp,
+                                        color: Colors.grey[500],
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           );
