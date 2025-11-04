@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../../core/utils/avatar_color_utils.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/models/conversation_model.dart';
 import '../../../core/services/communication_service.dart';
 import '../../../core/services/realtime_update_service.dart';
+import '../../../core/services/storage_service.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -122,7 +124,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         }
 
         final chatsList = chatsData
-            .where((chatJson) => chatJson is Map<String, dynamic>)
+            .whereType<Map<String, dynamic>>()
             .map(
               (chatJson) =>
                   Conversation.fromJson(chatJson as Map<String, dynamic>),
@@ -184,7 +186,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         }
 
         final chatsList = chatsData
-            .where((chatJson) => chatJson is Map<String, dynamic>)
+            .whereType<Map<String, dynamic>>()
             .map(
               (chatJson) =>
                   Conversation.fromJson(chatJson as Map<String, dynamic>),
@@ -260,7 +262,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         }
 
         final chatsList = chatsData
-            .where((chatJson) => chatJson is Map<String, dynamic>)
+            .whereType<Map<String, dynamic>>()
             .map(
               (chatJson) =>
                   Conversation.fromJson(chatJson as Map<String, dynamic>),
@@ -615,6 +617,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
         chat.studentAvatar ?? chat.otherParticipant.profilePicture;
     final hasUnread = chat.unreadCount > 0;
 
+    // Get current user ID to check if last message is from current user
+    final currentUserId = StorageService.getUserProfile()?['id'] as int?;
+    final lastMessage = chat.lastMessage;
+    final isLastMessageFromMe =
+        lastMessage != null &&
+        currentUserId != null &&
+        lastMessage.displaySenderId == currentUserId;
+    final isLastMessageRead = lastMessage?.isRead ?? false;
+
     return InkWell(
       onTap: () async {
         // Navigate to chat
@@ -695,8 +706,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       // Status Indicator
                       if (hasUnread)
                         _buildUnreadBadge(chat.unreadCount)
+                      else if (isLastMessageFromMe)
+                        // Show one tick for sent, two ticks for read
+                        isLastMessageRead
+                            ? _buildReadIndicator()
+                            : _buildSentIndicator()
                       else
-                        _buildReadIndicator(),
+                        // No indicator for messages from others
+                        const SizedBox.shrink(),
                     ],
                   ),
                 ],
@@ -733,20 +750,19 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildInitialsAvatar(String name) {
+    final initials = _getInitials(name);
+    final backgroundColor = AvatarColorUtils.getColorForName(name);
     return Container(
       width: 56.w,
       height: 56.w,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.grey[300],
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle, color: backgroundColor),
       child: Center(
         child: Text(
-          _getInitials(name),
+          initials,
           style: GoogleFonts.poppins(
             fontSize: 18.sp,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: Colors.white,
           ),
         ),
       ),
@@ -754,6 +770,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildReadIndicator() {
+    // Show two ticks for read messages
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -762,6 +779,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
         Icon(Icons.done_all, size: 16.sp, color: _lightBlueColor),
       ],
     );
+  }
+
+  Widget _buildSentIndicator() {
+    // Show one tick for sent messages (not yet read)
+    return Icon(Icons.done, size: 16.sp, color: _lightBlueColor);
   }
 
   Widget _buildUnreadBadge(int count) {

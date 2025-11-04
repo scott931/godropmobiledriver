@@ -76,24 +76,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   width: 120.w,
                   height: 120.h,
                   decoration: BoxDecoration(
-                    color: AppTheme.primaryColor,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(20.r),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.primaryColor.withOpacity(0.3),
+                        color: Colors.black.withOpacity(0.2),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
                     ],
                   ),
-                  child: Center(
-                    child: Text(
-                      'Go Drop',
-                      style: TextStyle(
-                        fontSize: 24.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                  child: Padding(
+                    padding: EdgeInsets.all(12.w),
+                    child: Image.asset(
+                      'assets/images/bus_logo.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),

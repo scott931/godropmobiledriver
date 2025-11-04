@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/models/message_model.dart';
+import '../../../core/utils/avatar_color_utils.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;
@@ -251,12 +252,13 @@ class MessageBubble extends StatelessWidget {
 
   Widget _buildInitialsAvatar(String name) {
     final initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final backgroundColor = AvatarColorUtils.getColorForName(name);
     return Container(
       width: 32.w,
       height: 32.w,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.grey[300],
+        color: backgroundColor,
       ),
       child: Center(
         child: Text(
@@ -264,7 +266,7 @@ class MessageBubble extends StatelessWidget {
           style: GoogleFonts.poppins(
             fontSize: 14.sp,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: Colors.white,
           ),
         ),
       ),

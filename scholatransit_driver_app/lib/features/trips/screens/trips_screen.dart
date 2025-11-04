@@ -8,6 +8,7 @@ import '../../../core/providers/location_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/models/trip_model.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/services/location_service.dart';
 
 class TripsScreen extends ConsumerStatefulWidget {
   const TripsScreen({super.key});
@@ -296,7 +297,7 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
   }
 }
 
-class _ModernTripCard extends StatelessWidget {
+class _ModernTripCard extends StatefulWidget {
   final Trip trip;
   final VoidCallback? onTap;
   final VoidCallback? onStart;
@@ -310,9 +311,139 @@ class _ModernTripCard extends StatelessWidget {
   });
 
   @override
+  State<_ModernTripCard> createState() => _ModernTripCardState();
+}
+
+class _ModernTripCardState extends State<_ModernTripCard> {
+  String? _startLocationName;
+  String? _endLocationName;
+  bool _isLoadingLocations = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocationNames();
+  }
+
+  Future<void> _loadLocationNames() async {
+    if (_isLoadingLocations) return;
+
+    setState(() => _isLoadingLocations = true);
+
+    // Get start location name
+    if (widget.trip.startLatitude != null && widget.trip.startLongitude != null) {
+      final startName = await LocationService.getAddressFromCoordinates(
+        widget.trip.startLatitude!,
+        widget.trip.startLongitude!,
+      );
+      if (mounted) {
+        setState(() => _startLocationName = startName);
+      }
+    } else if (widget.trip.startLocation != null &&
+               !widget.trip.startLocation!.startsWith('SRID')) {
+      // If it's already a name, use it
+      setState(() => _startLocationName = widget.trip.startLocation);
+    }
+
+    // Get end location name
+    if (widget.trip.endLatitude != null && widget.trip.endLongitude != null) {
+      final endName = await LocationService.getAddressFromCoordinates(
+        widget.trip.endLatitude!,
+        widget.trip.endLongitude!,
+      );
+      if (mounted) {
+        setState(() => _endLocationName = endName);
+      }
+    } else if (widget.trip.endLocation != null &&
+               !widget.trip.endLocation!.startsWith('SRID')) {
+      // If it's already a name, use it
+      setState(() => _endLocationName = widget.trip.endLocation);
+    }
+
+    if (mounted) {
+      setState(() => _isLoadingLocations = false);
+    }
+  }
+
+  String _getStartLocationDisplay() {
+    if (_startLocationName != null) return _startLocationName!;
+    if (widget.trip.startLocation != null &&
+        !widget.trip.startLocation!.startsWith('SRID')) {
+      return widget.trip.startLocation!;
+    }
+    return 'Loading...';
+  }
+
+  String _getEndLocationDisplay() {
+    if (_endLocationName != null) return _endLocationName!;
+    if (widget.trip.endLocation != null &&
+        !widget.trip.endLocation!.startsWith('SRID')) {
+      return widget.trip.endLocation!;
+    }
+    return 'Loading...';
+  }
+
+  String _getDurationDisplay() {
+    // If actual duration is available, use it
+    if (widget.trip.actualDuration != null) {
+      final minutes = widget.trip.actualDuration!.inMinutes;
+      if (minutes >= 60) {
+        return '${minutes ~/ 60}h ${minutes % 60}m';
+      }
+      return '$minutes min';
+    }
+
+    // If duration field is provided, use it
+    if (widget.trip.duration != null) {
+      if (widget.trip.duration! >= 60) {
+        return '${widget.trip.duration! ~/ 60}h ${widget.trip.duration! % 60}m';
+      }
+      return '${widget.trip.duration} min';
+    }
+
+    // Calculate from scheduled times
+    final scheduledDuration = widget.trip.scheduledDuration;
+    final minutes = scheduledDuration.inMinutes;
+    if (minutes >= 60) {
+      return '${minutes ~/ 60}h ${minutes % 60}m';
+    }
+    return '$minutes min';
+  }
+
+  String _getDistanceDisplay() {
+    // If distance is provided by backend, use it
+    if (widget.trip.distance != null) {
+      if (widget.trip.distance! >= 1.0) {
+        return '${widget.trip.distance!.toStringAsFixed(1)} km';
+      }
+      return '${(widget.trip.distance! * 1000).toStringAsFixed(0)} m';
+    }
+
+    // Calculate distance from coordinates if available
+    if (widget.trip.startLatitude != null &&
+        widget.trip.startLongitude != null &&
+        widget.trip.endLatitude != null &&
+        widget.trip.endLongitude != null) {
+      final distance = LocationService.calculateDistance(
+        widget.trip.startLatitude!,
+        widget.trip.startLongitude!,
+        widget.trip.endLatitude!,
+        widget.trip.endLongitude!,
+      );
+      final distanceKm = distance / 1000;
+      if (distanceKm >= 1.0) {
+        return '${distanceKm.toStringAsFixed(1)} km';
+      }
+      return '${distance.toStringAsFixed(0)} m';
+    }
+
+    return 'N/A';
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -351,7 +482,7 @@ class _ModernTripCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          trip.tripId,
+                          widget.trip.routeName ?? widget.trip.tripId,
                           style: GoogleFonts.poppins(
                             fontSize: 16.sp,
                             fontWeight: FontWeight.w600,
@@ -401,15 +532,17 @@ class _ModernTripCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          trip.startLocation ?? 'Unknown',
+                          _getStartLocationDisplay(),
                           style: GoogleFonts.poppins(
                             fontSize: 12.sp,
                             color: Colors.grey[600],
                           ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: 4.h),
                         Text(
-                          _formatTime(trip.scheduledStart),
+                          _formatTime(widget.trip.scheduledStart),
                           style: GoogleFonts.poppins(
                             fontSize: 16.sp,
                             fontWeight: FontWeight.w600,
@@ -451,16 +584,18 @@ class _ModernTripCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          trip.endLocation ?? 'Unknown',
+                          _getEndLocationDisplay(),
                           style: GoogleFonts.poppins(
                             fontSize: 12.sp,
                             color: Colors.grey[600],
                           ),
                           textAlign: TextAlign.right,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         SizedBox(height: 4.h),
                         Text(
-                          _formatTime(trip.scheduledEnd),
+                          _formatTime(widget.trip.scheduledEnd),
                           style: GoogleFonts.poppins(
                             fontSize: 16.sp,
                             fontWeight: FontWeight.w600,
@@ -477,7 +612,7 @@ class _ModernTripCard extends StatelessWidget {
               SizedBox(height: 16.h),
 
               // ETA Information
-              if (trip.estimatedArrival != null) _buildETAInfo(),
+              if (widget.trip.estimatedArrival != null) _buildETAInfo(),
 
               SizedBox(height: 16.h),
 
@@ -491,48 +626,44 @@ class _ModernTripCard extends StatelessWidget {
                         _TripAttribute(
                           icon: Icons.schedule,
                           label: 'Duration',
-                          value: trip.duration != null
-                              ? '${trip.duration} min'
-                              : 'N/A',
+                          value: _getDurationDisplay(),
                         ),
                         SizedBox(width: 16.w),
                         _TripAttribute(
                           icon: Icons.straighten,
                           label: 'Distance',
-                          value: trip.distance != null
-                              ? '${trip.distance!.toStringAsFixed(1)} km'
-                              : 'N/A',
+                          value: _getDistanceDisplay(),
                         ),
                       ],
                     ),
                   ),
 
                   // Action Button
-                  if (onStart != null || onEnd != null)
+                  if (widget.onStart != null || widget.onEnd != null)
                     Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 16.w,
                         vertical: 8.h,
                       ),
                       decoration: BoxDecoration(
-                        color: onStart != null
+                        color: widget.onStart != null
                             ? const Color(0xFF10B981)
                             : const Color(0xFFEF4444),
                         borderRadius: BorderRadius.circular(20.r),
                       ),
                       child: GestureDetector(
-                        onTap: onStart ?? onEnd,
+                        onTap: widget.onStart ?? widget.onEnd,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              onStart != null ? Icons.play_arrow : Icons.stop,
+                              widget.onStart != null ? Icons.play_arrow : Icons.stop,
                               color: Colors.white,
                               size: 16.w,
                             ),
                             SizedBox(width: 4.w),
                             Text(
-                              onStart != null ? 'Start' : 'End',
+                              widget.onStart != null ? 'Start' : 'End',
                               style: GoogleFonts.poppins(
                                 fontSize: 12.sp,
                                 fontWeight: FontWeight.w600,
@@ -553,7 +684,7 @@ class _ModernTripCard extends StatelessWidget {
   }
 
   Color _getStatusColor() {
-    switch (trip.status) {
+    switch (widget.trip.status) {
       case TripStatus.pending:
         return const Color(0xFFF59E0B);
       case TripStatus.inProgress:
@@ -568,7 +699,7 @@ class _ModernTripCard extends StatelessWidget {
   }
 
   String _getStatusText() {
-    switch (trip.status) {
+    switch (widget.trip.status) {
       case TripStatus.pending:
         return 'PENDING';
       case TripStatus.inProgress:
@@ -583,7 +714,7 @@ class _ModernTripCard extends StatelessWidget {
   }
 
   String _getTripTypeText() {
-    switch (trip.type) {
+    switch (widget.trip.type) {
       case TripType.pickup:
         return 'Pickup Trip';
       case TripType.dropoff:
@@ -603,12 +734,12 @@ class _ModernTripCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(12.w),
       decoration: BoxDecoration(
-        color: trip.isRunningLate
+        color: widget.trip.isRunningLate
             ? Colors.red.withOpacity(0.1)
             : Colors.green.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8.r),
         border: Border.all(
-          color: trip.isRunningLate
+          color: widget.trip.isRunningLate
               ? Colors.red.withOpacity(0.3)
               : Colors.green.withOpacity(0.3),
           width: 1,
@@ -617,8 +748,8 @@ class _ModernTripCard extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            trip.isRunningLate ? Icons.warning : Icons.schedule,
-            color: trip.isRunningLate ? Colors.red : Colors.green,
+            widget.trip.isRunningLate ? Icons.warning : Icons.schedule,
+            color: widget.trip.isRunningLate ? Colors.red : Colors.green,
             size: 16.w,
           ),
           SizedBox(width: 8.w),
@@ -627,17 +758,17 @@ class _ModernTripCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ETA: ${trip.formattedTimeToArrival}',
+                  'ETA: ${widget.trip.formattedTimeToArrival}',
                   style: GoogleFonts.poppins(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w600,
-                    color: trip.isRunningLate ? Colors.red : Colors.green,
+                    color: widget.trip.isRunningLate ? Colors.red : Colors.green,
                   ),
                 ),
-                if (trip.trafficConditions != 'Unknown') ...[
+                if (widget.trip.trafficConditions != 'Unknown') ...[
                   SizedBox(height: 2.h),
                   Text(
-                    trip.trafficConditions,
+                    widget.trip.trafficConditions,
                     style: GoogleFonts.poppins(
                       fontSize: 10.sp,
                       color: Colors.grey[600],
@@ -647,7 +778,7 @@ class _ModernTripCard extends StatelessWidget {
               ],
             ),
           ),
-          if (trip.isRunningLate) ...[
+          if (widget.trip.isRunningLate) ...[
             Container(
               padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
               decoration: BoxDecoration(

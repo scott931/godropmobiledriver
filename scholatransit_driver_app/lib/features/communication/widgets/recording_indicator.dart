@@ -4,10 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 class RecordingIndicator extends StatefulWidget {
   final Duration recordingDuration;
+  final VoidCallback? onStop;
 
   const RecordingIndicator({
     super.key,
     required this.recordingDuration,
+    this.onStop,
   });
 
   @override
@@ -77,11 +79,11 @@ class _RecordingIndicatorState extends State<RecordingIndicator>
                         vertical: 12.h,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4A90E2), // Blue color to match sent messages
+                        color: const Color(0xFFEF4444), // Red color when recording
                         borderRadius: BorderRadius.circular(12.r),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF4A90E2).withOpacity(
+                            color: const Color(0xFFEF4444).withOpacity(
                               0.3 + (_animationController.value * 0.2),
                             ),
                             blurRadius: 8,
@@ -153,6 +155,38 @@ class _RecordingIndicatorState extends State<RecordingIndicator>
               ],
             ),
           ),
+          // Stop button
+          if (widget.onStop != null)
+            Padding(
+              padding: EdgeInsets.only(left: 8.w),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: widget.onStop,
+                  borderRadius: BorderRadius.circular(20.r),
+                  child: Container(
+                    width: 40.w,
+                    height: 40.w,
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.3),
+                          blurRadius: 8,
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      Icons.stop,
+                      color: Colors.white,
+                      size: 20.w,
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

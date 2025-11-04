@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
 import '../config/app_config.dart';
 import '../services/api_service.dart';
+import 'push_notification_service.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _localNotifications =
@@ -189,8 +190,13 @@ class NotificationService {
   }
 
   static Future<String?> getFCMToken() async {
-    // FCM is disabled, return null
-    return null;
+    // FCM is disabled, use OneSignal instead
+    // This method is kept for compatibility
+    try {
+      return await PushNotificationService.getDeviceToken();
+    } catch (e) {
+      return null;
+    }
   }
 
   static Future<void> subscribeToTopic(String topic) async {

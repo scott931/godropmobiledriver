@@ -56,7 +56,7 @@ class CurrentTripCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        trip.tripId,
+                        trip.routeName ?? 'Route ${trip.routeId ?? 'N/A'}',
                         style: GoogleFonts.poppins(
                           fontSize: 14.sp,
                           color: Colors.white.withOpacity(0.8),

@@ -783,20 +783,11 @@ class _ActiveTripBanner extends StatelessWidget {
               ),
               SizedBox(height: 4.h),
               Text(
-                'Trip ID: ${activeTrip.tripId}',
+                activeTrip.routeName ?? 'Route ${activeTrip.routeId ?? 'N/A'}',
                 style: GoogleFonts.poppins(
                   fontSize: 16.sp,
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: 4.h),
-              Text(
-                'Route: ${activeTrip.routeName ?? 'Unknown Route'}',
-                style: GoogleFonts.poppins(
-                  fontSize: 12.sp,
-                  color: Colors.white.withOpacity(0.8),
-                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],

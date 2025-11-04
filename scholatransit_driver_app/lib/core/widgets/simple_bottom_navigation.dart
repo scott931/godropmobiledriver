@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../theme/app_theme.dart';
+import '../services/realtime_update_service.dart';
+import '../services/communication_service.dart';
 
-class SimpleBottomNavigation extends StatelessWidget {
+class SimpleBottomNavigation extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTap;
 
@@ -13,7 +15,115 @@ class SimpleBottomNavigation extends StatelessWidget {
   });
 
   @override
+  State<SimpleBottomNavigation> createState() => _SimpleBottomNavigationState();
+}
+
+class _SimpleBottomNavigationState extends State<SimpleBottomNavigation> {
+  int _unreadCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnreadCount();
+    _startListeningToUpdates();
+  }
+
+  void _loadUnreadCount() async {
+    try {
+      final response = await CommunicationService.getUnreadCount();
+      if (response.success && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
+        final count = data['unread_count'] as int? ?? 0;
+        print('📊 BottomNav: Loaded unread count: $count');
+        if (mounted) {
+          setState(() {
+            _unreadCount = count;
+          });
+        }
+      } else {
+        print('⚠️ BottomNav: Failed to load unread count: ${response.error}');
+        // Try to calculate from chat list as fallback
+        _calculateUnreadFromChatList();
+      }
+    } catch (e) {
+      print('❌ BottomNav: Error loading unread count: $e');
+      // Try to calculate from chat list as fallback
+      _calculateUnreadFromChatList();
+    }
+  }
+
+  void _calculateUnreadFromChatList() async {
+    try {
+      final response = await CommunicationService.listChats();
+      if (response.success && response.data != null) {
+        List<dynamic> chatsData;
+        if (response.data is List) {
+          chatsData = response.data as List;
+        } else if (response.data is Map<String, dynamic>) {
+          final data = response.data as Map<String, dynamic>;
+          if (data.containsKey('results')) {
+            chatsData = data['results'] as List? ?? [];
+          } else if (data.containsKey('data')) {
+            chatsData = data['data'] as List? ?? [];
+          } else {
+            chatsData = [];
+          }
+        } else {
+          chatsData = [];
+        }
+
+        int totalUnread = 0;
+        for (var chatJson in chatsData) {
+          if (chatJson is Map<String, dynamic>) {
+            final unreadCount = chatJson['unread_count'] as int? ?? 0;
+            totalUnread += unreadCount;
+          }
+        }
+
+        print('📊 BottomNav: Calculated unread count from chat list: $totalUnread');
+        if (mounted) {
+          setState(() {
+            _unreadCount = totalUnread;
+          });
+        }
+      }
+    } catch (e) {
+      print('❌ BottomNav: Error calculating unread from chat list: $e');
+    }
+  }
+
+  void _startListeningToUpdates() {
+    // Listen to real-time unread count updates
+    RealtimeUpdateService.startPolling(
+      onUnreadCountUpdated: (unreadCount) {
+        print('📊 BottomNav: Unread count updated: $unreadCount');
+        if (mounted) {
+          setState(() {
+            _unreadCount = unreadCount;
+          });
+        }
+      },
+      onChatListUpdated: (updatedChats) {
+        // Calculate unread count from chat list as backup
+        int totalUnread = 0;
+        for (var chat in updatedChats) {
+          totalUnread += chat.unreadCount;
+        }
+        print('📊 BottomNav: Calculated unread from chat list update: $totalUnread');
+        if (mounted) {
+          setState(() {
+            _unreadCount = totalUnread;
+          });
+        }
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Debug: Log current unread count
+    print('🔴 BottomNav: Building with unread count: $_unreadCount, should show badge: ${_unreadCount > 0}');
+
     return Container(
       color: Colors.white,
       child: SafeArea(
@@ -58,6 +168,7 @@ class SimpleBottomNavigation extends StatelessWidget {
                 activeIcon: Icons.chat_bubble,
                 label: 'Conversations',
                 index: 4,
+                showBadge: _unreadCount > 0,
               ),
             ],
           ),
@@ -71,22 +182,66 @@ class SimpleBottomNavigation extends StatelessWidget {
     required IconData activeIcon,
     required String label,
     required int index,
+    bool showBadge = false,
   }) {
-    final isActive = currentIndex == index;
+    final isActive = widget.currentIndex == index;
+
+    // Debug: Log badge state for conversation icon
+    if (index == 4) {
+      print('🔴 BottomNav: Conversation icon - showBadge: $showBadge');
+    }
 
     return GestureDetector(
-      onTap: () => onTap(index),
+      onTap: () => widget.onTap(index),
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 4.h),
+        padding: EdgeInsets.symmetric(vertical: 2.h, horizontal: 8.w),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              isActive ? activeIcon : icon,
-              size: 20.w,
-              color: isActive ? AppTheme.primaryColor : AppTheme.textTertiary,
+            // Icon with badge wrapper
+            SizedBox(
+              width: 24.w,
+              height: 24.w,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(
+                    child: Icon(
+                      isActive ? activeIcon : icon,
+                      size: 20.w,
+                      color: isActive ? AppTheme.primaryColor : AppTheme.textTertiary,
+                    ),
+                  ),
+                  // Red badge indicator for unread messages
+                  if (showBadge && index == 4)
+                    Positioned(
+                      right: -2.w,
+                      top: -2.h,
+                      child: Container(
+                        width: 12.w,
+                        height: 12.w,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.9),
+                              blurRadius: 3,
+                              spreadRadius: 0.5,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-            SizedBox(height: 2.h),
+            SizedBox(height: 1.h),
             Text(
               label,
               style: TextStyle(

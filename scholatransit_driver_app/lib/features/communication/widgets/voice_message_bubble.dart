@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import '../../../core/models/message_model.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/storage_service.dart';
+import '../../../core/utils/avatar_color_utils.dart';
 
 class VoiceMessageBubble extends StatefulWidget {
   final Message message;
@@ -789,12 +790,13 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble>
 
   Widget _buildInitialsAvatar(String name) {
     final initials = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final backgroundColor = AvatarColorUtils.getColorForName(name);
     return Container(
       width: 32.w,
       height: 32.w,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.grey[300],
+        color: backgroundColor,
       ),
       child: Center(
         child: Text(
@@ -802,7 +804,7 @@ class _VoiceMessageBubbleState extends State<VoiceMessageBubble>
           style: GoogleFonts.poppins(
             fontSize: 14.sp,
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: Colors.white,
           ),
         ),
       ),

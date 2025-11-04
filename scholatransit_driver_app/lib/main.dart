@@ -6,10 +6,14 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
+import 'core/config/app_config.dart';
 import 'core/services/storage_service.dart';
 import 'core/services/api_service.dart';
 import 'core/services/location_health_monitor.dart';
 import 'core/services/simple_communication_log_service.dart';
+import 'core/services/background_message_service.dart';
+import 'core/services/notification_service.dart';
+import 'core/services/push_notification_service.dart';
 import 'core/widgets/system_back_button_handler.dart';
 
 void main() async {
@@ -39,6 +43,24 @@ Future<void> _initializeServices() async {
 
   // Initialize location health monitoring
   LocationHealthMonitor.startMonitoring();
+
+  // Initialize notification service (local notifications)
+  await NotificationService.init();
+
+  // Initialize push notification service (OneSignal)
+  // Replace 'YOUR_ONESIGNAL_APP_ID' with your actual OneSignal App ID
+  try {
+    await PushNotificationService.init(
+      oneSignalAppId: AppConfig.oneSignalAppId,
+    );
+  } catch (e) {
+    print('⚠️ Failed to initialize push notifications: $e');
+    // Continue without push notifications - local notifications will still work
+  }
+
+  // Start background message checking service
+  // This will check for new messages even when app is in background
+  BackgroundMessageService.startBackgroundChecking();
 }
 
 Future<void> _requestPermissions() async {

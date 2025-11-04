@@ -101,6 +101,10 @@ class AppConfig {
   static const String notificationChannelDescription =
       'Notifications for drivers about trips, students, and emergencies';
 
+  // OneSignal Configuration
+  // Get your OneSignal App ID from: https://app.onesignal.com -> Settings -> Keys & IDs
+  static const String oneSignalAppId = 'YOUR_ONESIGNAL_APP_ID'; // Replace with your OneSignal App ID
+
   // Storage Keys
   static const String authTokenKey = 'auth_token';
   static const String refreshTokenKey = 'refresh_token';

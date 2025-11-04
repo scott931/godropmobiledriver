@@ -115,7 +115,7 @@ class _TripItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  trip.tripId,
+                  trip.routeName ?? 'Route ${trip.routeId ?? 'N/A'}',
                   style: GoogleFonts.poppins(
                     fontSize: 16.sp,
                     fontWeight: FontWeight.w600,

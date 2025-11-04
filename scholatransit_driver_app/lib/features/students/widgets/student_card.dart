@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../core/models/student_model.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/avatar_color_utils.dart';
 
 class StudentCard extends StatelessWidget {
   final Student student;
@@ -12,130 +14,197 @@ class StudentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = _getStatusColor();
+
     return GestureDetector(
       onTap: () => context.go('/students/${student.id}'),
       child: Container(
-        margin: EdgeInsets.only(bottom: 12.h),
+        margin: EdgeInsets.only(bottom: 10.h),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border(
+            left: BorderSide(
+              color: statusColor,
+              width: 4.w,
+            ),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: statusColor.withOpacity(0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
+              spreadRadius: 0,
             ),
           ],
         ),
         child: Padding(
-          padding: EdgeInsets.all(16.w),
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
           child: Row(
             children: [
-              // Simple Avatar
+              // Avatar with Status Ring
               Container(
-                width: 48.w,
-                height: 48.w,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _getStatusColor().withOpacity(0.1),
+                  border: Border.all(
+                    color: statusColor,
+                    width: 2.5.w,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: statusColor.withOpacity(0.2),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
-                child: student.profileImage != null
-                    ? ClipOval(
-                        child: Image.network(
-                          student.profileImage!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _buildAvatarFallback(),
-                        ),
-                      )
-                    : _buildAvatarFallback(),
+                child: Container(
+                  width: 52.w,
+                  height: 52.w,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AvatarColorUtils.getColorForName(student.firstName)
+                        .withOpacity(0.1),
+                  ),
+                  child: student.profileImage != null
+                      ? ClipOval(
+                          child: Image.network(
+                            student.profileImage!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                _buildAvatarFallback(),
+                          ),
+                        )
+                      : _buildAvatarFallback(),
+                ),
               ),
               SizedBox(width: 12.w),
               // Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      student.fullName,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            student.fullName,
+                            style: GoogleFonts.poppins(
+                              fontSize: 15.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ),
+                        // Status Badge
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10.w,
+                            vertical: 4.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Text(
+                            _getStatusText(),
+                            style: GoogleFonts.poppins(
+                              fontSize: 10.sp,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(height: 4.h),
-                    if (student.grade != null)
-                      Text(
-                        'Grade ${student.grade}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
+                    SizedBox(height: 6.h),
+                    if (student.grade != null || student.school != null)
+                      Row(
+                        children: [
+                          if (student.grade != null) ...[
+                            Icon(
+                              Icons.school_outlined,
+                              size: 12.w,
+                              color: Colors.grey[600],
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'Grade ${student.grade}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12.sp,
+                                color: Colors.grey[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                          if (student.grade != null && student.school != null)
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 6.w),
+                              child: Container(
+                                width: 3.w,
+                                height: 3.w,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[400],
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          if (student.school != null) ...[
+                            Expanded(
+                              child: Text(
+                                student.school!,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12.sp,
+                                  color: Colors.grey[700],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    if (student.school != null) ...[
-                      SizedBox(height: 2.h),
-                      Text(
-                        student.school!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    if (onStatusUpdate != null && _canUpdateStatus()) ...[
+                      SizedBox(height: 8.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _ActionButton(
+                              onPressed: () => onStatusUpdate!(StudentStatus.onBus),
+                              label: 'On Bus',
+                              icon: Icons.directions_bus,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: _ActionButton(
+                              onPressed: () =>
+                                  onStatusUpdate!(StudentStatus.droppedOff),
+                              label: 'Dropped',
+                              icon: Icons.check_circle,
+                              color: AppTheme.successColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (onStatusUpdate != null) ...[
+                      SizedBox(height: 6.h),
+                      _ActionButton(
+                        onPressed: () => context.go('/students/${student.id}'),
+                        label: 'View',
+                        icon: Icons.arrow_forward_ios,
+                        color: AppTheme.primaryColor,
+                        isOutlined: true,
+                        isFullWidth: true,
                       ),
                     ],
                   ],
                 ),
-              ),
-              // Status and Actions
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Status Badge
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8.w,
-                      vertical: 4.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(),
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                    child: Text(
-                      _getStatusText(),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  // Action Buttons
-                  if (onStatusUpdate != null && _canUpdateStatus()) ...[
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _SimpleButton(
-                          onPressed: () => onStatusUpdate!(StudentStatus.onBus),
-                          label: 'On Bus',
-                          color: AppTheme.primaryColor,
-                        ),
-                        SizedBox(width: 8.w),
-                        _SimpleButton(
-                          onPressed: () =>
-                              onStatusUpdate!(StudentStatus.droppedOff),
-                          label: 'Dropped',
-                          color: AppTheme.successColor,
-                        ),
-                      ],
-                    ),
-                  ] else if (onStatusUpdate != null) ...[
-                    _SimpleButton(
-                      onPressed: () => context.go('/students/${student.id}'),
-                      label: 'View',
-                      color: AppTheme.primaryColor,
-                      isOutlined: true,
-                    ),
-                  ],
-                ],
               ),
             ],
           ),
@@ -145,13 +214,14 @@ class StudentCard extends StatelessWidget {
   }
 
   Widget _buildAvatarFallback() {
+    final avatarColor = AvatarColorUtils.getColorForName(student.firstName);
     return Center(
       child: Text(
         student.firstName[0].toUpperCase(),
-        style: TextStyle(
-          color: _getStatusColor(),
-          fontWeight: FontWeight.w600,
-          fontSize: 18.sp,
+        style: GoogleFonts.poppins(
+          color: avatarColor,
+          fontWeight: FontWeight.w700,
+          fontSize: 20.sp,
         ),
       ),
     );
@@ -193,51 +263,70 @@ class StudentCard extends StatelessWidget {
   }
 }
 
-class _SimpleButton extends StatelessWidget {
+class _ActionButton extends StatelessWidget {
   final VoidCallback onPressed;
   final String label;
+  final IconData icon;
   final Color color;
   final bool isOutlined;
+  final bool isFullWidth;
 
-  const _SimpleButton({
+  const _ActionButton({
     required this.onPressed,
     required this.label,
+    required this.icon,
     required this.color,
     this.isOutlined = false,
+    this.isFullWidth = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (isOutlined) {
-      return TextButton(
-        onPressed: onPressed,
-        style: TextButton.styleFrom(
-          foregroundColor: color,
-          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.r),
-            side: BorderSide(color: color, width: 1),
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
-        ),
-      );
-    }
+    final button = isOutlined
+        ? OutlinedButton.icon(
+            onPressed: onPressed,
+            icon: Icon(icon, size: 14.w),
+            label: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: color,
+              side: BorderSide(color: color, width: 1.5),
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              minimumSize: Size(0, 32.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+            ),
+          )
+        : ElevatedButton.icon(
+            onPressed: onPressed,
+            icon: Icon(icon, size: 14.w, color: Colors.white),
+            label: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+              minimumSize: Size(0, 32.h),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              elevation: 1,
+              shadowColor: color.withOpacity(0.3),
+            ),
+          );
 
-    return TextButton(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
-      ),
-    );
+    return isFullWidth ? SizedBox(width: double.infinity, child: button) : button;
   }
 }
