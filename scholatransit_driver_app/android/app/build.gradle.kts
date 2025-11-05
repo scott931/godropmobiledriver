@@ -39,9 +39,11 @@ android {
         buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"pk.eyJ1Ijoid2F5bmU5MzEiLCJhIjoiY21maW5qaWpjMGRpazJsc2VnNmRoOW0xaSJ9.S4led3XBi7bpACc4D2KyBQ\"")
 
         // Graphics and memory optimizations
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
-        }
+        // Note: ABI filters are managed by Flutter when using --split-per-abi
+        // Remove the ndk block below if you want Flutter to manage ABIs automatically
+        // ndk {
+        //     abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        // }
 
         // Increase heap size to handle graphics buffer issues
         manifestPlaceholders["android:largeHeap"] = "true"
@@ -53,6 +55,14 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+}
+
+// Disable ART profile compilation to avoid baseline-prof.txt errors
+// This is done via Gradle task configuration since the property was removed in AGP 8.0+
+afterEvaluate {
+    tasks.matching { it.name.contains("ArtProfile", ignoreCase = true) }.configureEach {
+        enabled = false
     }
 }
 
