@@ -65,7 +65,9 @@ class Message {
         } else if (senderField is int) {
           senderIdFromSender = senderField;
         } else {
-          print('⚠️ DEBUG: sender is neither Map nor int: ${senderField.runtimeType}, value: $senderField');
+          print(
+            '⚠️ DEBUG: sender is neither Map nor int: ${senderField.runtimeType}, value: $senderField',
+          );
         }
       }
     } catch (e, stackTrace) {
@@ -76,10 +78,11 @@ class Message {
     // Extract sender info from various possible fields
     int? senderId;
     try {
-      senderId = json['sender_id'] as int? ??
-                 senderIdFromSender ??
-                 senderMap?['id'] as int? ??
-                 sender?.id;
+      senderId =
+          json['sender_id'] as int? ??
+          senderIdFromSender ??
+          senderMap?['id'] as int? ??
+          sender?.id;
     } catch (e) {
       print('⚠️ ERROR: Failed to extract sender_id: $e');
       senderId = senderIdFromSender ?? sender?.id;
@@ -87,11 +90,12 @@ class Message {
 
     String? senderName;
     try {
-      senderName = json['sender_name'] as String? ??
-                   senderMap?['display_name'] as String? ??
-                   senderMap?['full_name'] as String? ??
-                   sender?.displayName ??
-                   sender?.fullName;
+      senderName =
+          json['sender_name'] as String? ??
+          senderMap?['display_name'] as String? ??
+          senderMap?['full_name'] as String? ??
+          sender?.displayName ??
+          sender?.fullName;
     } catch (e) {
       print('⚠️ ERROR: Failed to extract sender_name: $e');
       senderName = sender?.displayName ?? sender?.fullName ?? 'Unknown';
@@ -99,26 +103,28 @@ class Message {
 
     String? senderAvatar;
     try {
-      senderAvatar = json['sender_avatar'] as String? ??
-                     senderMap?['profile_picture'] as String? ??
-                     sender?.profilePicture;
+      senderAvatar =
+          json['sender_avatar'] as String? ??
+          senderMap?['profile_picture'] as String? ??
+          sender?.profilePicture;
     } catch (e) {
       print('⚠️ ERROR: Failed to extract sender_avatar: $e');
       senderAvatar = sender?.profilePicture;
     }
 
     // Parse message type
-    final messageTypeStr = json['message_type'] as String? ??
-                           json['type'] as String? ??
-                           'text';
+    final messageTypeStr =
+        json['message_type'] as String? ?? json['type'] as String? ?? 'text';
     final messageType = MessageType.fromString(messageTypeStr);
 
     // Parse timestamp
     DateTime timestamp;
     try {
-      timestamp = DateTime.parse(json['created_at'] as String? ??
-                                json['timestamp'] as String? ??
-                                DateTime.now().toIso8601String());
+      timestamp = DateTime.parse(
+        json['created_at'] as String? ??
+            json['timestamp'] as String? ??
+            DateTime.now().toIso8601String(),
+      );
     } catch (e) {
       timestamp = DateTime.now();
     }
@@ -130,7 +136,8 @@ class Message {
 
     try {
       // Determine message type early to prioritize correctly
-      final messageTypeStr = json['message_type'] as String? ?? json['type'] as String?;
+      final messageTypeStr =
+          json['message_type'] as String? ?? json['type'] as String?;
       final isVoiceMessage = messageTypeStr == 'voice';
       final isImageMessage = messageTypeStr == 'image';
 
@@ -151,7 +158,9 @@ class Message {
               voiceUrl = url;
             }
             print('✅ Found attachment URL in attachment field: $url');
-          } else if (url.isNotEmpty && url != 'null' && url.toLowerCase() != 'none') {
+          } else if (url.isNotEmpty &&
+              url != 'null' &&
+              url.toLowerCase() != 'none') {
             // Relative URL - will be handled by URL construction in widgets
             attachmentUrl = url;
             if (isVoiceMessage) {
@@ -163,9 +172,10 @@ class Message {
           }
         } else if (json['attachment'] is Map<String, dynamic>) {
           final attachmentMap = json['attachment'] as Map<String, dynamic>;
-          final url = attachmentMap['url'] as String? ??
-                      attachmentMap['file'] as String? ??
-                      attachmentMap['attachment'] as String?;
+          final url =
+              attachmentMap['url'] as String? ??
+              attachmentMap['file'] as String? ??
+              attachmentMap['attachment'] as String?;
           if (url != null && url.isNotEmpty) {
             attachmentUrl = url;
             // If voice message, also set voiceUrl
@@ -179,7 +189,9 @@ class Message {
           // Attachment might be an ID reference - skip
           print('⚠️ DEBUG: attachment is an int (ID): ${json['attachment']}');
         } else {
-          print('⚠️ DEBUG: attachment is unexpected type: ${json['attachment'].runtimeType}');
+          print(
+            '⚠️ DEBUG: attachment is unexpected type: ${json['attachment'].runtimeType}',
+          );
         }
       }
 
@@ -189,16 +201,16 @@ class Message {
           final url = json['voice_url'] as String;
           if (url.isNotEmpty) {
             voiceUrl = url;
-            if (attachmentUrl == null) {
-              attachmentUrl = url; // Also set attachmentUrl for backward compatibility
-            }
+            attachmentUrl ??= url;
             print('✅ Found voice URL in voice_url field: $url');
           }
         }
       }
 
       // PRIORITY 3: Check attachment_url (fallback - some API responses use this)
-      if (attachmentUrl == null && json['attachment_url'] != null && json['attachment_url'] is String) {
+      if (attachmentUrl == null &&
+          json['attachment_url'] != null &&
+          json['attachment_url'] is String) {
         final url = json['attachment_url'] as String;
         if (url.isNotEmpty) {
           attachmentUrl = url;
@@ -213,9 +225,11 @@ class Message {
       // If still no URL and message type suggests it should have one, log warning with full JSON
       if (attachmentUrl == null && voiceUrl == null) {
         if (isVoiceMessage || isImageMessage || messageTypeStr == 'file') {
-          print('⚠️ WARNING: ${messageTypeStr} message has no attachment URL');
+          print('⚠️ WARNING: $messageTypeStr message has no attachment URL');
           print('   Message JSON keys: ${json.keys.toList()}');
-          print('   URL-related fields: ${json.keys.where((k) => k.toLowerCase().contains('attach') || k.toLowerCase().contains('url')).toList()}');
+          print(
+            '   URL-related fields: ${json.keys.where((k) => k.toLowerCase().contains('attach') || k.toLowerCase().contains('url')).toList()}',
+          );
           print('   Full JSON: $json');
         }
       } else {
@@ -249,20 +263,21 @@ class Message {
         if (json['chat'] is int) {
           conversationId = json['chat'] as int;
         } else if (json['chat'] is Map<String, dynamic>) {
-          conversationId = (json['chat'] as Map<String, dynamic>)['id'] as int? ?? 0;
+          conversationId =
+              (json['chat'] as Map<String, dynamic>)['id'] as int? ?? 0;
         } else {
-          print('⚠️ DEBUG: chat field is neither int nor Map: ${json['chat'].runtimeType}');
+          print(
+            '⚠️ DEBUG: chat field is neither int nor Map: ${json['chat'].runtimeType}',
+          );
         }
       } else {
-        conversationId = json['conversation_id'] as int? ??
-                         json['chat_id'] as int? ??
-                         0;
+        conversationId =
+            json['conversation_id'] as int? ?? json['chat_id'] as int? ?? 0;
       }
     } catch (e) {
       print('⚠️ ERROR: Failed to parse conversationId: $e');
-      conversationId = json['conversation_id'] as int? ??
-                       json['chat_id'] as int? ??
-                       0;
+      conversationId =
+          json['conversation_id'] as int? ?? json['chat_id'] as int? ?? 0;
     }
 
     // Parse content safely
@@ -308,14 +323,21 @@ class Message {
       }
 
       // Debug logging for voice messages
-      final messageTypeStr = json['message_type'] as String? ?? json['type'] as String?;
+      final messageTypeStr =
+          json['message_type'] as String? ?? json['type'] as String?;
       if (messageTypeStr == 'voice') {
         print('📊 Parsing voice duration:');
-        print('   voice_duration field: ${json['voice_duration']} (type: ${json['voice_duration']?.runtimeType})');
-        print('   duration field: ${json['duration']} (type: ${json['duration']?.runtimeType})');
+        print(
+          '   voice_duration field: ${json['voice_duration']} (type: ${json['voice_duration']?.runtimeType})',
+        );
+        print(
+          '   duration field: ${json['duration']} (type: ${json['duration']?.runtimeType})',
+        );
         print('   Parsed duration: $parsedVoiceDuration');
         if (parsedVoiceDuration == null) {
-          print('   ⚠️ No duration found - available fields: ${json.keys.where((k) => k.toLowerCase().contains('duration') || k.toLowerCase().contains('time')).toList()}');
+          print(
+            '   ⚠️ No duration found - available fields: ${json.keys.where((k) => k.toLowerCase().contains('duration') || k.toLowerCase().contains('time')).toList()}',
+          );
         }
       }
     } catch (e) {
@@ -336,11 +358,18 @@ class Message {
       isRead: json['is_read'] as bool? ?? false,
       voiceUrl: voiceUrl ?? json['voice_url'] as String? ?? attachmentUrl,
       voiceDuration: parsedVoiceDuration,
-      attachmentUrl: attachmentUrl ?? json['attachment_url'] as String? ?? voiceUrl,
-      attachmentType: attachmentType ?? json['attachment_type'] as String? ??
-                      (messageType == MessageType.image ? 'image' :
-                       messageType == MessageType.voice ? 'audio' :
-                       messageType == MessageType.file ? 'file' : null),
+      attachmentUrl:
+          attachmentUrl ?? json['attachment_url'] as String? ?? voiceUrl,
+      attachmentType:
+          attachmentType ??
+          json['attachment_type'] as String? ??
+          (messageType == MessageType.image
+              ? 'image'
+              : messageType == MessageType.voice
+              ? 'audio'
+              : messageType == MessageType.file
+              ? 'file'
+              : null),
       replyTo: replyTo,
       replyToContent: replyToContent,
       replyToSender: replyToSender,
@@ -458,11 +487,13 @@ class SenderInfo {
         id: json['id'] as int? ?? 0,
         firstName: json['first_name'] as String? ?? '',
         lastName: json['last_name'] as String? ?? '',
-        fullName: json['full_name'] as String? ??
-                  '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim(),
-        displayName: json['display_name'] as String? ??
-                     json['full_name'] as String? ??
-                     '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim(),
+        fullName:
+            json['full_name'] as String? ??
+            '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim(),
+        displayName:
+            json['display_name'] as String? ??
+            json['full_name'] as String? ??
+            '${json['first_name'] ?? ''} ${json['last_name'] ?? ''}'.trim(),
         email: json['email'] as String?,
         userType: json['user_type'] as String? ?? 'unknown',
         profilePicture: json['profile_picture'] as String?,

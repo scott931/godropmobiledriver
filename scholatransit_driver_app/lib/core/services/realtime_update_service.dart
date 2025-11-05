@@ -12,12 +12,17 @@ class RealtimeUpdateService {
   static Timer? _updateTimer;
   static bool _isPolling = false;
   static final Set<int> _activeChatIds = {};
-  static final Map<int, int> _lastMessageIds = {}; // Track last message ID per chat
-  static final Map<int, DateTime> _lastCheckTimes = {}; // Track last check time per chat
-  static final Map<int, Map<int, bool>> _messageReadStatus = {}; // Track read status per message per chat
+  static final Map<int, int> _lastMessageIds =
+      {}; // Track last message ID per chat
+  static final Map<int, DateTime> _lastCheckTimes =
+      {}; // Track last check time per chat
+  static final Map<int, Map<int, bool>> _messageReadStatus =
+      {}; // Track read status per message per chat
   static int? _currentChatId; // Currently open chat
-  static final Map<int, String> _chatNames = {}; // Cache chat names for notifications
-  static final Set<int> _notifiedMessageIds = {}; // Track which messages we've notified about
+  static final Map<int, String> _chatNames =
+      {}; // Cache chat names for notifications
+  static final Set<int> _notifiedMessageIds =
+      {}; // Track which messages we've notified about
 
   // Callbacks
   static Function(List<Message>)? onNewMessages;
@@ -27,7 +32,9 @@ class RealtimeUpdateService {
   static Function(Map<String, dynamic>)? onNotificationReceived;
 
   // Configuration
-  static const Duration _pollInterval = Duration(seconds: 2); // Poll every 2 seconds
+  static const Duration _pollInterval = Duration(
+    seconds: 2,
+  ); // Poll every 2 seconds
 
   /// Start polling for updates
   static void startPolling({
@@ -39,7 +46,9 @@ class RealtimeUpdateService {
     Function(Map<String, dynamic>)? onNotificationReceived,
   }) {
     if (_isPolling) {
-      print('⚠️ RealtimeUpdateService: Already polling, ignoring start request');
+      print(
+        '⚠️ RealtimeUpdateService: Already polling, ignoring start request',
+      );
       // Update callbacks even if already polling (for multiple screens)
       RealtimeUpdateService.onNewMessages = onNewMessages;
       RealtimeUpdateService.onChatMessagesUpdated = onChatMessagesUpdated;
@@ -66,7 +75,9 @@ class RealtimeUpdateService {
     }
 
     _isPolling = true;
-    print('✅ RealtimeUpdateService: Starting background polling (interval: ${_pollInterval.inSeconds}s)');
+    print(
+      '✅ RealtimeUpdateService: Starting background polling (interval: ${_pollInterval.inSeconds}s)',
+    );
 
     // Start immediate check
     _performUpdate();
@@ -151,7 +162,9 @@ class RealtimeUpdateService {
   static void initializeChatLastMessage(int chatId, int lastMessageId) {
     _lastMessageIds[chatId] = lastMessageId;
     _lastCheckTimes[chatId] = DateTime.now();
-    print('📱 RealtimeUpdateService: Initialized chat $chatId with last message ID: $lastMessageId');
+    print(
+      '📱 RealtimeUpdateService: Initialized chat $chatId with last message ID: $lastMessageId',
+    );
   }
 
   /// Initialize read status tracking for all messages in a chat
@@ -164,7 +177,9 @@ class RealtimeUpdateService {
       _messageReadStatus[chatId]![message.id] = message.isRead;
     }
 
-    print('📱 RealtimeUpdateService: Initialized read status tracking for ${messages.length} messages in chat $chatId');
+    print(
+      '📱 RealtimeUpdateService: Initialized read status tracking for ${messages.length} messages in chat $chatId',
+    );
   }
 
   /// Perform update check (runs silently in background)
@@ -195,7 +210,9 @@ class RealtimeUpdateService {
 
     for (final chatId in _activeChatIds.toList()) {
       try {
-        final response = await CommunicationService.getChatMessages(chatId: chatId);
+        final response = await CommunicationService.getChatMessages(
+          chatId: chatId,
+        );
 
         if (response.success && response.data != null) {
           List<dynamic> messagesData;
@@ -220,8 +237,10 @@ class RealtimeUpdateService {
 
           // Parse messages
           final messages = messagesData
-              .where((msgJson) => msgJson is Map<String, dynamic>)
-              .map((msgJson) => Message.fromJson(msgJson as Map<String, dynamic>))
+              .whereType<Map<String, dynamic>>()
+              .map(
+                (msgJson) => Message.fromJson(msgJson as Map<String, dynamic>),
+              )
               .toList();
 
           // Sort by timestamp
@@ -241,10 +260,14 @@ class RealtimeUpdateService {
 
             // Check if there are new messages
             if (latestMessageId > lastMessageId) {
-              final newMessages = messages.where((msg) => msg.id > lastMessageId).toList();
+              final newMessages = messages
+                  .where((msg) => msg.id > lastMessageId)
+                  .toList();
 
               if (newMessages.isNotEmpty) {
-                print('📨 RealtimeUpdateService: Found ${newMessages.length} new messages in chat $chatId');
+                print(
+                  '📨 RealtimeUpdateService: Found ${newMessages.length} new messages in chat $chatId',
+                );
                 _lastMessageIds[chatId] = latestMessageId;
 
                 // Update read status tracking for new messages
@@ -268,7 +291,9 @@ class RealtimeUpdateService {
           }
         }
       } catch (e) {
-        print('❌ RealtimeUpdateService: Error checking messages for chat $chatId: $e');
+        print(
+          '❌ RealtimeUpdateService: Error checking messages for chat $chatId: $e',
+        );
       }
     }
   }
@@ -308,7 +333,9 @@ class RealtimeUpdateService {
       if (previousReadStatus != null &&
           previousReadStatus != currentReadStatus &&
           currentReadStatus == true) {
-        print('📖 RealtimeUpdateService: Message ${message.id} in chat $chatId marked as read');
+        print(
+          '📖 RealtimeUpdateService: Message ${message.id} in chat $chatId marked as read',
+        );
         messagesWithChangedStatus.add(message);
       }
 
@@ -318,7 +345,9 @@ class RealtimeUpdateService {
 
     // Notify if any read status changed
     if (messagesWithChangedStatus.isNotEmpty && onChatMessagesUpdated != null) {
-      print('📖 RealtimeUpdateService: Notifying ${messagesWithChangedStatus.length} messages with read status updates');
+      print(
+        '📖 RealtimeUpdateService: Notifying ${messagesWithChangedStatus.length} messages with read status updates',
+      );
       onChatMessagesUpdated!(chatId, messagesWithChangedStatus);
     }
   }
@@ -348,8 +377,11 @@ class RealtimeUpdateService {
         }
 
         final chatsList = chatsData
-            .where((chatJson) => chatJson is Map<String, dynamic>)
-            .map((chatJson) => Conversation.fromJson(chatJson as Map<String, dynamic>))
+            .whereType<Map<String, dynamic>>()
+            .map(
+              (chatJson) =>
+                  Conversation.fromJson(chatJson as Map<String, dynamic>),
+            )
             .toList();
 
         // Sort chats: pinned first, then by last message time
@@ -419,7 +451,10 @@ class RealtimeUpdateService {
   }
 
   /// Show notifications for new messages
-  static Future<void> _showNotificationsForNewMessages(int chatId, List<Message> newMessages) async {
+  static Future<void> _showNotificationsForNewMessages(
+    int chatId,
+    List<Message> newMessages,
+  ) async {
     // Don't show notifications if this chat is currently open
     if (_currentChatId == chatId) {
       print('📱 Chat $chatId is currently open, skipping notifications');
@@ -442,7 +477,9 @@ class RealtimeUpdateService {
       if (chatName == null) {
         // Try to get chat name from conversation details
         try {
-          final chatResponse = await CommunicationService.getChatDetails(chatId: chatId);
+          final chatResponse = await CommunicationService.getChatDetails(
+            chatId: chatId,
+          );
           if (chatResponse.success && chatResponse.data != null) {
             Map<String, dynamic> chatData;
             if (chatResponse.data is Map<String, dynamic>) {
@@ -491,13 +528,17 @@ class RealtimeUpdateService {
 
       // Keep only last 100 notified message IDs to prevent memory issues
       if (_notifiedMessageIds.length > 100) {
-        final oldestIds = _notifiedMessageIds.take(_notifiedMessageIds.length - 100).toList();
+        final oldestIds = _notifiedMessageIds
+            .take(_notifiedMessageIds.length - 100)
+            .toList();
         for (final id in oldestIds) {
           _notifiedMessageIds.remove(id);
         }
       }
 
-      print('🔔 Notification shown for message ${latestMessage.id} from $senderName in chat $chatId');
+      print(
+        '🔔 Notification shown for message ${latestMessage.id} from $senderName in chat $chatId',
+      );
     } catch (e) {
       print('❌ Error showing notification for new message: $e');
     }
@@ -522,4 +563,3 @@ class RealtimeUpdateService {
     forceUpdate();
   }
 }
-

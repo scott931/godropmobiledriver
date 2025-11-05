@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_drop/core/services/communication_service.dart';
-import 'package:go_drop/core/services/api_service.dart';
 
 void main() {
   group('CommunicationService Tests', () {
@@ -83,4 +82,3 @@ void main() {
     });
   });
 }
-
