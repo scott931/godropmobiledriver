@@ -35,6 +35,11 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Determine which flow brought us here: login vs register
+    // Default to "login" to preserve existing behavior.
+    final uri = GoRouterState.of(context).uri;
+    final flow = uri.queryParameters['flow'] ?? 'login';
+
     final authState = ref.watch(authProvider);
     final parentAuthState = ref.watch(parentAuthProvider);
 
@@ -45,8 +50,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           '📱 DEBUG: Driver authentication successful, navigating to dashboard',
         );
         context.go('/dashboard');
-      }
-      if (next.error != null) {
+      } else if (!next.isAuthenticated && next.error != null) {
+        // Only show errors when the user is NOT authenticated
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.error!),
@@ -62,8 +67,8 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           '📱 DEBUG: Parent authentication successful, navigating to parent dashboard',
         );
         context.go('/parent/dashboard');
-      }
-      if (next.error != null) {
+      } else if (!next.isAuthenticated && next.error != null) {
+        // Only show errors when the user is NOT authenticated
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(next.error!),
@@ -198,19 +203,14 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () {
-                      // TODO: Implement resend OTP
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Resend OTP feature coming soon'),
-                        ),
-                      );
-                    },
+                    onTap: authState.isLoading ? null : _handleResendOtp,
                     child: Text(
                       'Resend it.',
                       style: GoogleFonts.poppins(
                         fontSize: 14.sp,
-                        color: const Color(0xFF3B82F6),
+                        color: authState.isLoading
+                            ? Colors.grey[400]
+                            : const Color(0xFF3B82F6),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -269,6 +269,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     // Check if widget is still mounted before proceeding
     if (!mounted) return;
 
+    // Clear any previous errors before starting a new verification attempt
+    ref.read(authProvider.notifier).clearError();
+    ref.read(parentAuthProvider.notifier).clearError();
+
     // Collect all OTP digits
     String otpCode = '';
     for (var controller in _otpControllers) {
@@ -287,39 +291,168 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       return;
     }
 
-    // Try driver OTP verification first
-    if (!mounted) return;
-    final driverSuccess = await ref
-        .read(authProvider.notifier)
-        .verifyLoginOtp(otpCode: otpCode.trim());
+    final trimmedOtp = otpCode.trim();
 
-    if (driverSuccess) {
-      return; // Success, navigation handled by listener
-    }
+    // Get flow from route parameters
+    final uri = GoRouterState.of(context).uri;
+    final flow = uri.queryParameters['flow'] ?? 'login';
 
-    // If driver OTP fails, try parent OTP verification
-    if (mounted) {
-      final parentSuccess = await ref
-          .read(parentAuthProvider.notifier)
-          .verifyOtp(otpCode.trim());
+    if (flow == 'login') {
+      // LOGIN FLOW
+      // Try driver OTP verification first
+      if (!mounted) return;
+      final driverSuccess = await ref
+          .read(authProvider.notifier)
+          .verifyLoginOtp(otpCode: trimmedOtp);
 
-      if (parentSuccess) {
+      if (driverSuccess) {
         return; // Success, navigation handled by listener
       }
-    }
 
-    // If both fail, try driver registration methods as fallback
-    if (mounted) {
-      final emailCompletionSuccess = await ref
+      // If driver OTP fails, try parent OTP verification
+      if (mounted) {
+        final parentSuccess = await ref
+            .read(parentAuthProvider.notifier)
+            .verifyOtp(trimmedOtp);
+
+        if (parentSuccess) {
+          return; // Success, navigation handled by listener
+        }
+      }
+    } else if (flow == 'register') {
+      // REGISTRATION FLOW
+      if (mounted) {
+        final auth = ref.read(authProvider);
+
+        // If we don't have a registration email in state, skip the
+        // email-completion step to avoid bogus "missing email" errors
+        if (auth.registrationEmail == null) {
+          await ref
+              .read(authProvider.notifier)
+              .verifyRegisterOtp(otpCode: trimmedOtp);
+        } else {
+          // First try completing email-based registration
+          final emailCompletionSuccess = await ref
+              .read(authProvider.notifier)
+              .completeEmailRegistration(otpCode: trimmedOtp);
+
+          // If email completion fails, fall back to registration OTP
+          if (!emailCompletionSuccess && mounted) {
+            await ref
+                .read(authProvider.notifier)
+                .verifyRegisterOtp(otpCode: trimmedOtp);
+          }
+        }
+      }
+    } else {
+      // Unknown flow: keep existing broad fallback behavior
+      if (!mounted) return;
+      final driverSuccess = await ref
           .read(authProvider.notifier)
-          .completeEmailRegistration(otpCode: otpCode.trim());
+          .verifyLoginOtp(otpCode: trimmedOtp);
 
-      // If email completion fails, try registration OTP
-      if (!emailCompletionSuccess && mounted) {
-        await ref
+      if (driverSuccess) return;
+
+      if (mounted) {
+        final parentSuccess = await ref
+            .read(parentAuthProvider.notifier)
+            .verifyOtp(trimmedOtp);
+        if (parentSuccess) return;
+      }
+
+      if (mounted) {
+        final emailCompletionSuccess = await ref
             .read(authProvider.notifier)
-            .verifyRegisterOtp(otpCode: otpCode.trim());
+            .completeEmailRegistration(otpCode: trimmedOtp);
+        if (!emailCompletionSuccess && mounted) {
+          await ref
+              .read(authProvider.notifier)
+              .verifyRegisterOtp(otpCode: trimmedOtp);
+        }
       }
     }
+  }
+
+  Future<void> _handleResendOtp() async {
+    if (!mounted) return;
+
+    // Clear any previous errors
+    ref.read(authProvider.notifier).clearError();
+    ref.read(parentAuthProvider.notifier).clearError();
+
+    // Get email from state or try to get from registration email
+    final auth = ref.read(authProvider);
+    final parentAuth = ref.read(parentAuthProvider);
+
+    String? email;
+    int? otpId;
+
+    // Try to get email and OTP ID from driver auth state
+    if (auth.registrationEmail != null) {
+      email = auth.registrationEmail;
+      otpId = auth.otpId;
+    }
+    // Try to get from parent auth state
+    else if (parentAuth.registrationEmail != null) {
+      email = parentAuth.registrationEmail;
+      otpId = parentAuth.otpId;
+    }
+
+    if (email == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to resend OTP. Please try logging in again.',
+          ),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+
+    // Try driver resend first
+    final driverSuccess = await ref
+        .read(authProvider.notifier)
+        .resendOtp(email: email, otpId: otpId);
+
+    if (driverSuccess) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('OTP resent successfully. Please check your email.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      return;
+    }
+
+    // If driver resend fails, try parent resend
+    final parentSuccess = await ref
+        .read(parentAuthProvider.notifier)
+        .resendOtp(email: email, otpId: otpId);
+
+    if (parentSuccess) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('OTP resent successfully. Please check your email.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      return;
+    }
+
+    // If both fail, show error
+    if (!mounted) return;
+    final error = ref.read(authProvider).error ??
+        ref.read(parentAuthProvider).error ??
+        'Failed to resend OTP. Please try again.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error),
+        backgroundColor: AppTheme.errorColor,
+      ),
+    );
   }
 }

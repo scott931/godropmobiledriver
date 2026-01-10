@@ -6,7 +6,7 @@
 const axios = require('axios');
 
 // API Configuration
-const BASE_URL = 'https://schooltransit-backend-staging.onrender.com/api/v1';
+const BASE_URL = 'https://schooltransit-backend-staging-ixld.onrender.com/api/v1';
 const START_TRIP_ENDPOINT = '/tracking/trips/start/';
 
 // Test data matching the API specification

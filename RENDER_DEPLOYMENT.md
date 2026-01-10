@@ -52,7 +52,7 @@ If you prefer manual setup:
 3. **Set Environment Variables:**
    ```
    NODE_ENV=production
-   VITE_API_BASE_URL=https://schooltransit-backend-staging.onrender.com
+   VITE_API_BASE_URL=https://schooltransit-backend-staging-ixld.onrender.com/api/v1
    VITE_MAPBOX_API_KEY=pk.eyJ1Ijoid2VzbGV5MjU0IiwiYSI6ImNsMzY2dnA0MDAzem0zZG8wZTFzc3B3eG8ifQ.EVg7Sg3_wpa_QO6EJjj9-g
    ```
 
@@ -70,7 +70,7 @@ The following environment variables are configured:
 | Variable | Value | Description |
 |----------|-------|-------------|
 | `NODE_ENV` | `production` | Node environment |
-| `VITE_API_BASE_URL` | `https://schooltransit-backend-staging.onrender.com` | Backend API URL |
+| `VITE_API_BASE_URL` | `https://schooltransit-backend-staging-ixld.onrender.com/api/v1` | Backend API URL |
 | `VITE_MAPBOX_API_KEY` | `pk.eyJ1Ijoid2VzbGV5MjU0IiwiYSI6ImNsMzY2dnA0MDAzem0zZG8wZTFzc3B3eG8ifQ.EVg7Sg3_wpa_QO6EJjj9-g` | Mapbox API key for maps |
 
 ### 5. Security Headers

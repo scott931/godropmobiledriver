@@ -1,8 +1,8 @@
 class AppConfig {
   // API Configuration
   static const String baseUrl =
-      'https://schooltransit-backend-staging.onrender.com/';
-  static const String apiVersion = '/api/v1';
+      'https://schooltransit-backend-staging-ixld.onrender.com/api/v1';
+  static const String apiVersion = '';
   static const String apiBaseUrl = '$baseUrl$apiVersion';
 
   // API Endpoints
@@ -12,11 +12,13 @@ class AppConfig {
   static const String registerEmailCompleteEndpoint =
       '/users/otp/register/complete-email/';
   static const String passwordResetEndpoint = '/users/password/reset/';
+  static const String passwordResetConfirmEndpoint = '/users/password/reset/confirm/';
   static const String logoutEndpoint = '/users/logout/';
   static const String refreshTokenEndpoint = '/users/refresh-token/';
   static const String profileEndpoint = '/users/me/';
   static const String verifyOtpLoginEndpoint = '/users/verify-otp/login/';
   static const String verifyOtpRegisterEndpoint = '/users/verify-otp/register/';
+  static const String resendOtpEndpoint = '/users/otp/resend/';
 
   // Trip Management Endpoints
   static const String tripsEndpoint = '/trips/';

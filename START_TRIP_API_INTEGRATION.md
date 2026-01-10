@@ -179,7 +179,7 @@ The API endpoint is configured in `AppConfig`:
 static const String startTripEndpoint = '/trips/start/';
 ```
 
-Base URL: `https://schooltransit-backend-staging.onrender.com/api/v1`
+Base URL: `https://schooltransit-backend-staging-ixld.onrender.com/api/v1`
 
 ## Security Considerations
 

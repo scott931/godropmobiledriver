@@ -7,6 +7,8 @@ import '../models/email_completion_request.dart';
 import '../models/email_completion_response.dart';
 import '../models/password_reset_request.dart';
 import '../models/password_reset_response.dart';
+import '../models/password_reset_confirm_request.dart';
+import '../models/password_reset_confirm_response.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../config/app_config.dart';
@@ -701,6 +703,121 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(
         isLoading: false,
         error: 'Password reset failed: $e',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+    required String newPasswordConfirm,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final request = PasswordResetConfirmRequest(
+        token: token,
+        newPassword: newPassword,
+        newPasswordConfirm: newPasswordConfirm,
+      );
+
+      final response = await ApiService.post<Map<String, dynamic>>(
+        AppConfig.passwordResetConfirmEndpoint,
+        data: request.toJson(),
+      );
+
+      if (response.success && response.data != null) {
+        final confirmResponse =
+            PasswordResetConfirmResponse.fromJson(response.data!);
+
+        if (confirmResponse.success) {
+          state = state.copyWith(isLoading: false, error: null);
+          return true;
+        } else {
+          state = state.copyWith(
+            isLoading: false,
+            error: confirmResponse.message,
+          );
+          return false;
+        }
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: response.error ?? 'Password reset confirmation failed',
+        );
+        return false;
+      }
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Password reset confirmation failed: $e',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> resendOtp({String? email, int? otpId}) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      // Use email from state if not provided
+      final emailToUse = email ?? state.registrationEmail;
+      if (emailToUse == null) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Email is required to resend OTP',
+        );
+        return false;
+      }
+
+      // Use otpId from state if not provided
+      final otpIdToUse = otpId ?? state.otpId;
+
+      final requestData = <String, dynamic>{
+        'email': emailToUse,
+      };
+
+      if (otpIdToUse != null) {
+        requestData['otp_id'] = otpIdToUse;
+      }
+
+      final response = await ApiService.post<Map<String, dynamic>>(
+        AppConfig.resendOtpEndpoint,
+        data: requestData,
+      );
+
+      if (response.success && response.data != null) {
+        final data = response.data!;
+
+        // Extract new OTP ID if provided
+        int? newOtpId;
+        if (data['otp_id'] is int) {
+          newOtpId = data['otp_id'] as int;
+        } else if (data['data'] is Map<String, dynamic>) {
+          final nestedData = data['data'] as Map<String, dynamic>;
+          if (nestedData['otp_id'] is int) {
+            newOtpId = nestedData['otp_id'] as int;
+          }
+        }
+
+        state = state.copyWith(
+          isLoading: false,
+          error: null,
+          otpId: newOtpId ?? state.otpId,
+        );
+        return true;
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: response.error ?? 'Failed to resend OTP',
+        );
+        return false;
+      }
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to resend OTP: $e',
       );
       return false;
     }

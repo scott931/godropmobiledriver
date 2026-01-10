@@ -317,6 +317,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             });
                           },
                           activeColor: AppTheme.primaryColor,
+                          checkColor: Colors.white,
+                          side: BorderSide(
+                            color: Colors.grey[600] ?? Colors.grey,
+                            width: 1.5,
+                          ),
                         ),
                         Expanded(
                           child: RichText(
@@ -503,7 +508,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
       if (mounted) {
         if (success) {
-          context.go('/otp');
+          // Indicate that this OTP flow is for registration
+          context.go('/otp?flow=register');
         }
       }
     }

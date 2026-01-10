@@ -188,6 +188,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             });
                           },
                           activeColor: AppTheme.primaryColor,
+                          checkColor: Colors.white,
+                          side: BorderSide(
+                            color: Colors.grey[600] ?? Colors.grey,
+                            width: 1.5,
+                          ),
                         ),
                         Text(
                           'Remember me',
@@ -342,26 +347,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
 
       // Try driver login first
-      final driverSuccess = await ref
-          .read(authProvider.notifier)
-          .login(email, password);
+      final driverSuccess =
+          await ref.read(authProvider.notifier).login(email, password);
 
       if (driverSuccess) {
         if (mounted) {
-          context.go('/otp');
+          // Indicate that this OTP flow is for login
+          context.go('/otp?flow=login');
         }
         return;
       }
 
       // If driver login fails, try parent login
       if (mounted) {
-        final parentSuccess = await ref
-            .read(parentAuthProvider.notifier)
-            .login(email, password);
+        final parentSuccess =
+            await ref.read(parentAuthProvider.notifier).login(email, password);
 
         if (mounted) {
           if (parentSuccess) {
-            context.go('/otp');
+            context.go('/otp?flow=login');
           } else {
             // Show generic error if both fail
             ScaffoldMessenger.of(context).showSnackBar(
