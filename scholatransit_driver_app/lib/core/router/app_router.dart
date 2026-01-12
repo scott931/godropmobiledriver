@@ -11,6 +11,7 @@ import '../../features/auth/screens/reset_password_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/trips/screens/trips_screen.dart';
 import '../../features/trips/screens/trip_details_screen.dart';
+import '../../features/trips/screens/route_mapping_screen.dart';
 import '../../features/students/screens/students_screen.dart';
 import '../../features/students/screens/student_details_screen.dart';
 import '../../features/students/screens/qr_scanner_screen.dart';
@@ -147,6 +148,37 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 );
               }
               return TripDetailsScreen(tripId: tripId);
+            },
+          ),
+          GoRoute(
+            path: '/trips/route-map/:tripId',
+            name: 'route-map',
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              final tripIdParam = state.pathParameters['tripId'];
+              if (tripIdParam == null) {
+                return const Scaffold(
+                  body: Center(child: Text('Invalid trip ID')),
+                );
+              }
+              final tripId = int.tryParse(tripIdParam);
+              if (tripId == null) {
+                return const Scaffold(
+                  body: Center(child: Text('Invalid trip ID format')),
+                );
+              }
+              return RouteMappingScreen(tripId: tripId);
             },
           ),
           GoRoute(

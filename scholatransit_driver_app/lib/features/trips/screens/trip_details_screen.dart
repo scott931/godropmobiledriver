@@ -563,11 +563,28 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             ),
             SizedBox(height: 12.h),
             _buildActionButton(
+              icon: Icons.route,
+              label: 'View Route Map',
+              description: 'See parent locations and route to school',
+              color: const Color(0xFF059669),
+              onTap: () => context.go('/trips/route-map/${trip.id}'),
+            ),
+            SizedBox(height: 12.h),
+            _buildActionButton(
               icon: Icons.stop,
               label: 'End Trip',
               description: 'Complete the current trip',
               color: const Color(0xFFDC2626),
               onTap: () => _endTrip(trip),
+            ),
+          ],
+          if (trip.status == TripStatus.pending) ...[
+            _buildActionButton(
+              icon: Icons.route,
+              label: 'View Route Map',
+              description: 'See parent locations and route to school',
+              color: const Color(0xFF059669),
+              onTap: () => context.go('/trips/route-map/${trip.id}'),
             ),
           ],
 
