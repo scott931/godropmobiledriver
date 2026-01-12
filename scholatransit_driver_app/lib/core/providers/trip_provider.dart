@@ -63,6 +63,27 @@ class TripNotifier extends StateNotifier<TripState> {
     }
   }
 
+  /// Client-side filtering: Filter trips to only show those assigned to the current driver
+  /// This is a defense-in-depth measure to ensure drivers only see their own trips
+  List<Trip> _filterTripsByDriverId(List<Trip> trips) {
+    final driverId = StorageService.getDriverId();
+    
+    if (driverId == null) {
+      print('⚠️ SECURITY: No driver ID found in storage. Filtering all trips for safety.');
+      return [];
+    }
+
+    final filteredTrips = trips.where((trip) => trip.driverId == driverId).toList();
+    
+    if (filteredTrips.length != trips.length) {
+      final filteredCount = trips.length - filteredTrips.length;
+      print('🔒 SECURITY: Filtered out $filteredCount trip(s) not assigned to driver $driverId');
+      print('🔒 SECURITY: Showing ${filteredTrips.length} trip(s) assigned to current driver');
+    }
+    
+    return filteredTrips;
+  }
+
   Future<void> loadTrips() async {
     print('🚀 DEBUG: Starting to load trips...');
     state = state.copyWith(isLoading: true, error: null);
@@ -85,8 +106,11 @@ class TripNotifier extends StateNotifier<TripState> {
                 .toList() ??
             [];
 
-        print('✅ DEBUG: Loaded ${tripsList.length} trips');
-        state = state.copyWith(isLoading: false, trips: tripsList, error: null);
+        // Apply client-side filtering as defense-in-depth
+        final filteredTrips = _filterTripsByDriverId(tripsList);
+
+        print('✅ DEBUG: Loaded ${tripsList.length} trips, filtered to ${filteredTrips.length} assigned trips');
+        state = state.copyWith(isLoading: false, trips: filteredTrips, error: null);
       } else {
         print('❌ DEBUG: API call failed - ${response.error}');
         state = state.copyWith(
@@ -119,13 +143,16 @@ class TripNotifier extends StateNotifier<TripState> {
                 .toList() ??
             [];
 
+        // Apply client-side filtering as defense-in-depth
+        final filteredTrips = _filterTripsByDriverId(tripsList);
+
         // Set the first active trip as current trip if available
-        final activeTrips = tripsList.where((trip) => trip.isActive).toList();
+        final activeTrips = filteredTrips.where((trip) => trip.isActive).toList();
         final currentTrip = activeTrips.isNotEmpty ? activeTrips.first : null;
 
         state = state.copyWith(
           isLoading: false,
-          trips: tripsList,
+          trips: filteredTrips,
           currentTrip: currentTrip,
           error: null,
         );
@@ -161,7 +188,11 @@ class TripNotifier extends StateNotifier<TripState> {
                 .toList() ??
             [];
 
-        state = state.copyWith(isLoading: false, trips: tripsList, error: null);
+        // Apply client-side filtering as defense-in-depth
+        // This is especially important for loadAllTrips which may return all trips
+        final filteredTrips = _filterTripsByDriverId(tripsList);
+
+        state = state.copyWith(isLoading: false, trips: filteredTrips, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -193,7 +224,10 @@ class TripNotifier extends StateNotifier<TripState> {
                 .toList() ??
             [];
 
-        state = state.copyWith(isLoading: false, trips: tripsList, error: null);
+        // Apply client-side filtering as defense-in-depth
+        final filteredTrips = _filterTripsByDriverId(tripsList);
+
+        state = state.copyWith(isLoading: false, trips: filteredTrips, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -224,7 +258,10 @@ class TripNotifier extends StateNotifier<TripState> {
                 .toList() ??
             [];
 
-        state = state.copyWith(isLoading: false, trips: tripsList, error: null);
+        // Apply client-side filtering as defense-in-depth
+        final filteredTrips = _filterTripsByDriverId(tripsList);
+
+        state = state.copyWith(isLoading: false, trips: filteredTrips, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -263,7 +300,10 @@ class TripNotifier extends StateNotifier<TripState> {
                 .toList() ??
             [];
 
-        state = state.copyWith(isLoading: false, trips: tripsList, error: null);
+        // Apply client-side filtering as defense-in-depth
+        final filteredTrips = _filterTripsByDriverId(tripsList);
+
+        state = state.copyWith(isLoading: false, trips: filteredTrips, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -1371,7 +1411,10 @@ class TripNotifier extends StateNotifier<TripState> {
       return t;
     }).toList();
 
-    state = state.copyWith(trips: updatedTrips);
+    // Apply client-side filtering as defense-in-depth when updating trips
+    final filteredTrips = _filterTripsByDriverId(updatedTrips);
+
+    state = state.copyWith(trips: filteredTrips);
   }
 
   Future<void> refreshTrips() async {
@@ -1401,10 +1444,13 @@ class TripNotifier extends StateNotifier<TripState> {
                 .toList() ??
             [];
 
+        // Apply client-side filtering as defense-in-depth
+        final filteredTrips = _filterTripsByDriverId(tripsList);
+
         // Only update if trips have changed
-        if (tripsList.length != state.trips.length ||
-            _hasTripStatusChanged(tripsList)) {
-          state = state.copyWith(trips: tripsList, error: null);
+        if (filteredTrips.length != state.trips.length ||
+            _hasTripStatusChanged(filteredTrips)) {
+          state = state.copyWith(trips: filteredTrips, error: null);
         }
       }
     } catch (e) {
