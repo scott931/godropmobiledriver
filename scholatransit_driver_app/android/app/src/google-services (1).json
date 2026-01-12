@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "10095910682",
+    "project_id": "godropparent",
+    "storage_bucket": "godropparent.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:10095910682:android:7ad047f6cbc506152056a3",
+        "android_client_info": {
+          "package_name": "com.scholatransit.driver.scholatransit_driver_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCJGjULlaAWgc1wBvWxZtdy11-eXAvk5U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:10095910682:android:32dda1fa0d48dfb42056a3",
+        "android_client_info": {
+          "package_name": "com.scholatransit.driver.scholatransit_parent_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCJGjULlaAWgc1wBvWxZtdy11-eXAvk5U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

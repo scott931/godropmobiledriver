@@ -3,6 +3,7 @@ import 'package:onesignal_flutter/onesignal_flutter.dart';
 import '../config/app_config.dart';
 import 'api_service.dart';
 import 'notification_service.dart';
+import 'navigation_service.dart';
 
 /// Service for handling push notifications using OneSignal
 /// This service works without Firebase Cloud Messaging
@@ -145,13 +146,18 @@ class PushNotificationService {
         '📱 PushNotificationService: Notification tapped - Type: $notificationType, Chat ID: $chatId',
       );
 
-      // Handle navigation based on notification type
-      // This will be handled by the app router based on the payload
-      if (chatId != null) {
-        // Navigate to chat screen
-        // You can emit an event or use a navigation service here
-        print('📱 PushNotificationService: Should navigate to chat $chatId');
-      }
+      // Navigate to notifications screen to view details
+      NavigationService.go('/notifications');
+      
+      // Optional: Handle specific navigation based on notification type
+      // if (chatId != null) {
+      //   NavigationService.go('/conversations/chat/$chatId');
+      // } else if (tripId != null) {
+      //   NavigationService.go('/trips/details/$tripId');
+      // }
+    } else {
+      // Navigate to notifications screen even if no additional data
+      NavigationService.go('/notifications');
     }
   }
 

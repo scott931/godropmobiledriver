@@ -5,6 +5,8 @@ import 'package:timezone/timezone.dart' as tz;
 import '../config/app_config.dart';
 import '../services/api_service.dart';
 import 'push_notification_service.dart';
+import 'firebase_notification_service.dart';
+import 'navigation_service.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _localNotifications =
@@ -59,7 +61,23 @@ class NotificationService {
 
   static void _onNotificationTapped(NotificationResponse response) {
     print('Notification tapped: ${response.payload}');
-    // Handle notification tap
+    
+    // Navigate to notifications screen to view details
+    NavigationService.go('/notifications');
+    
+    // Optional: Handle specific navigation based on payload
+    // if (response.payload != null) {
+    //   if (response.payload!.startsWith('chat_')) {
+    //     final chatId = response.payload!.replaceFirst('chat_', '');
+    //     NavigationService.go('/conversations/chat/$chatId');
+    //   } else if (response.payload!.startsWith('trip_')) {
+    //     final tripId = response.payload!.replaceFirst('trip_', '');
+    //     NavigationService.go('/trips/details/$tripId');
+    //   } else if (response.payload!.startsWith('emergency_')) {
+    //     final emergencyId = response.payload!.replaceFirst('emergency_', '');
+    //     NavigationService.go('/emergency');
+    //   }
+    // }
   }
 
   // No-op handlers since FCM is removed
@@ -190,8 +208,16 @@ class NotificationService {
   }
 
   static Future<String?> getFCMToken() async {
-    // FCM is disabled, use OneSignal instead
-    // This method is kept for compatibility
+    // Try Firebase first, fallback to OneSignal
+    try {
+      if (FirebaseNotificationService.isInitialized) {
+        return await FirebaseNotificationService.getToken();
+      }
+    } catch (e) {
+      print('⚠️ Failed to get FCM token: $e');
+    }
+    
+    // Fallback to OneSignal
     try {
       return await PushNotificationService.getDeviceToken();
     } catch (e) {
@@ -200,11 +226,19 @@ class NotificationService {
   }
 
   static Future<void> subscribeToTopic(String topic) async {
-    // FCM is disabled, no-op
+    // Use Firebase if available
+    if (FirebaseNotificationService.isInitialized) {
+      await FirebaseNotificationService.subscribeToTopic(topic);
+    }
+    // OneSignal topic subscription can be added here if needed
   }
 
   static Future<void> unsubscribeFromTopic(String topic) async {
-    // FCM is disabled, no-op
+    // Use Firebase if available
+    if (FirebaseNotificationService.isInitialized) {
+      await FirebaseNotificationService.unsubscribeFromTopic(topic);
+    }
+    // OneSignal topic unsubscription can be added here if needed
   }
 
   /// Show notification for a new message

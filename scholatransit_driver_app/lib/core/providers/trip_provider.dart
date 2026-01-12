@@ -1015,36 +1015,161 @@ class TripNotifier extends StateNotifier<TripState> {
     StudentStatus status,
   ) async {
     try {
-      // Only send if parent contact info is available
-      if (student.parentPhone == null && student.parentEmail == null) {
+      // Only send notifications for pickup and dropoff events
+      if (status != StudentStatus.pickedUp && status != StudentStatus.droppedOff) {
         print(
-          '⚠️ Trip Provider: No parent contact info for ${student.fullName}',
+          '⚠️ Trip Provider: Skipping parent notification for status ${status.name}',
         );
         return;
       }
 
-      // Convert StudentStatus to ChildStatus for parent notification
-      final childStatus = _convertToChildStatus(status);
+      // Check if we have parent IDs
+      if (student.parentIds.isEmpty) {
+        print(
+          '⚠️ Trip Provider: No parent IDs found for ${student.fullName}, trying student ID approach',
+        );
+        // Fallback: use student ID and let backend route to parents
+        await _sendNotificationWithStudentId(student, status);
+        return;
+      }
 
-      // For now, we'll use a placeholder parent ID since we don't have parent data
-      // In a real implementation, you'd need to fetch or store parent IDs
-      const parentId = 1; // This should be fetched from student data or API
+      // Determine notification type and message
+      final notificationType = status == StudentStatus.pickedUp
+          ? 'student_pickup'
+          : 'student_dropoff';
+      
+      final title = status == StudentStatus.pickedUp
+          ? 'Student Picked Up'
+          : 'Student Dropped Off';
+      
+      final message = status == StudentStatus.pickedUp
+          ? 'Your child ${student.fullName} has been picked up'
+          : 'Your child ${student.fullName} has been dropped off';
 
-      await ParentNotificationService.sendChildStatusUpdate(
-        parentId: parentId,
-        childId: student.id,
-        status: childStatus,
-        additionalData: {
-          'trip_id': state.currentTrip?.id,
-          'timestamp': DateTime.now().toIso8601String(),
-        },
-      );
+      // Get current location for the notification
+      String? locationWkt;
+      try {
+        final position = await LocationService.getCurrentPosition();
+        if (position != null) {
+          locationWkt = 'POINT(${position.longitude} ${position.latitude})';
+        }
+      } catch (e) {
+        print('⚠️ Trip Provider: Could not get location for notification: $e');
+      }
+
+      // Send notification to each parent
+      int successCount = 0;
+      int failureCount = 0;
+
+      for (final parentId in student.parentIds) {
+        try {
+          final response = await ApiService.post<Map<String, dynamic>>(
+            AppConfig.notificationsEndpoint,
+            data: {
+              'recipient': parentId, // Use parent ID as recipient
+              'student': student.id,
+              'notification_type': notificationType,
+              'priority': 'normal',
+              'title': title,
+              'message': message,
+              if (state.currentTrip?.vehicleId != null)
+                'vehicle': state.currentTrip!.vehicleId,
+              if (state.currentTrip?.routeId != null)
+                'route': state.currentTrip!.routeId,
+              if (locationWkt != null) 'location': locationWkt,
+              'channels': ['push', 'sms', 'email'],
+              'metadata': {
+                'trip_id': state.currentTrip?.id,
+                'student_name': student.fullName,
+                'timestamp': DateTime.now().toIso8601String(),
+              },
+            },
+          );
+
+          if (response.success) {
+            successCount++;
+            print(
+              '✅ Trip Provider: Notification sent to parent $parentId for ${student.fullName}',
+            );
+          } else {
+            failureCount++;
+            print(
+              '❌ Trip Provider: Failed to send notification to parent $parentId: ${response.error}',
+            );
+          }
+        } catch (e) {
+          failureCount++;
+          print(
+            '❌ Trip Provider: Error sending notification to parent $parentId: $e',
+          );
+        }
+      }
 
       print(
-        '📱 Trip Provider: Parent notification sent for ${student.fullName}',
+        '📱 Trip Provider: Parent notifications sent for ${student.fullName} - ${status.name} (Success: $successCount, Failed: $failureCount)',
       );
     } catch (e) {
       print('❌ Trip Provider: Error sending parent notification: $e');
+    }
+  }
+
+  /// Fallback: Send notification using student ID (backend routes to parents)
+  Future<void> _sendNotificationWithStudentId(
+    Student student,
+    StudentStatus status,
+  ) async {
+    final notificationType = status == StudentStatus.pickedUp
+        ? 'student_pickup'
+        : 'student_dropoff';
+    
+    final title = status == StudentStatus.pickedUp
+        ? 'Student Picked Up'
+        : 'Student Dropped Off';
+    
+    final message = status == StudentStatus.pickedUp
+        ? 'Your child ${student.fullName} has been picked up'
+        : 'Your child ${student.fullName} has been dropped off';
+
+    String? locationWkt;
+    try {
+      final position = await LocationService.getCurrentPosition();
+      if (position != null) {
+        locationWkt = 'POINT(${position.longitude} ${position.latitude})';
+      }
+    } catch (e) {
+      print('⚠️ Trip Provider: Could not get location for notification: $e');
+    }
+
+    final response = await ApiService.post<Map<String, dynamic>>(
+      AppConfig.notificationsEndpoint,
+      data: {
+        'student': student.id,
+        'notification_type': notificationType,
+        'priority': 'normal',
+        'title': title,
+        'message': message,
+        if (state.currentTrip?.vehicleId != null)
+          'vehicle': state.currentTrip!.vehicleId,
+        if (state.currentTrip?.routeId != null)
+          'route': state.currentTrip!.routeId,
+        if (locationWkt != null) 'location': locationWkt,
+        'channels': ['push', 'sms', 'email'],
+        'metadata': {
+          'trip_id': state.currentTrip?.id,
+          'student_name': student.fullName,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      },
+    );
+
+    if (response.success) {
+      print(
+        '✅ Trip Provider: Parent notification sent via student ID for ${student.fullName}',
+      );
+    } else {
+      print(
+        '❌ Trip Provider: Failed to send parent notification via student ID: ${response.error}',
+      );
     }
   }
 

@@ -11,6 +11,7 @@ class Student {
   final String? parentName;
   final String? parentPhone;
   final String? parentEmail;
+  final List<int> parentIds;
   final String? address;
   final double? latitude;
   final double? longitude;
@@ -31,6 +32,7 @@ class Student {
     this.parentName,
     this.parentPhone,
     this.parentEmail,
+    this.parentIds = const [],
     this.address,
     this.latitude,
     this.longitude,
@@ -44,6 +46,48 @@ class Student {
   String get fullName => '$firstName $lastName';
 
   factory Student.fromJson(Map<String, dynamic> json) {
+    // Parse parent IDs from various possible formats
+    List<int> parseParentIds(Map<String, dynamic> json) {
+      // Try parent_ids array first
+      if (json['parent_ids'] != null) {
+        final ids = json['parent_ids'] as List?;
+        if (ids != null) {
+          return ids
+              .map((id) => id is int ? id : int.tryParse(id.toString()) ?? 0)
+              .where((id) => id > 0)
+              .toList();
+        }
+      }
+
+      // Try parents array (extract IDs from parent objects)
+      if (json['parents'] != null) {
+        final parents = json['parents'] as List?;
+        if (parents != null) {
+          return parents.map((parent) {
+            if (parent is Map) {
+              return parent['id'] as int? ?? 0;
+            } else if (parent is int) {
+              return parent;
+            }
+            return 0;
+          }).where((id) => id > 0).toList();
+        }
+      }
+
+      // Try single parent_id
+      if (json['parent_id'] != null) {
+        final parentId = json['parent_id'];
+        if (parentId is int && parentId > 0) {
+          return [parentId];
+        } else if (parentId is String) {
+          final id = int.tryParse(parentId);
+          if (id != null && id > 0) return [id];
+        }
+      }
+
+      return [];
+    }
+
     return Student(
       id: json['id'] ?? 0,
       studentId: json['student_id'] ?? '',
@@ -55,6 +99,7 @@ class Student {
       parentName: json['parent_name'],
       parentPhone: json['parent_phone'],
       parentEmail: json['parent_email'],
+      parentIds: parseParentIds(json),
       address: json['address'],
       latitude: json['latitude']?.toDouble(),
       longitude: json['longitude']?.toDouble(),
@@ -80,6 +125,7 @@ class Student {
       'parent_name': parentName,
       'parent_phone': parentPhone,
       'parent_email': parentEmail,
+      'parent_ids': parentIds,
       'address': address,
       'latitude': latitude,
       'longitude': longitude,
@@ -122,6 +168,7 @@ class Student {
     String? parentName,
     String? parentPhone,
     String? parentEmail,
+    List<int>? parentIds,
     String? address,
     double? latitude,
     double? longitude,
@@ -142,6 +189,7 @@ class Student {
       parentName: parentName ?? this.parentName,
       parentPhone: parentPhone ?? this.parentPhone,
       parentEmail: parentEmail ?? this.parentEmail,
+      parentIds: parentIds ?? this.parentIds,
       address: address ?? this.address,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/location_service.dart';
+import '../services/firestore_location_service.dart';
 import '../services/api_service.dart';
 import '../config/app_config.dart';
 import '../models/location_model.dart';
@@ -162,6 +163,20 @@ class LocationNotifier extends StateNotifier<LocationState> {
           state = state.copyWith(error: error.toString());
         },
       );
+
+      // Start Firestore location updates
+      // This will automatically send location updates to Firestore
+      try {
+        await FirestoreLocationService.startLocationUpdates(
+          onError: (error) {
+            print('⚠️ Firestore location update error: $error');
+            // Don't update state error as this is a background service
+          },
+        );
+      } catch (e) {
+        print('⚠️ Failed to start Firestore location updates: $e');
+        // Continue without Firestore updates - location tracking still works
+      }
     } catch (e) {
       state = state.copyWith(
         error: 'Failed to initialize location tracking: $e',
@@ -188,6 +203,19 @@ class LocationNotifier extends StateNotifier<LocationState> {
   Future<void> startTracking() async {
     try {
       await LocationService.startLocationTracking();
+      
+      // Start Firestore location updates
+      try {
+        await FirestoreLocationService.startLocationUpdates(
+          onError: (error) {
+            print('⚠️ Firestore location update error: $error');
+          },
+        );
+      } catch (e) {
+        print('⚠️ Failed to start Firestore location updates: $e');
+        // Continue without Firestore updates
+      }
+      
       state = state.copyWith(isTracking: true, error: null);
     } catch (e) {
       state = state.copyWith(error: 'Failed to start location tracking: $e');
@@ -197,6 +225,14 @@ class LocationNotifier extends StateNotifier<LocationState> {
   Future<void> stopTracking() async {
     try {
       await LocationService.stopLocationTracking();
+      
+      // Stop Firestore location updates
+      try {
+        await FirestoreLocationService.stopLocationUpdates();
+      } catch (e) {
+        print('⚠️ Failed to stop Firestore location updates: $e');
+      }
+      
       state = state.copyWith(isTracking: false, error: null);
     } catch (e) {
       state = state.copyWith(error: 'Failed to stop location tracking: $e');
