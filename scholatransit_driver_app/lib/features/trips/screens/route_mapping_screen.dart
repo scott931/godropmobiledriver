@@ -9,7 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/providers/location_provider.dart';
 import '../../../core/models/trip_model.dart';
-import '../../../core/services/route_mapping_service.dart';
+import '../../../core/services/route_mapping_service.dart' show RouteMappingService, RouteMap, RouteStop;
 import '../../../core/services/routing_service.dart';
 
 class RouteMappingScreen extends ConsumerStatefulWidget {
@@ -23,7 +23,7 @@ class RouteMappingScreen extends ConsumerStatefulWidget {
 
 class _RouteMappingScreenState extends ConsumerState<RouteMappingScreen> {
   MapboxMap? _mapboxMap;
-  RouteMappingService.RouteMap? _routeMap;
+  RouteMap? _routeMap;
   bool _isLoading = true;
   String? _error;
   PointAnnotationManager? _pointAnnotationManager;
@@ -105,21 +105,19 @@ class _RouteMappingScreenState extends ConsumerState<RouteMappingScreen> {
           return Position(coord['longitude']!, coord['latitude']!);
         }).toList();
 
-        final lineString = LineString(coordinates);
-        final routeSource = await _mapboxMap!.addSource(
-          GeoJsonSource(
-            id: 'route-source',
-            geoJson: lineString.toJson(),
-          ),
-        );
+        final lineString = LineString(coordinates: coordinates);
 
         _polylineAnnotationManager = await _mapboxMap!.annotations
             .createPolylineAnnotationManager();
 
+        // Convert color string to int (format: #4285F4 -> 0xFF4285F4)
+        final colorString = AppConfig.routeColorPrimary.replaceFirst('#', '');
+        final routeColor = int.parse('0xFF$colorString');
+
         _routePolyline = await _polylineAnnotationManager!.create(
           PolylineAnnotationOptions(
             geometry: lineString,
-            lineColor: AppConfig.routeColorPrimary,
+            lineColor: routeColor,
             lineWidth: 4.0,
             lineOpacity: 0.8,
           ),
@@ -135,10 +133,10 @@ class _RouteMappingScreenState extends ConsumerState<RouteMappingScreen> {
               coordinates: Position(stop.longitude, stop.latitude),
             ),
             textField: '${i + 1}',
-            textColor: Colors.white,
+            textColor: Colors.white.value,
             textSize: 14.0,
             textOffset: [0.0, -2.0],
-            iconColor: const Color(0xFF1E3A8A),
+            iconColor: const Color(0xFF1E3A8A).value,
             iconSize: 1.2,
           ),
         );
@@ -156,9 +154,9 @@ class _RouteMappingScreenState extends ConsumerState<RouteMappingScreen> {
               ),
             ),
             textField: 'S',
-            textColor: Colors.white,
+            textColor: Colors.white.value,
             textSize: 14.0,
-            iconColor: const Color(0xFF059669),
+            iconColor: const Color(0xFF059669).value,
             iconSize: 1.2,
           ),
         );
@@ -178,11 +176,38 @@ class _RouteMappingScreenState extends ConsumerState<RouteMappingScreen> {
         }
 
         if (allPoints.isNotEmpty) {
-          final bounds = _calculateBounds(allPoints);
+          // Calculate center and zoom to fit all points
+          double minLat = allPoints[0].lat.toDouble();
+          double maxLat = allPoints[0].lat.toDouble();
+          double minLng = allPoints[0].lng.toDouble();
+          double maxLng = allPoints[0].lng.toDouble();
+
+          for (final pos in allPoints) {
+            final lat = pos.lat.toDouble();
+            final lng = pos.lng.toDouble();
+            if (lat < minLat) minLat = lat;
+            if (lat > maxLat) maxLat = lat;
+            if (lng < minLng) minLng = lng;
+            if (lng > maxLng) maxLng = lng;
+          }
+
+          final centerLat = (minLat + maxLat) / 2;
+          final centerLng = (minLng + maxLng) / 2;
+          
+          // Calculate zoom level based on bounds
+          final latDiff = maxLat - minLat;
+          final lngDiff = maxLng - minLng;
+          final maxDiff = latDiff > lngDiff ? latDiff : lngDiff;
+          double zoom = 12.0;
+          if (maxDiff > 0.1) zoom = 11.0;
+          if (maxDiff > 0.2) zoom = 10.0;
+          if (maxDiff < 0.01) zoom = 14.0;
+          if (maxDiff < 0.005) zoom = 15.0;
+
           await _mapboxMap!.flyTo(
             CameraOptions(
-              bounds: bounds,
-              padding: EdgeInsets.all(50.w),
+              center: Point(coordinates: Position(centerLng, centerLat)),
+              zoom: zoom,
             ),
             MapAnimationOptions(duration: 1000),
           );
@@ -212,24 +237,6 @@ class _RouteMappingScreenState extends ConsumerState<RouteMappingScreen> {
     }
   }
 
-  CoordinateBounds _calculateBounds(List<Position> positions) {
-    double minLat = positions[0].lat;
-    double maxLat = positions[0].lat;
-    double minLng = positions[0].lng;
-    double maxLng = positions[0].lng;
-
-    for (final pos in positions) {
-      if (pos.lat < minLat) minLat = pos.lat;
-      if (pos.lat > maxLat) maxLat = pos.lat;
-      if (pos.lng < minLng) minLng = pos.lng;
-      if (pos.lng > maxLng) maxLng = pos.lng;
-    }
-
-    return CoordinateBounds(
-      southwest: Position(lng: minLng, lat: minLat),
-      northeast: Position(lng: maxLng, lat: maxLat),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -498,7 +505,7 @@ class _RouteMappingScreenState extends ConsumerState<RouteMappingScreen> {
     );
   }
 
-  Widget _buildStopCard(RouteMappingService.RouteStop stop, int stopNumber) {
+  Widget _buildStopCard(RouteStop stop, int stopNumber) {
     return Container(
       margin: EdgeInsets.only(bottom: 12.h),
       padding: EdgeInsets.all(16.w),

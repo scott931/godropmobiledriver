@@ -5,10 +5,8 @@ import 'routing_service.dart';
 import 'eta_service.dart';
 import 'location_service.dart';
 
-/// Service for mapping routes with parent locations and calculating ETAs
-class RouteMappingService {
-  /// Represents a stop in the route with location and ETA
-  class RouteStop {
+/// Represents a stop in the route with location and ETA
+class RouteStop {
     final String id;
     final String name;
     final String address;
@@ -45,50 +43,52 @@ class RouteMappingService {
     }
   }
 
-  /// Represents a complete route with all stops and path
-  class RouteMap {
-    final List<RouteStop> stops;
-    final List<Map<String, double>> routePath;
-    final double totalDistance;
-    final Duration totalDuration;
-    final RouteStop? schoolStop;
-    final Duration? etaToSchool;
+/// Represents a complete route with all stops and path
+class RouteMap {
+  final List<RouteStop> stops;
+  final List<Map<String, double>> routePath;
+  final double totalDistance;
+  final Duration totalDuration;
+  final RouteStop? schoolStop;
+  final Duration? etaToSchool;
 
-    RouteMap({
-      required this.stops,
-      required this.routePath,
-      required this.totalDistance,
-      required this.totalDuration,
-      this.schoolStop,
-      this.etaToSchool,
-    });
+  RouteMap({
+    required this.stops,
+    required this.routePath,
+    required this.totalDistance,
+    required this.totalDuration,
+    this.schoolStop,
+    this.etaToSchool,
+  });
 
-    String get formattedTotalDistance {
-      if (totalDistance < 1000) {
-        return '${totalDistance.toStringAsFixed(0)} m';
-      }
-      return '${(totalDistance / 1000).toStringAsFixed(2)} km';
+  String get formattedTotalDistance {
+    if (totalDistance < 1000) {
+      return '${totalDistance.toStringAsFixed(0)} m';
     }
-
-    String get formattedTotalDuration {
-      final hours = totalDuration.inHours;
-      final minutes = totalDuration.inMinutes % 60;
-      if (hours > 0) {
-        return '${hours}h ${minutes}m';
-      }
-      return '${minutes}m';
-    }
-
-    String get formattedETAToSchool {
-      if (etaToSchool == null) return 'Calculating...';
-      final minutes = etaToSchool!.inMinutes;
-      if (minutes < 60) return '$minutes min';
-      final hours = minutes ~/ 60;
-      final mins = minutes % 60;
-      return '${hours}h ${mins}m';
-    }
+    return '${(totalDistance / 1000).toStringAsFixed(2)} km';
   }
 
+  String get formattedTotalDuration {
+    final hours = totalDuration.inHours;
+    final minutes = totalDuration.inMinutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    }
+    return '${minutes}m';
+  }
+
+  String get formattedETAToSchool {
+    if (etaToSchool == null) return 'Calculating...';
+    final minutes = etaToSchool!.inMinutes;
+    if (minutes < 60) return '$minutes min';
+    final hours = minutes ~/ 60;
+    final mins = minutes % 60;
+    return '${hours}h ${mins}m';
+  }
+}
+
+/// Service for mapping routes with parent locations and calculating ETAs
+class RouteMappingService {
   /// Calculate route map for a trip with all parent locations
   static Future<RouteMap?> calculateRouteMap({
     required Trip trip,
