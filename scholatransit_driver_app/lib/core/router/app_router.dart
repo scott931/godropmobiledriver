@@ -85,19 +85,47 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             name: 'dashboard',
             builder: (context, state) {
               final authState = ref.watch(authProvider);
-              final parentAuthState = ref.watch(parentAuthProvider);
 
-              // Check if user is authenticated as driver
+              // Only allow drivers - block all other users
               if (authState.isAuthenticated && authState.driver != null) {
                 return const DashboardScreen();
               }
-              // Check if user is authenticated as parent
-              else if (parentAuthState.isAuthenticated &&
-                  parentAuthState.parent != null) {
-                return const ParentDashboardScreen();
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/trips',
+            name: 'trips',
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const TripsScreen();
               }
-              // If not authenticated, redirect to login
-              else {
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/trips/details/:tripId',
+            name: 'trip-details',
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   context.go('/login');
                 });
@@ -105,17 +133,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   body: Center(child: CircularProgressIndicator()),
                 );
               }
-            },
-          ),
-          GoRoute(
-            path: '/trips',
-            name: 'trips',
-            builder: (context, state) => const TripsScreen(),
-          ),
-          GoRoute(
-            path: '/trips/details/:tripId',
-            name: 'trip-details',
-            builder: (context, state) {
+
               final tripIdParam = state.pathParameters['tripId'];
               if (tripIdParam == null) {
                 return const Scaffold(
@@ -134,22 +152,76 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/students',
             name: 'students',
-            builder: (context, state) => const StudentsScreen(),
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const StudentsScreen();
+              }
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
           ),
           GoRoute(
             path: '/students/qr-scanner',
             name: 'qr-scanner',
-            builder: (context, state) => const QRScannerScreen(),
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const QRScannerScreen();
+              }
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
           ),
           GoRoute(
             path: '/students/simple-qr-scanner',
             name: 'simple-qr-scanner',
-            builder: (context, state) => const SimpleQRScannerScreen(),
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const SimpleQRScannerScreen();
+              }
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
           ),
           GoRoute(
             path: '/students/:studentId',
             name: 'student-details',
             builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
               final studentIdParam = state.pathParameters['studentId'];
               if (studentIdParam == null) {
                 return const Scaffold(
@@ -168,17 +240,57 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/map',
             name: 'map',
-            builder: (context, state) => const MapScreen(),
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const MapScreen();
+              }
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
           ),
           GoRoute(
             path: '/notifications',
             name: 'notifications',
-            builder: (context, state) => const NotificationsScreen(),
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const NotificationsScreen();
+              }
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
           ),
           GoRoute(
             path: '/notifications/alert-details',
             name: 'alert-details',
             builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
               final alertData = state.extra as Map<String, dynamic>;
               return AlertDetailsScreen(alertData: alertData);
             },
@@ -186,12 +298,38 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/conversations',
             name: 'conversations',
-            builder: (context, state) => const ConversationsScreen(),
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const ConversationsScreen();
+              }
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
           ),
           GoRoute(
             path: '/conversations/chat/:conversationId',
             name: 'chat',
             builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
               final conversationData = state.extra as Map<String, dynamic>;
               return ChatScreen(conversation: conversationData['conversation']);
             },
@@ -200,6 +338,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: '/conversations/whatsapp-redirect',
             name: 'whatsapp-redirect',
             builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
               final extra = state.extra as Map<String, dynamic>;
               return WhatsAppRedirectScreen(
                 contactName: extra['contactName'] as String,
@@ -211,46 +361,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/whatsapp-test',
             name: 'whatsapp-test',
-            builder: (context, state) => const WhatsAppTestScreen(),
-          ),
-          GoRoute(
-            path: '/whatsapp-debug',
-            name: 'whatsapp-debug',
-            builder: (context, state) => const WhatsAppDebugScreen(),
-          ),
-          GoRoute(
-            path: '/contact-demo',
-            name: 'contact-demo',
-            builder: (context, state) => const ContactDemoScreen(),
-          ),
-          GoRoute(
-            path: '/emergency',
-            name: 'emergency',
-            builder: (context, state) => const EmergencyScreen(),
-          ),
-          GoRoute(
-            path: '/emergency/create-alert',
-            name: 'create-alert',
-            builder: (context, state) => const CreateAlertScreen(),
-          ),
-          GoRoute(
-            path: '/profile',
-            name: 'profile',
             builder: (context, state) {
               final authState = ref.watch(authProvider);
-              final parentAuthState = ref.watch(parentAuthProvider);
 
-              // Check if user is authenticated as driver
-              if (authState.isAuthenticated && authState.driver != null) {
-                return const DriverProfileScreen();
-              }
-              // Check if user is authenticated as parent
-              else if (parentAuthState.isAuthenticated &&
-                  parentAuthState.parent != null) {
-                return const ParentProfileScreen();
-              }
-              // If not authenticated, redirect to login
-              else {
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   context.go('/login');
                 });
@@ -258,12 +373,119 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                   body: Center(child: CircularProgressIndicator()),
                 );
               }
+              return const WhatsAppTestScreen();
+            },
+          ),
+          GoRoute(
+            path: '/whatsapp-debug',
+            name: 'whatsapp-debug',
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              return const WhatsAppDebugScreen();
+            },
+          ),
+          GoRoute(
+            path: '/contact-demo',
+            name: 'contact-demo',
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              return const ContactDemoScreen();
+            },
+          ),
+          GoRoute(
+            path: '/emergency',
+            name: 'emergency',
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const EmergencyScreen();
+              }
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/emergency/create-alert',
+            name: 'create-alert',
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (!authState.isAuthenticated || authState.driver == null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  context.go('/login');
+                });
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              return const CreateAlertScreen();
+            },
+          ),
+          GoRoute(
+            path: '/profile',
+            name: 'profile',
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const DriverProfileScreen();
+              }
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
             },
           ),
           GoRoute(
             path: '/settings',
             name: 'settings',
-            builder: (context, state) => const SettingsScreen(),
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+
+              // Only allow drivers - block all other users
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const SettingsScreen();
+              }
+              // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
           ),
         ],
       ),
@@ -320,6 +542,18 @@ class MainShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    // Only allow drivers - block all other users including parents
+    if (!authState.isAuthenticated || authState.driver == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.go('/login');
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       body: child,
       bottomNavigationBar: SimpleBottomNavigation(
