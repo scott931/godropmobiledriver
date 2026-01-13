@@ -83,6 +83,9 @@ class AppConfig {
   // Communication Endpoints
   static const String conversationsEndpoint = '/communication/conversations/';
 
+  // Schools Endpoints
+  static const String schoolsEndpoint = '/schools/';
+
   // App Configuration
   static const String appName = 'Go Drop';
   static const String appVersion = '1.0.0';

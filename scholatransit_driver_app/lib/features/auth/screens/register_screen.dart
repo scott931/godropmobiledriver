@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/school_provider.dart';
 import '../../../core/models/registration_request.dart';
+import '../../../core/models/school_model.dart';
+import '../../../core/utils/phone_utils.dart';
 import '../../../core/theme/app_theme.dart';
 import 'dart:io' show Platform;
 
@@ -26,11 +29,49 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _addressController = TextEditingController();
   final _emergencyContactNameController = TextEditingController();
   final _emergencyContactPhoneController = TextEditingController();
+  final _schoolSearchController = TextEditingController();
+  final _schoolFocusNode = FocusNode();
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
   final String _userType = 'driver';
+  School? _selectedSchool;
+  List<School> _filteredSchools = [];
+  bool _showSchoolDropdown = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Load schools when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(schoolProvider.notifier).loadSchools();
+    });
+    
+    // Listen to school search changes
+    _schoolSearchController.addListener(_filterSchools);
+    _schoolFocusNode.addListener(() {
+      setState(() {
+        _showSchoolDropdown = _schoolFocusNode.hasFocus;
+      });
+    });
+  }
+  
+  void _filterSchools() {
+    final query = _schoolSearchController.text.toLowerCase();
+    final schoolState = ref.read(schoolProvider);
+    
+    setState(() {
+      if (query.isEmpty) {
+        _filteredSchools = schoolState.schools;
+      } else {
+        _filteredSchools = schoolState.schools
+            .where((school) =>
+                school.name.toLowerCase().contains(query))
+            .toList();
+      }
+    });
+  }
+  
   @override
   void dispose() {
     _usernameController.dispose();
@@ -43,12 +84,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _addressController.dispose();
     _emergencyContactNameController.dispose();
     _emergencyContactPhoneController.dispose();
+    _schoolSearchController.dispose();
+    _schoolFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final schoolState = ref.watch(schoolProvider);
+
+    // Update filtered schools when schools are loaded
+    if (schoolState.schools.isNotEmpty && _filteredSchools.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _filterSchools();
+      });
+    }
 
     // Listen for errors
     ref.listen<AuthState>(authProvider, (previous, next) {
@@ -202,6 +253,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         return null;
                       },
                     ),
+                    SizedBox(height: 16.h),
+
+                    // School Selection Field
+                    _buildSchoolDropdown(),
                     SizedBox(height: 16.h),
 
                     // Emergency Contact Name Field
@@ -471,6 +526,202 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
+  Widget _buildSchoolDropdown() {
+    final schoolState = ref.watch(schoolProvider);
+    
+    // Update filtered schools when school state changes
+    if (_filteredSchools.isEmpty && schoolState.schools.isNotEmpty) {
+      _filteredSchools = schoolState.schools;
+    }
+
+    // Show loading indicator in suffix when loading
+    Widget? suffixIcon;
+    if (schoolState.isLoading) {
+      suffixIcon = Padding(
+        padding: EdgeInsets.all(12.w),
+        child: SizedBox(
+          width: 20.w,
+          height: 20.h,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+          ),
+        ),
+      );
+    } else if (_schoolSearchController.text.isNotEmpty) {
+      suffixIcon = IconButton(
+        icon: Icon(Icons.clear, color: Colors.grey[600], size: 20.sp),
+        onPressed: () {
+          _schoolSearchController.clear();
+          setState(() {
+            _selectedSchool = null;
+            _showSchoolDropdown = false;
+          });
+          _schoolFocusNode.unfocus();
+        },
+      );
+    } else {
+      suffixIcon = Icon(Icons.arrow_drop_down, color: Colors.grey[600]);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: _schoolSearchController,
+          focusNode: _schoolFocusNode,
+          enabled: !schoolState.isLoading,
+          decoration: InputDecoration(
+            labelText: 'School',
+            labelStyle: TextStyle(color: Colors.grey[600], fontSize: 14.sp),
+            prefixIcon: Icon(Icons.school_outlined, color: Colors.grey[600]),
+            suffixIcon: suffixIcon,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8.r),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8.r),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8.r),
+              borderSide: BorderSide(color: Colors.black, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+            hintText: schoolState.isLoading
+                ? 'Loading schools...'
+                : schoolState.error != null
+                    ? 'Error loading schools'
+                    : 'Search and select a school',
+            hintStyle: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 16.sp,
+              fontWeight: FontWeight.w400,
+            ),
+            errorText: schoolState.error,
+          ),
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w400,
+          ),
+          onTap: () {
+            if (!schoolState.isLoading && schoolState.schools.isNotEmpty) {
+              setState(() {
+                _showSchoolDropdown = true;
+              });
+            }
+          },
+          validator: (value) {
+            if (_selectedSchool == null) {
+              return 'Please select a school';
+            }
+            return null;
+          },
+        ),
+        if (_showSchoolDropdown && 
+            !schoolState.isLoading && 
+            _filteredSchools.isNotEmpty)
+          Container(
+            margin: EdgeInsets.only(top: 4.h),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: Colors.grey[300]!),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            constraints: BoxConstraints(maxHeight: 200.h),
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _filteredSchools.length,
+              itemBuilder: (context, index) {
+                final school = _filteredSchools[index];
+                final isSelected = _selectedSchool?.id == school.id;
+                
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedSchool = school;
+                      _schoolSearchController.text = school.name;
+                      _showSchoolDropdown = false;
+                    });
+                    _schoolFocusNode.unfocus();
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    decoration: BoxDecoration(
+                      color: isSelected 
+                          ? AppTheme.primaryColor.withOpacity(0.1)
+                          : Colors.transparent,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.grey[200]!,
+                          width: index < _filteredSchools.length - 1 ? 1 : 0,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            school.name,
+                            style: TextStyle(
+                              color: isSelected 
+                                  ? AppTheme.primaryColor
+                                  : Colors.black,
+                              fontSize: 16.sp,
+                              fontWeight: isSelected 
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                        if (isSelected)
+                          Icon(
+                            Icons.check_circle,
+                            color: AppTheme.primaryColor,
+                            size: 20.sp,
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        if (_showSchoolDropdown && 
+            !schoolState.isLoading && 
+            _filteredSchools.isEmpty &&
+            _schoolSearchController.text.isNotEmpty)
+          Container(
+            margin: EdgeInsets.only(top: 4.h),
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Text(
+              'No schools found',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14.sp,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   Future<void> _handleRegister() async {
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -483,6 +734,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     if (_formKey.currentState!.validate()) {
+      // Normalize phone numbers
+      final normalizedPhone = PhoneUtils.normalizePhoneNumber(
+        _phoneController.text.trim(),
+      );
+      final normalizedEmergencyPhone = PhoneUtils.normalizePhoneNumber(
+        _emergencyContactPhoneController.text.trim(),
+      );
+
+      // Get school ID
+      final schoolId = _selectedSchool?.id;
+
       final registrationRequest = RegistrationRequest(
         username: _usernameController.text.trim(),
         email: _emailController.text.trim(),
@@ -491,15 +753,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         userType: _userType,
-        phoneNumber: _phoneController.text.trim(),
+        phoneNumber: normalizedPhone,
         address: _addressController.text.trim(),
         emergencyContactName: _emergencyContactNameController.text.trim(),
-        emergencyContactPhone: _emergencyContactPhoneController.text.trim(),
+        emergencyContactPhone: normalizedEmergencyPhone,
         source: 'mobile',
         deviceInfo: DeviceInfo(
           userAgent: 'Flutter (${Platform.operatingSystem})',
           deviceType: 'mobile',
         ),
+        school: schoolId,
       );
 
       final success = await ref

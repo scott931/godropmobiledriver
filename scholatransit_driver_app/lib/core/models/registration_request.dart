@@ -12,6 +12,7 @@ class RegistrationRequest {
   final String emergencyContactPhone;
   final String source;
   final DeviceInfo deviceInfo;
+  final int? school;
 
   const RegistrationRequest({
     required this.username,
@@ -27,10 +28,11 @@ class RegistrationRequest {
     required this.emergencyContactPhone,
     required this.source,
     required this.deviceInfo,
+    this.school,
   });
 
   Map<String, dynamic> toJson() {
-    return {
+    final json = {
       'username': username,
       'email': email,
       'password': password,
@@ -45,6 +47,14 @@ class RegistrationRequest {
       'source': source,
       'device_info': deviceInfo.toJson(),
     };
+    
+    // Only include school if it's provided
+    final schoolId = school;
+    if (schoolId != null) {
+      json['school'] = schoolId;
+    }
+    
+    return json;
   }
 
   factory RegistrationRequest.fromJson(Map<String, dynamic> json) {
@@ -64,6 +74,7 @@ class RegistrationRequest {
       deviceInfo: DeviceInfo.fromJson(
         json['device_info'] as Map<String, dynamic>,
       ),
+      school: json['school'] as int?,
     );
   }
 }
