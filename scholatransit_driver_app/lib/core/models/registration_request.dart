@@ -46,6 +46,7 @@ class RegistrationRequest {
       'emergency_contact_phone': emergencyContactPhone,
       'source': source,
       'device_info': deviceInfo.toJson(),
+      'otp_type': 'register',
     };
     
     // Only include school if it's provided

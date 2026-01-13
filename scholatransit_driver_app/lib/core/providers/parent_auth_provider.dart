@@ -165,7 +165,13 @@ class ParentAuthNotifier extends StateNotifier<ParentAuthState> {
     try {
       final response = await ApiService.post<Map<String, dynamic>>(
         '/auth/verify-otp/',
-        data: {'otp_id': state.otpId, 'otp_code': otp},
+        data: {
+          'otp_code': otp,
+          'otp_id': state.otpId,
+          'otp': {
+            'otp_type': 'login',
+          },
+        },
       );
 
       if (response.success && response.data != null) {
@@ -257,7 +263,7 @@ class ParentAuthNotifier extends StateNotifier<ParentAuthState> {
     await _loadParentProfile();
   }
 
-  Future<bool> resendOtp({String? email, int? otpId}) async {
+  Future<bool> resendOtp({String? email, int? otpId, String? otpType}) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -274,8 +280,12 @@ class ParentAuthNotifier extends StateNotifier<ParentAuthState> {
       // Use otpId from state if not provided
       final otpIdToUse = otpId ?? state.otpId;
 
+      // Determine otp_type - default to 'login' if not provided
+      final otpTypeToUse = otpType ?? 'login';
+
       final requestData = <String, dynamic>{
         'email': emailToUse,
+        'otp_type': otpTypeToUse,
       };
 
       if (otpIdToUse != null) {

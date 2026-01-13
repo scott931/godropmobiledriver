@@ -140,14 +140,21 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                         focusNode: _focusNodes[index],
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
+                        textAlignVertical: TextAlignVertical.center,
                         maxLength: 1,
                         style: GoogleFonts.poppins(
                           fontSize: 24.sp,
                           fontWeight: FontWeight.w600,
                           color: Colors.black,
+                          height: 1.2,
                         ),
                         decoration: InputDecoration(
                           counterText: '',
+                          contentPadding: EdgeInsets.symmetric(
+                            vertical: 18.h,
+                            horizontal: 0,
+                          ),
+                          isDense: true,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12.r),
                             borderSide: BorderSide(color: Colors.grey[300]!),
@@ -165,6 +172,10 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                           ),
                           filled: true,
                           fillColor: Colors.white,
+                          constraints: BoxConstraints(
+                            minHeight: 60.h,
+                            maxHeight: 60.h,
+                          ),
                         ),
                         onChanged: (value) {
                           if (value.isNotEmpty) {
@@ -380,6 +391,11 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     ref.read(authProvider.notifier).clearError();
     ref.read(parentAuthProvider.notifier).clearError();
 
+    // Get flow from route parameters to determine otp_type
+    final uri = GoRouterState.of(context).uri;
+    final flow = uri.queryParameters['flow'] ?? 'login';
+    final otpType = flow == 'register' ? 'register' : 'login';
+
     // Get email from state or try to get from registration email
     final auth = ref.read(authProvider);
     final parentAuth = ref.read(parentAuthProvider);
@@ -414,7 +430,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     // Try driver resend first
     final driverSuccess = await ref
         .read(authProvider.notifier)
-        .resendOtp(email: email, otpId: otpId);
+        .resendOtp(email: email, otpId: otpId, otpType: otpType);
 
     if (driverSuccess) {
       if (!mounted) return;
@@ -430,7 +446,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     // If driver resend fails, try parent resend
     final parentSuccess = await ref
         .read(parentAuthProvider.notifier)
-        .resendOtp(email: email, otpId: otpId);
+        .resendOtp(email: email, otpId: otpId, otpType: otpType);
 
     if (parentSuccess) {
       if (!mounted) return;

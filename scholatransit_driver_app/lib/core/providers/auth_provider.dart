@@ -417,6 +417,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         data: {
           'otp_code': otpCode,
           'otp_id': otpId,
+          'otp': {
+            'otp_type': 'login',
+          },
           'source': 'mobile',
           'device_info': {
             'user_agent': 'Flutter (${Platform.operatingSystem})',
@@ -510,6 +513,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         data: {
           'otp_code': otpCode,
           'otp_id': otpId,
+          'otp': {
+            'otp_type': 'register',
+          },
           'source': 'mobile',
           'device_info': {
             'user_agent': 'Flutter (${Platform.operatingSystem})',
@@ -757,7 +763,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> resendOtp({String? email, int? otpId}) async {
+  Future<bool> resendOtp({String? email, int? otpId, String? otpType}) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -774,8 +780,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Use otpId from state if not provided
       final otpIdToUse = otpId ?? state.otpId;
 
+      // Determine otp_type - default to 'login' if not provided
+      final otpTypeToUse = otpType ?? 'login';
+
       final requestData = <String, dynamic>{
         'email': emailToUse,
+        'otp_type': otpTypeToUse,
       };
 
       if (otpIdToUse != null) {

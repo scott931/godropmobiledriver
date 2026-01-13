@@ -5,7 +5,13 @@ class EmailCompletionRequest {
   const EmailCompletionRequest({required this.email, required this.otpCode});
 
   Map<String, dynamic> toJson() {
-    return {'email': email, 'otp_code': otpCode};
+    return {
+      'email': email,
+      'otp_code': otpCode,
+      'otp': {
+        'otp_type': 'register',
+      },
+    };
   }
 
   factory EmailCompletionRequest.fromJson(Map<String, dynamic> json) {
