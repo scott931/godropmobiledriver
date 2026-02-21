@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/providers/auth_provider.dart';
-import '../../../core/providers/parent_auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -19,6 +18,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _rememberMe = false;
+  String? _lastShownError;
+
+  void _showErrorSnackBar(String msg) {
+    if (_lastShownError == msg) return;
+    _lastShownError = msg;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppTheme.errorColor,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -30,30 +43,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final parentAuthState = ref.watch(parentAuthProvider);
 
-    // Listen for errors from both auth providers
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.error!),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
+      if (next.error != null && previous?.error != next.error) {
+        _lastShownError = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showErrorSnackBar(next.error!);
+        });
       }
     });
 
-    ref.listen<ParentAuthState>(parentAuthProvider, (previous, next) {
-      if (next.error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.error!),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
-    });
+    if (authState.error != null && _lastShownError != authState.error) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && authState.error != null) _showErrorSnackBar(authState.error!);
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -256,32 +260,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                     SizedBox(height: 32.h),
 
-                    // Footer
-                    Center(
-                      child: RichText(
-                        text: TextSpan(
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: Colors.grey[600],
-                          ),
-                          children: [
-                            const TextSpan(text: "Don't have an account? "),
-                            WidgetSpan(
-                              child: GestureDetector(
-                                onTap: () => context.go('/register'),
-                                child: Text(
-                                  'Sign up',
-                                  style: TextStyle(
-                                    color: AppTheme.primaryColor,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    // Signup section - commented out
+                    // Center(
+                    //   child: RichText(
+                    //     text: TextSpan(
+                    //       style: TextStyle(
+                    //         fontSize: 14.sp,
+                    //         color: Colors.grey[600],
+                    //       ),
+                    //       children: [
+                    //         const TextSpan(text: "Don't have an account? "),
+                    //         WidgetSpan(
+                    //           child: GestureDetector(
+                    //             onTap: () => context.go('/register'),
+                    //             child: Text(
+                    //               'Sign up',
+                    //               style: TextStyle(
+                    //                 color: AppTheme.primaryColor,
+                    //                 fontWeight: FontWeight.w500,
+                    //               ),
+                    //             ),
+                    //           ),
+                    //         ),
+                    //       ],
+                    //     ),
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
@@ -346,38 +350,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       // Check if widget is still mounted before proceeding
       if (!mounted) return;
 
-      // Try driver login first
-      final driverSuccess =
+      // Driver app: only allow driver accounts (admin and parent are restricted)
+      final success =
           await ref.read(authProvider.notifier).login(email, password);
 
-      if (driverSuccess) {
-        if (mounted) {
-          // Indicate that this OTP flow is for login
+      if (mounted) {
+        if (success) {
           context.go('/otp?flow=login');
         }
-        return;
-      }
-
-      // If driver login fails, try parent login
-      if (mounted) {
-        final parentSuccess =
-            await ref.read(parentAuthProvider.notifier).login(email, password);
-
-        if (mounted) {
-          if (parentSuccess) {
-            context.go('/otp?flow=login');
-          } else {
-            // Show generic error if both fail
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Invalid email or password. Please check your credentials.',
-                ),
-                backgroundColor: AppTheme.errorColor,
-              ),
-            );
-          }
-        }
+        // When login fails, auth provider sets state.error - ref.listen above
+        // displays it via SnackBar. No need to show a duplicate here.
       }
     }
   }

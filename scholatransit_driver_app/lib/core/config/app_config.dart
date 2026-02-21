@@ -16,6 +16,10 @@ class AppConfig {
   static const String logoutEndpoint = '/users/logout/';
   static const String refreshTokenEndpoint = '/users/refresh-token/';
   static const String profileEndpoint = '/users/me/';
+  /// Users API - same as web's driversAPI.getDriver (GET /api/v1/users/:id/)
+  static const String userDetailsEndpoint = '/users/:id/';
+  /// Drivers API - same as web's studentsAPI (GET /api/v1/drivers/:id)
+  static const String driverDetailsEndpoint = '/drivers/';
   static const String verifyOtpLoginEndpoint = '/users/verify-otp/login/';
   static const String verifyOtpRegisterEndpoint = '/users/verify-otp/register/';
   static const String resendOtpEndpoint = '/users/otp/resend/';
@@ -37,6 +41,12 @@ class AppConfig {
   // Driver Endpoints
   static const String driverProfileEndpoint = '/drivers/profile/';
   static const String driverAssignmentsEndpoint = '/drivers/assignments/';
+  /// Driver-specific assignments (may include vehicle) - GET /drivers/me/assignments/
+  static const String driverMeAssignmentsEndpoint = '/drivers/me/assignments/';
+  /// Driver's assigned vehicles - GET /drivers/me/vehicles/
+  static const String driverMeVehiclesEndpoint = '/drivers/me/vehicles/';
+  /// Vehicle assignments (driver-vehicle link) - GET /vehicle-assignments/?driver_id=X
+  static const String vehicleAssignmentsEndpoint = '/vehicle-assignments/';
 
   // Student Management Endpoints
   static const String studentsEndpoint = '/students/';
@@ -120,8 +130,10 @@ class AppConfig {
   static const String notificationSettingsKey = 'notification_settings';
 
   // Map Configuration
+  // Set via: flutter run --dart-define=MAPBOX_ACCESS_TOKEN=your_token
+  // Or add to local.properties: MAPBOX_ACCESS_TOKEN=your_token (see build.gradle.kts)
   static const String mapboxToken =
-      'pk.eyJ1Ijoid2F5bmU5MzEiLCJhIjoiY21maW5qaWpjMGRpazJsc2VnNmRoOW0xaSJ9.S4led3XBi7bpACc4D2KyBQ';
+      String.fromEnvironment('MAPBOX_ACCESS_TOKEN', defaultValue: '');
   static const String googleMapsApiKey = 'YOUR_GOOGLE_MAPS_API_KEY';
 
   // QR Code Configuration

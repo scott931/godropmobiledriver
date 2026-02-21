@@ -6,6 +6,13 @@ import 'storage_service.dart';
 class ApiService {
   static late Dio _dio;
   static final Connectivity _connectivity = Connectivity();
+  static void Function(String message)? _onSuspensionDetected;
+
+  /// Register callback for when API returns suspension/deactivation (401/403).
+  /// Used to log out immediately when any API call hits a suspended account.
+  static void setSuspensionCallback(void Function(String message)? callback) {
+    _onSuspensionDetected = callback;
+  }
 
   static Future<void> init() async {
     _dio = Dio(
@@ -97,6 +104,24 @@ class ApiService {
   static Interceptor _errorInterceptor() {
     return InterceptorsWrapper(
       onError: (error, handler) async {
+        // If 401/403 with suspension/inactive on non-auth endpoints, invoke callback for immediate logout
+        final code = error.response?.statusCode;
+        final path = error.requestOptions.path;
+        final isAuthEndpoint = path.contains('/login/') ||
+            path.contains('/register/') ||
+            path.contains('/otp/') ||
+            path.contains('/password/reset/') ||
+            path.contains('/refresh-token/') ||
+            path.contains('/logout');
+        // ANY 401/403 on protected endpoints = log out immediately (suspension, token invalid, etc.)
+        if (!isAuthEndpoint &&
+            (code == 401 || code == 403) &&
+            _onSuspensionDetected != null &&
+            StorageService.getAuthToken() != null) {
+          final msg = _extractSuspensionMessage(error.response?.data) ??
+              'Your session has expired or your account is not active. Please sign in again.';
+          _onSuspensionDetected!(msg);
+        }
         if (error.type == DioExceptionType.connectionTimeout ||
             error.type == DioExceptionType.receiveTimeout ||
             error.type == DioExceptionType.sendTimeout) {
@@ -115,6 +140,39 @@ class ApiService {
     );
   }
 
+  static String? _extractSuspensionMessage(dynamic data) {
+    if (data is! Map) return null;
+    final dataMap = Map<String, dynamic>.from(data);
+    final dataStr = dataMap.toString().toLowerCase();
+    if (!dataStr.contains('suspended') &&
+        !dataStr.contains('inactive') &&
+        !dataStr.contains('deactivated')) {
+      return null;
+    }
+    String? raw;
+    final errorData = dataMap['error'];
+    if (errorData is Map) {
+      final errMap = Map<String, dynamic>.from(errorData);
+      final nonFieldErrors = errMap['non_field_errors'];
+      if (nonFieldErrors is List && nonFieldErrors.isNotEmpty) {
+        final first = nonFieldErrors.first;
+        if (first is String) raw = first;
+      }
+    }
+    if (raw == null && dataMap['non_field_errors'] is List) {
+      final list = dataMap['non_field_errors'] as List;
+      raw = list.isNotEmpty ? list.first.toString() : null;
+    }
+    final lower = (raw ?? dataStr).toLowerCase();
+    if (lower.contains('inactive') || lower.contains('deactivated')) {
+      return 'Your account has been deactivated. Please contact your administrator.';
+    }
+    if (lower.contains('suspended')) {
+      return 'Your account has been suspended. Please contact your administrator.';
+    }
+    return raw ?? 'Your account is not active. Please contact your administrator.';
+  }
+
   // Generic HTTP methods
   static Future<ApiResponse<T>> get<T>(
     String path, {
@@ -129,7 +187,10 @@ class ApiService {
       );
       return ApiResponse<T>.success(response.data);
     } on DioException catch (e) {
-      return ApiResponse<T>.error(_handleDioError(e));
+      return ApiResponse<T>.error(
+        _handleDioError(e),
+        e.response?.statusCode,
+      );
     } catch (e) {
       return ApiResponse<T>.error('Unexpected error: $e');
     }
@@ -177,6 +238,27 @@ class ApiService {
     }
   }
 
+  static Future<ApiResponse<T>> patch<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+  }) async {
+    try {
+      final response = await _dio.patch(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+      );
+      return ApiResponse<T>.success(response.data);
+    } on DioException catch (e) {
+      return ApiResponse<T>.error(_handleDioError(e));
+    } catch (e) {
+      return ApiResponse<T>.error('Unexpected error: $e');
+    }
+  }
+
   static Future<ApiResponse<T>> delete<T>(
     String path, {
     dynamic data,
@@ -209,34 +291,55 @@ class ApiService {
         final data = error.response?.data;
 
         // Handle specific error messages from the API
-        if (data is Map<String, dynamic>) {
-          // First check for direct message field
-          if (data.containsKey('message')) {
-            return data['message'] as String;
-          }
-
-          // Check for error field with nested structure
-          if (data.containsKey('error')) {
-            final errorData = data['error'];
-            if (errorData is Map<String, dynamic>) {
-              if (errorData.containsKey('non_field_errors')) {
-                final nonFieldErrors = errorData['non_field_errors'] as List?;
-                if (nonFieldErrors != null && nonFieldErrors.isNotEmpty) {
-                  return nonFieldErrors.first.toString();
-                }
+        if (data is Map) {
+          final dataMap = Map<String, dynamic>.from(data);
+          // Prefer error.non_field_errors - contains the actual reason (e.g. suspension)
+          final errorData = dataMap['error'];
+          if (errorData is Map) {
+            final errMap = Map<String, dynamic>.from(errorData);
+            final nonFieldErrors = errMap['non_field_errors'];
+            if (nonFieldErrors is List && nonFieldErrors.isNotEmpty) {
+              final first = nonFieldErrors.first;
+              String msg;
+              if (first is String) {
+                msg = first;
+              } else if (first is Map) {
+                final fm = Map<String, dynamic>.from(first);
+                final s = fm['string'] ?? fm['message'];
+                msg = s != null && s.toString().trim().isNotEmpty ? s.toString() : first.toString();
+              } else {
+                msg = first.toString();
               }
-              // Check for message in error object
-              if (errorData.containsKey('message')) {
-                return errorData['message'] as String;
+              final lower = msg.toLowerCase();
+              if (lower.contains('inactive') || lower.contains('deactivated')) {
+                return 'Your account has been deactivated. Please contact your administrator.';
               }
+              if (lower.contains('suspended')) {
+                return 'Your account has been suspended. Please contact your administrator.';
+              }
+              return msg;
             }
-            return errorData.toString();
+            if (errMap['message'] != null) return errMap['message'].toString();
           }
-
-          // Check for detail field (common in some APIs)
-          if (data.containsKey('detail')) {
-            return data['detail'] as String;
+          // Also check non_field_errors at root level
+          final rootNonField = dataMap['non_field_errors'];
+          if (rootNonField is List && rootNonField.isNotEmpty) {
+            final first = rootNonField.first;
+            final m = first is String ? first : first.toString();
+            final ml = m.toString().toLowerCase();
+            if (ml.contains('inactive') || ml.contains('deactivated')) return 'Your account has been deactivated. Please contact your administrator.';
+            if (ml.contains('suspended')) return 'Your account has been suspended. Please contact your administrator.';
+            return m;
           }
+          final dataStr = dataMap.toString().toLowerCase();
+          if (dataStr.contains('inactive') || dataStr.contains('deactivated')) {
+            return 'Your account has been deactivated. Please contact your administrator.';
+          }
+          if (dataStr.contains('suspended')) {
+            return 'Your account has been suspended. Please contact your administrator.';
+          }
+          if (dataMap['message'] != null) return dataMap['message'].toString();
+          if (dataMap['detail'] != null) return dataMap['detail'].toString();
         }
 
         if (statusCode == 400) {

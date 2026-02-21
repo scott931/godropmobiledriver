@@ -88,6 +88,12 @@ class TripNotifier extends StateNotifier<TripState> {
     print('🚀 DEBUG: Starting to load trips...');
     state = state.copyWith(isLoading: true, error: null);
 
+    final driverId = StorageService.getDriverId();
+    if (driverId != null) {
+      await loadDriverTrips(driverId);
+      return;
+    }
+
     try {
       print('📡 DEBUG: Making API call to ${AppConfig.driverTripsEndpoint}');
       final response = await ApiService.get<Map<String, dynamic>>(
@@ -127,8 +133,23 @@ class TripNotifier extends StateNotifier<TripState> {
     }
   }
 
+  /// Load trips for the driver dashboard. Uses GET /tracking/trips/driver/?driver_id={id}
+  /// when driver ID is available (returns trips with vehicle data per trip). Falls back
+  /// to /tracking/trips/active/ when no driver ID (e.g. before profile loads).
   Future<void> loadActiveTrips() async {
     state = state.copyWith(isLoading: true, error: null);
+
+    final driverId = StorageService.getDriverId();
+    if (driverId != null) {
+      // Use driver-specific endpoint - returns trips with vehicle data per trip
+      await loadDriverTrips(driverId);
+      // Set current trip from active trips
+      final activeTrips = state.trips.where((trip) => trip.isActive).toList();
+      if (activeTrips.isNotEmpty) {
+        state = state.copyWith(currentTrip: activeTrips.first);
+      }
+      return;
+    }
 
     try {
       final response = await ApiService.get<Map<String, dynamic>>(
@@ -243,8 +264,13 @@ class TripNotifier extends StateNotifier<TripState> {
   }
 
   Future<void> loadCurrentDriverTrips() async {
-    state = state.copyWith(isLoading: true, error: null);
+    final driverId = StorageService.getDriverId();
+    if (driverId != null) {
+      await loadDriverTrips(driverId);
+      return;
+    }
 
+    state = state.copyWith(isLoading: true, error: null);
     try {
       final response = await ApiService.get<Map<String, dynamic>>(
         AppConfig.driverTripsEndpoint,

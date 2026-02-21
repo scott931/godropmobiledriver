@@ -126,6 +126,21 @@ static const String apiVersion = '/api/v1';
    - `ios/Runner/GoogleService-Info.plist`
 4. Enable Firebase Messaging
 
+#### Mapbox Setup (required for maps and routing)
+1. Get a Mapbox access token at [account.mapbox.com](https://account.mapbox.com/access-tokens/)
+2. Add to `android/local.properties` (create if needed; this file is gitignored):
+   ```
+   MAPBOX_ACCESS_TOKEN=pk.your_token_here
+   MAPBOX_DOWNLOADS_TOKEN=pk.your_token_here
+   ```
+3. Run the app using:
+   ```bash
+   ./scripts/run_with_mapbox.sh
+   ```
+   Or manually: `flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_token`
+   
+   See `android/local.properties.example` for details.
+
 #### Google Maps Setup
 1. Get a Google Maps API key
 2. Update `android/app/src/main/AndroidManifest.xml`:

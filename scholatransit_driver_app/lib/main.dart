@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -9,6 +10,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/config/app_config.dart';
+import 'core/providers/auth_provider.dart';
 import 'core/services/storage_service.dart';
 import 'core/services/api_service.dart';
 import 'core/services/location_health_monitor.dart';
@@ -91,16 +93,97 @@ Future<void> _requestPermissions() async {
 
   // Request camera permission (for QR scanning)
   await Permission.camera.request();
-
-  // Request contact permission (for parent contact selection)
-  await Permission.contacts.request();
 }
 
-class GoDropApp extends ConsumerWidget {
+class GoDropApp extends ConsumerStatefulWidget {
   const GoDropApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GoDropApp> createState() => _GoDropAppState();
+}
+
+class _GoDropAppState extends ConsumerState<GoDropApp>
+    with WidgetsBindingObserver {
+  Timer? _statusCheckTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startStatusCheckIfAuthenticated();
+    ApiService.setSuspensionCallback(_onSuspensionFromApi);
+  }
+
+  void _onSuspensionFromApi(String message) {
+    if (!mounted) return;
+    ref.read(authProvider.notifier).logout(suspensionError: message);
+    // Navigate immediately - don't wait for async logout; user must not use app
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(appRouterProvider).go('/login');
+    });
+  }
+
+  @override
+  void dispose() {
+    ApiService.setSuspensionCallback(null);
+    _statusCheckTimer?.cancel();
+    _statusCheckTimer = null;
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void _startStatusCheckIfAuthenticated() {
+    _statusCheckTimer?.cancel();
+    final authState = ref.read(authProvider);
+    if (authState.isAuthenticated && authState.driver != null) {
+      // Check driver status every 30 sec - logs out if suspended/deactivated
+      _statusCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (!mounted) return;
+        final s = ref.read(authProvider);
+        if (!s.isAuthenticated) {
+          _statusCheckTimer?.cancel();
+          return;
+        }
+        ref.read(authProvider.notifier).loadDriverProfile();
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      final authState = ref.read(authProvider);
+      if (authState.isAuthenticated && authState.driver != null) {
+        ref.read(authProvider.notifier).loadDriverProfile();
+      }
+      _startStatusCheckIfAuthenticated();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      _statusCheckTimer?.cancel();
+      _statusCheckTimer = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<AuthState>(authProvider, (previous, next) {
+      if (next.isAuthenticated && previous?.isAuthenticated != true) {
+        _startStatusCheckIfAuthenticated();
+      } else if (!next.isAuthenticated) {
+        _statusCheckTimer?.cancel();
+        _statusCheckTimer = null;
+        // Redirect to login only when transitioning from authenticated (suspension/logout)
+        if (previous?.isAuthenticated == true) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            ref.read(appRouterProvider).go('/login');
+          });
+        }
+      }
+    });
     return ScreenUtilInit(
       designSize: const Size(375, 812), // iPhone X design size
       minTextAdapt: true,

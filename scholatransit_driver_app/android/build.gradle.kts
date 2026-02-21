@@ -3,6 +3,14 @@ plugins {
     id("com.google.gms.google-services") version "4.4.4" apply false
 }
 
+// Load local.properties for Mapbox downloads token (gitignored)
+val rootLocalProperties = java.util.Properties()
+val rootLocalPropertiesFile = file("local.properties")
+if (rootLocalPropertiesFile.exists()) {
+    rootLocalProperties.load(rootLocalPropertiesFile.inputStream())
+}
+val mapboxDownloadsToken = rootLocalProperties.getProperty("MAPBOX_DOWNLOADS_TOKEN")
+
 allprojects {
     repositories {
         google()
@@ -10,9 +18,8 @@ allprojects {
         maven {
             url = uri("https://api.mapbox.com/downloads/v2/releases/maven")
             credentials {
-                // Uses token from gradle.properties (MAPBOX_DOWNLOADS_TOKEN)
                 username = "mapbox"
-                password = providers.gradleProperty("MAPBOX_DOWNLOADS_TOKEN").orNull
+                password = mapboxDownloadsToken
             }
             authentication {
                 create<BasicAuthentication>("basic")

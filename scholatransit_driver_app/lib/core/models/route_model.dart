@@ -158,22 +158,59 @@ class RouteAssignment {
   });
 
   factory RouteAssignment.fromJson(Map<String, dynamic> json) {
+    // Vehicle can be: vehicle, assigned_vehicle, route.vehicle, route.assigned_vehicle
+    var v = json['vehicle'] ?? json['assigned_vehicle'];
+    final routeObj = json['route'];
+    if (v == null && routeObj is Map) {
+      final route = Map<String, dynamic>.from(routeObj as Map);
+      v = route['vehicle'] ?? route['assigned_vehicle'];
+    }
+    int vehicleId = 0;
+    if (v is int) {
+      vehicleId = v;
+    } else if (v is Map) {
+      vehicleId = (v['id'] ?? v['vehicle_id'] ?? 0) as int? ?? 0;
+    }
+    if (vehicleId == 0) {
+      vehicleId = (json['vehicle_id'] ?? json['assigned_vehicle_id']) as int? ?? 0;
+    }
+    String vehiclePlate = (json['vehicle_license_plate'] ??
+            json['assigned_vehicle_license'] ??
+            (v is Map ? v['license_plate'] ?? v['license_plate_number'] : null))
+        ?.toString() ??
+        '';
+    if (vehiclePlate.isEmpty && v is Map) {
+      vehiclePlate = (v['name'] ?? v['license_plate'] ?? v['license_plate_number'])?.toString() ?? '';
+    }
+    final routeVal = json['route'] ?? json['route_id'];
+    int routeId = 0;
+    if (routeVal is int) {
+      routeId = routeVal;
+    } else if (routeVal is Map) {
+      routeId = (routeVal['id'] ?? routeVal['route_id']) as int? ?? 0;
+    } else if (routeVal != null) {
+      routeId = int.tryParse(routeVal.toString()) ?? 0;
+    }
     return RouteAssignment(
       id: json['id'] ?? 0,
-      routeId: json['route'] ?? 0,
-      routeName: json['route_name'] ?? '',
-      vehicleId: json['vehicle'] ?? 0,
-      vehicleLicensePlate: json['vehicle_license_plate'] ?? '',
-      driverId: json['driver'] ?? 0,
-      driverName: json['driver_name'] ?? '',
+      routeId: routeId,
+      routeName: (json['route_name'] ?? '').toString(),
+      vehicleId: vehicleId,
+      vehicleLicensePlate: vehiclePlate,
+      driverId: json['driver'] ?? json['driver_id'] ?? 0,
+      driverName: (json['driver_name'] ?? '').toString(),
       status: json['status'] ?? '',
       statusDisplay: json['status_display'] ?? '',
       isActive: json['is_active'] ?? false,
       startDate: json['start_date'] ?? '',
       endDate: json['end_date'] ?? '',
       notes: json['notes'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.tryParse(json['updated_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 }

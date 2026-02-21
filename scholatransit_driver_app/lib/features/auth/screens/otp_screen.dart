@@ -4,7 +4,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/auth_provider.dart';
-import '../../../core/providers/parent_auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
@@ -41,40 +40,26 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     final flow = uri.queryParameters['flow'] ?? 'login';
 
     final authState = ref.watch(authProvider);
-    final parentAuthState = ref.watch(parentAuthProvider);
 
-    // Listen for successful authentication from both providers
+    // Listen for successful driver authentication (admin and parent are restricted)
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.isAuthenticated && next.driver != null) {
-        print(
-          '📱 DEBUG: Driver authentication successful, navigating to dashboard',
-        );
-        context.go('/dashboard');
+        // For register flow: new user has temp password, prompt to change before dashboard
+        // For login flow: existing user has already set their password, go straight to dashboard
+        if (flow == 'register') {
+          print(
+            '📱 DEBUG: Driver registration successful (new user), navigating to change password prompt',
+          );
+          context.go('/change-password-prompt');
+        } else {
+          print(
+            '📱 DEBUG: Driver login successful, navigating to dashboard',
+          );
+          context.go('/dashboard');
+        }
       } else if (!next.isAuthenticated && next.error != null) {
-        // Only show errors when the user is NOT authenticated
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.error!),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
-      }
-    });
-
-    ref.listen<ParentAuthState>(parentAuthProvider, (previous, next) {
-      if (next.isAuthenticated && next.parent != null) {
-        print(
-          '📱 DEBUG: Parent authentication successful, navigating to parent dashboard',
-        );
-        context.go('/parent/dashboard');
-      } else if (!next.isAuthenticated && next.error != null) {
-        // Only show errors when the user is NOT authenticated
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.error!),
-            backgroundColor: AppTheme.errorColor,
-          ),
-        );
+        // Redirect to login so suspension/blocked message is shown prominently
+        context.go('/login');
       }
     });
 
@@ -282,7 +267,6 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
 
     // Clear any previous errors before starting a new verification attempt
     ref.read(authProvider.notifier).clearError();
-    ref.read(parentAuthProvider.notifier).clearError();
 
     // Collect all OTP digits
     String otpCode = '';
@@ -309,27 +293,12 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     final flow = uri.queryParameters['flow'] ?? 'login';
 
     if (flow == 'login') {
-      // LOGIN FLOW
-      // Try driver OTP verification first
+      // LOGIN FLOW - Driver app: only driver accounts allowed (admin and parent restricted)
       if (!mounted) return;
-      final driverSuccess = await ref
+      await ref
           .read(authProvider.notifier)
           .verifyLoginOtp(otpCode: trimmedOtp);
-
-      if (driverSuccess) {
-        return; // Success, navigation handled by listener
-      }
-
-      // If driver OTP fails, try parent OTP verification
-      if (mounted) {
-        final parentSuccess = await ref
-            .read(parentAuthProvider.notifier)
-            .verifyOtp(trimmedOtp);
-
-        if (parentSuccess) {
-          return; // Success, navigation handled by listener
-        }
-      }
+      return;
     } else if (flow == 'register') {
       // REGISTRATION FLOW
       if (mounted) {
@@ -356,63 +325,26 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         }
       }
     } else {
-      // Unknown flow: keep existing broad fallback behavior
+      // Unknown flow: try driver login OTP only
       if (!mounted) return;
-      final driverSuccess = await ref
+      await ref
           .read(authProvider.notifier)
           .verifyLoginOtp(otpCode: trimmedOtp);
-
-      if (driverSuccess) return;
-
-      if (mounted) {
-        final parentSuccess = await ref
-            .read(parentAuthProvider.notifier)
-            .verifyOtp(trimmedOtp);
-        if (parentSuccess) return;
-      }
-
-      if (mounted) {
-        final emailCompletionSuccess = await ref
-            .read(authProvider.notifier)
-            .completeEmailRegistration(otpCode: trimmedOtp);
-        if (!emailCompletionSuccess && mounted) {
-          await ref
-              .read(authProvider.notifier)
-              .verifyRegisterOtp(otpCode: trimmedOtp);
-        }
-      }
     }
   }
 
   Future<void> _handleResendOtp() async {
     if (!mounted) return;
 
-    // Clear any previous errors
     ref.read(authProvider.notifier).clearError();
-    ref.read(parentAuthProvider.notifier).clearError();
 
-    // Get flow from route parameters to determine otp_type
     final uri = GoRouterState.of(context).uri;
     final flow = uri.queryParameters['flow'] ?? 'login';
     final otpType = flow == 'register' ? 'register' : 'login';
 
-    // Get email from state or try to get from registration email
     final auth = ref.read(authProvider);
-    final parentAuth = ref.read(parentAuthProvider);
-
-    String? email;
-    int? otpId;
-
-    // Try to get email and OTP ID from driver auth state
-    if (auth.registrationEmail != null) {
-      email = auth.registrationEmail;
-      otpId = auth.otpId;
-    }
-    // Try to get from parent auth state
-    else if (parentAuth.registrationEmail != null) {
-      email = parentAuth.registrationEmail;
-      otpId = parentAuth.otpId;
-    }
+    final email = auth.registrationEmail;
+    final otpId = auth.otpId;
 
     if (email == null) {
       if (!mounted) return;
@@ -427,48 +359,26 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       return;
     }
 
-    // Try driver resend first
-    final driverSuccess = await ref
+    final success = await ref
         .read(authProvider.notifier)
         .resendOtp(email: email, otpId: otpId, otpType: otpType);
 
-    if (driverSuccess) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('OTP resent successfully. Please check your email.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      return;
-    }
-
-    // If driver resend fails, try parent resend
-    final parentSuccess = await ref
-        .read(parentAuthProvider.notifier)
-        .resendOtp(email: email, otpId: otpId, otpType: otpType);
-
-    if (parentSuccess) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('OTP resent successfully. Please check your email.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      return;
-    }
-
-    // If both fail, show error
     if (!mounted) return;
-    final error = ref.read(authProvider).error ??
-        ref.read(parentAuthProvider).error ??
-        'Failed to resend OTP. Please try again.';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(error),
-        backgroundColor: AppTheme.errorColor,
-      ),
-    );
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('OTP resent successfully. Please check your email.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } else {
+      final error = ref.read(authProvider).error ?? 'Failed to resend OTP. Please try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
   }
 }

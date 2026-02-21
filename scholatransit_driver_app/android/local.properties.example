@@ -1,0 +1,8 @@
+# Add these lines to your android/local.properties (file is gitignored).
+# Flutter creates local.properties automatically - just add the Mapbox keys below.
+#
+# Mapbox - get your token at https://account.mapbox.com/access-tokens/
+# Use the same public token (pk.xxx) for both - it works for maps and SDK downloads.
+#
+# MAPBOX_ACCESS_TOKEN=pk.your_mapbox_public_token_here
+# MAPBOX_DOWNLOADS_TOKEN=pk.your_mapbox_public_token_here

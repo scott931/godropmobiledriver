@@ -163,14 +163,38 @@ class Trip {
     return 'Severe Traffic';
   }
 
+  static int? _parseVehicleId(Map<String, dynamic> json) {
+    final v = json['vehicle'] ?? json['assigned_vehicle'];
+    if (v is int) return v;
+    if (v is Map) return (v['id'] ?? v['vehicle_id']) as int?;
+    final vid = json['vehicle_id'] ?? json['assigned_vehicle_id'];
+    if (vid is int) return vid;
+    if (vid != null) return int.tryParse(vid.toString());
+    return null;
+  }
+
+  static String? _parseVehicleName(Map<String, dynamic> json) {
+    final name = json['vehicle_name'] ??
+        json['vehicle_name_display'] ??
+        json['assigned_vehicle_name'];
+    if (name != null) return name.toString();
+    final v = json['vehicle'] ?? json['assigned_vehicle'];
+    if (v is Map) {
+      return (v['name'] ??
+              v['license_plate'] ??
+              v['license_plate_number'])?.toString();
+    }
+    return null;
+  }
+
   factory Trip.fromJson(Map<String, dynamic> json) {
     return Trip(
       id: json['id'] ?? 0,
       tripId: json['trip_id'] ?? '',
       driverId: json['driver'] ?? json['driver_id'] ?? 0,
       driverName: json['driver_name'],
-      vehicleId: json['vehicle'] ?? json['vehicle_id'],
-      vehicleName: json['vehicle_name'],
+      vehicleId: _parseVehicleId(json),
+      vehicleName: _parseVehicleName(json),
       routeId: json['route'] ?? json['route_id'],
       routeName: json['route_name'],
       status: _parseTripStatus(json['status']),
@@ -226,8 +250,8 @@ class Trip {
       tripId: json['trip_id'] ?? '',
       driverId: json['driver'] ?? json['driver_id'] ?? 0,
       driverName: json['driver_name'],
-      vehicleId: json['vehicle'] ?? json['vehicle_id'],
-      vehicleName: json['vehicle_name'],
+      vehicleId: _parseVehicleId(json),
+      vehicleName: _parseVehicleName(json),
       routeId: json['route'] ?? json['route_id'],
       routeName: json['route_name'],
       status: _parseTripStatus(json['status']),

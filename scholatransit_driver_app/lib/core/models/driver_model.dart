@@ -33,24 +33,75 @@ class Driver {
 
   String get fullName => '$firstName $lastName';
 
+  static String _parseDriverStatus(Map<String, dynamic> json) {
+    final status = json['status']?.toString();
+    if (status != null && status.isNotEmpty) return status;
+    final isActive = json['is_active'];
+    if (isActive is bool) return isActive ? 'active' : 'inactive';
+    return 'inactive';
+  }
+
+  static Map<String, dynamic>? _toMap(dynamic value) {
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
+
   factory Driver.fromJson(Map<String, dynamic> json) {
+    // Merge nested data from various backend structures (backend often nests license/dob/address)
+    final profileData = _toMap(json['profile_data']);
+    final driverProfile = _toMap(json['driver_profile']);
+    final di1 = _toMap(json['driver_info']);
+    final di2 = _toMap(profileData?['driver_info']);
+    final di3 = _toMap(profileData?['driver']);
+    final driverInfo = di1 ?? di2 ?? di3;
+    final extra = _toMap(json['extra']);
+    var merged = Map<String, dynamic>.from(json);
+    if (profileData != null) merged.addAll(profileData);
+    if (driverProfile != null) merged.addAll(driverProfile);
+    if (driverInfo != null) merged.addAll(driverInfo);
+    if (extra != null) merged.addAll(extra);
+
+    // API keys: /users/me/ uses phone_number; driver tables use license_number, date_of_birth
+    final phone = merged['phone_number'] ?? merged['phone'] ?? merged['mobile'] ?? '';
+    final licenseNumber = merged['license_number'] ??
+        merged['license_no'] ??
+        merged['license'] ??
+        merged['driving_license'] ??
+        merged['driver_license'] ??
+        '';
+    final dateOfBirthRaw = merged['date_of_birth'] ??
+        merged['dob'] ??
+        merged['birth_date'] ??
+        merged['birthday'];
+    final address = merged['address'] ?? merged['residential_address'];
+    final emergencyContact =
+        merged['emergency_contact_name'] ?? merged['emergency_contact'];
+    final emergencyPhone =
+        merged['emergency_contact_phone'] ?? merged['emergency_phone'];
+
     return Driver(
-      id: json['id'] ?? 0,
-      firstName: json['first_name'] ?? '',
-      lastName: json['last_name'] ?? '',
-      email: json['email'] ?? '',
-      phone: json['phone'] ?? '',
-      licenseNumber: json['license_number'] ?? '',
-      status: json['status'] ?? 'inactive',
-      profileImage: json['profile_image'],
-      dateOfBirth: json['date_of_birth'] != null
-          ? DateTime.parse(json['date_of_birth'])
+      id: merged['id'] ?? 0,
+      firstName: (merged['first_name'] ?? merged['firstname'] ?? '').toString(),
+      lastName: (merged['last_name'] ?? merged['lastname'] ?? '').toString(),
+      email: (merged['email'] ?? '').toString(),
+      phone: phone.toString(),
+      licenseNumber: licenseNumber.toString(),
+      status: _parseDriverStatus(merged),
+      profileImage: (merged['profile_image'] ?? merged['avatar'] ?? merged['profile_picture'])?.toString(),
+      dateOfBirth: dateOfBirthRaw != null
+          ? DateTime.tryParse(dateOfBirthRaw.toString())
           : null,
-      address: json['address'],
-      emergencyContact: json['emergency_contact'],
-      emergencyPhone: json['emergency_phone'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      address: address?.toString(),
+      emergencyContact: emergencyContact?.toString(),
+      emergencyPhone: emergencyPhone?.toString(),
+      createdAt: merged['created_at'] != null
+          ? DateTime.tryParse(merged['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      updatedAt: merged['updated_at'] != null
+          ? DateTime.tryParse(merged['updated_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 

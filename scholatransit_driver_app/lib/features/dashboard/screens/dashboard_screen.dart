@@ -6,6 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/trip_provider.dart';
+import '../../../core/providers/route_provider.dart';
+import '../../../core/models/trip_model.dart';
+import '../../../core/models/route_model.dart';
 import '../../../core/widgets/notification_badge.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/services/location_service_resolver.dart';
@@ -28,6 +31,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     // Load dashboard data
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(tripProvider.notifier).loadActiveTrips();
+      ref.read(routeProvider.notifier).loadDriverAssignments();
       _initializeMap();
     });
   }
@@ -72,26 +76,138 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
   }
 
-  List<Map<String, dynamic>> _getAssignedVehicles(List trips) {
-    // Extract unique vehicles from trips
+  /// Safely converts API/JSON maps to Map<String, dynamic> to avoid type cast errors.
+  static Map<String, dynamic>? _toMap(dynamic value) {
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
+  }
+
+  List<Map<String, dynamic>> _getAssignedVehicles(
+    List<Trip> trips,
+    List<RouteAssignment> routeAssignments,
+    List<Map<String, dynamic>> directVehicles, {
+    Map<String, dynamic>? profileRawData,
+  }) {
+    // Extract unique vehicles from trips, route assignments, direct vehicles API, and driver profile
     final Map<int, Map<String, dynamic>> uniqueVehicles = {};
 
+    // 1. From trips (may have vehicleId + vehicleName)
     for (final trip in trips) {
-      if (trip.vehicleId != null && trip.vehicleName != null) {
-        final vehicleId = trip.vehicleId!;
+      final vehicleId = trip.vehicleId;
+      if (vehicleId != null && vehicleId > 0) {
+        final name = trip.vehicleName ?? 'Vehicle $vehicleId';
         if (!uniqueVehicles.containsKey(vehicleId)) {
           uniqueVehicles[vehicleId] = {
             'id': vehicleId,
-            'name': trip.vehicleName,
-            'license': trip.vehicleId
-                .toString(), // Using vehicleId as license for now
-            'type': _getVehicleTypeFromName(trip.vehicleName!),
+            'name': name,
+            'license': trip.vehicleName ?? vehicleId.toString(),
+            'type': _getVehicleTypeFromName(name),
             'status': trip.isActive ? 'Active' : 'Available',
           };
-        } else {
-          // Update status if this trip is active
-          if (trip.isActive) {
-            uniqueVehicles[vehicleId]!['status'] = 'Active';
+        } else if (trip.isActive) {
+          uniqueVehicles[vehicleId]!['status'] = 'Active';
+        }
+      }
+    }
+
+    // 2. From route assignments (vehicleId + vehicleLicensePlate)
+    for (final a in routeAssignments) {
+      final vehicleId = a.vehicleId;
+      if (vehicleId > 0 && !uniqueVehicles.containsKey(vehicleId)) {
+        final name = a.vehicleLicensePlate.isNotEmpty
+            ? a.vehicleLicensePlate
+            : 'Vehicle $vehicleId';
+        uniqueVehicles[vehicleId] = {
+          'id': vehicleId,
+          'name': name,
+          'license': a.vehicleLicensePlate,
+          'type': _getVehicleTypeFromName(name),
+          'status': a.isActive ? 'Active' : 'Available',
+        };
+      }
+    }
+
+    // 3. From direct vehicles API (e.g. /drivers/me/vehicles/)
+    for (final v in directVehicles) {
+      final vid = (v['id'] ?? v['vehicle_id']) as int?;
+      if (vid != null && vid > 0 && !uniqueVehicles.containsKey(vid)) {
+        final n = (v['name'] ?? v['license_plate'] ?? v['license_plate_number'])?.toString();
+        final lic = (v['license_plate'] ?? v['license_plate_number'] ?? n)?.toString();
+        uniqueVehicles[vid] = {
+          'id': vid,
+          'name': n ?? 'Vehicle $vid',
+          'license': lic ?? vid.toString(),
+          'type': _getVehicleTypeFromName(n ?? ''),
+          'status': 'Assigned',
+        };
+      }
+    }
+
+    // 4. From driver profile - use safe map access (avoids Map<dynamic,dynamic> cast errors)
+    if (profileRawData != null) {
+      final pd = _toMap(profileRawData['profile_data']);
+      final di = _toMap(pd?['driver_info'] ?? pd?['driver']);
+      final v = _toMap(profileRawData['assigned_vehicle']) ??
+          _toMap(profileRawData['vehicle']) ??
+          _toMap(pd?['assigned_vehicle']) ??
+          _toMap(pd?['vehicle']) ??
+          _toMap(di?['assigned_vehicle']) ??
+          _toMap(di?['vehicle']);
+      int? vehicleId;
+      String? name;
+      String? license;
+      if (v != null) {
+        vehicleId = (v['id'] ?? v['vehicle_id']) as int?;
+        name = (v['name'] ?? v['license_plate'] ?? v['license_plate_number'])?.toString();
+        license = (v['license_plate'] ?? v['license_plate_number'] ?? name)?.toString();
+      }
+      if (vehicleId == null &&
+          (profileRawData['assigned_vehicle_id'] != null || profileRawData['vehicle_id'] != null)) {
+        vehicleId = (profileRawData['assigned_vehicle_id'] ??
+            profileRawData['vehicle_id']) as int?;
+        name = (profileRawData['assigned_vehicle_name'] ??
+            profileRawData['vehicle_name'] ??
+            profileRawData['vehicle_license_plate'])?.toString();
+        license = (profileRawData['vehicle_license_plate'] ??
+            profileRawData['assigned_vehicle_license'] ??
+            name)?.toString();
+      }
+      if (vehicleId != null && vehicleId > 0 && !uniqueVehicles.containsKey(vehicleId)) {
+        uniqueVehicles[vehicleId] = {
+          'id': vehicleId,
+          'name': name ?? 'Vehicle $vehicleId',
+          'license': license ?? vehicleId.toString(),
+          'type': _getVehicleTypeFromName(name ?? ''),
+          'status': 'Assigned',
+        };
+      }
+    }
+
+    // 5. Multiple assigned vehicles from profile (assigned_vehicles, vehicles arrays)
+    if (profileRawData != null) {
+      final pd = _toMap(profileRawData['profile_data']);
+      final list = profileRawData['assigned_vehicles'] as List? ??
+          pd?['assigned_vehicles'] as List? ??
+          (profileRawData['vehicles'] as List?) ??
+          (pd?['vehicles'] as List?);
+      if (list != null) {
+        for (final item in list) {
+          final map = _toMap(item);
+          if (map != null) {
+            final vid = (map['id'] ?? map['vehicle_id']) as int?;
+            if (vid != null && vid > 0 && !uniqueVehicles.containsKey(vid)) {
+              final n = (map['name'] ?? map['license_plate'] ?? map['license_plate_number'])?.toString();
+              final lic = (map['license_plate'] ?? map['license_plate_number'] ?? n)?.toString();
+              uniqueVehicles[vid] = {
+                'id': vid,
+                'name': n ?? 'Vehicle $vid',
+                'license': lic ?? vid.toString(),
+                'type': _getVehicleTypeFromName(n ?? ''),
+                'status': 'Assigned',
+              };
+            }
           }
         }
       }
@@ -146,14 +262,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final tripState = ref.watch(tripProvider);
+    final routeState = ref.watch(routeProvider);
 
-    // Listen for authentication state changes and reload trips
+    // Listen for authentication state changes and reload trips + assignments
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.isAuthenticated &&
           previous?.isAuthenticated != next.isAuthenticated) {
-        // User just logged in, reload trips
-        print('🔄 DEBUG: User logged in, reloading trips...');
+        // User just logged in, reload trips and vehicle assignments
+        print('🔄 DEBUG: User logged in, reloading trips and assignments...');
         ref.read(tripProvider.notifier).loadActiveTrips();
+        ref.read(routeProvider.notifier).loadDriverAssignments();
       } else if (!next.isAuthenticated && previous?.isAuthenticated == true) {
         // User just logged out, reset trip state
         print('🔄 DEBUG: User logged out, resetting trip state...');
@@ -227,9 +345,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ],
         ),
       ),
-      body: RefreshIndicator(
+      body:       RefreshIndicator(
         onRefresh: () async {
-          await ref.read(tripProvider.notifier).loadTrips();
+          // Refresh driver profile to detect admin suspension/deactivation
+          await ref.read(authProvider.notifier).loadDriverProfile();
+          await ref.read(tripProvider.notifier).loadActiveTrips();
+          await ref.read(routeProvider.notifier).loadDriverAssignments();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -426,14 +547,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                     ),
                     SizedBox(height: 16.h),
-                    if (tripState.trips.isNotEmpty)
+                    if (_getAssignedVehicles(
+                          tripState.trips,
+                          routeState.assignments,
+                          routeState.vehicles,
+                          profileRawData: authState.profileRawData,
+                        ).isNotEmpty)
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            ..._getAssignedVehicles(tripState.trips)
-                                .take(5)
-                                .map(
+                            ..._getAssignedVehicles(
+                                  tripState.trips,
+                                  routeState.assignments,
+                                  routeState.vehicles,
+                                  profileRawData: authState.profileRawData,
+                                )
+                                    .take(5)
+                                    .map(
                                   (vehicle) => Padding(
                                     padding: EdgeInsets.only(right: 16.w),
                                     child: _VehicleCard(

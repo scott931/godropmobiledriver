@@ -12,11 +12,16 @@ enum UserRole {
         return UserRole.parent;
       case 'admin':
         return UserRole.admin;
+      case 'super_admin':
+      case 'superadmin':
+      case 'administrator':
+        return UserRole.admin;
       case 'school_staff':
       case 'schoolstaff':
         return UserRole.schoolStaff;
       default:
-        return UserRole.driver;
+        // Unknown roles (e.g. custom backend types) are treated as non-driver and blocked
+        return UserRole.admin;
     }
   }
 

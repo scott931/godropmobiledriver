@@ -31,10 +31,26 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
     });
   }
 
+  static String _formatLabel(String key) {
+    final words = key.replaceAll('_', ' ').split(' ');
+    return words.map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ');
+  }
+
+  /// Get value from raw API response, trying multiple key variants
+  static String? _fromRaw(Map<String, dynamic>? raw, List<String> keys) {
+    if (raw == null) return null;
+    for (final k in keys) {
+      final v = raw[k];
+      if (v != null && v.toString().trim().isNotEmpty) return v.toString();
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final driver = authState.driver;
+    final raw = authState.profileRawData;
 
     if (authState.isLoading) {
       return Scaffold(
@@ -114,6 +130,11 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         title: const Text('Profile'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit Profile',
+            onPressed: () => context.push('/profile/edit'),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
               await ref.read(authProvider.notifier).loadDriverProfile();
@@ -128,19 +149,66 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
             // Profile Header
             _ProfileHeader(driver: driver),
 
+            // Prompt when profile is incomplete
+            if (_isProfileIncomplete(driver))
+              Padding(
+                padding: EdgeInsets.only(top: 16.h),
+                child: GestureDetector(
+                  onTap: () => context.push('/profile/edit'),
+                  child: Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: AppTheme.primaryColor, size: 20.w),
+                        SizedBox(width: 8.w),
+                        Expanded(
+                          child: Text(
+                            'Complete your profile – tap to add details',
+                            style: TextStyle(
+                              color: AppTheme.primaryColor,
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: AppTheme.primaryColor, size: 20.w),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
             SizedBox(height: 24.h),
 
-            // Profile Information
+            // Profile Information (prefer raw API response, fallback to Driver)
             _buildInfoSection(
               title: 'Personal Information',
               children: [
-                _buildInfoField(label: 'First Name', value: driver.firstName),
-                _buildInfoField(label: 'Last Name', value: driver.lastName),
-                _buildInfoField(label: 'Email', value: driver.email),
-                _buildInfoField(label: 'Phone', value: driver.phone),
+                _buildInfoField(
+                  label: 'First Name',
+                  value: _fromRaw(raw, ['first_name', 'firstname']) ?? driver.firstName,
+                ),
+                _buildInfoField(
+                  label: 'Last Name',
+                  value: _fromRaw(raw, ['last_name', 'lastname']) ?? driver.lastName,
+                ),
+                _buildInfoField(
+                  label: 'Email',
+                  value: _fromRaw(raw, ['email']) ?? driver.email,
+                ),
+                _buildInfoField(
+                  label: 'Phone',
+                  value: _fromRaw(raw, ['phone_number', 'phone', 'mobile']) ?? driver.phone,
+                ),
                 _buildInfoField(
                   label: 'Address',
-                  value: driver.address ?? 'Not provided',
+                  value: _fromRaw(raw, ['address', 'residential_address']) ?? driver.address ?? 'Not provided',
                   maxLines: 2,
                 ),
               ],
@@ -154,13 +222,15 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
               children: [
                 _buildInfoField(
                   label: 'License Number',
-                  value: driver.licenseNumber,
+                  value: _fromRaw(raw, ['license_number', 'license_no', 'license', 'driving_license', 'driver_license']) ?? (driver.licenseNumber.isEmpty ? 'Not provided' : driver.licenseNumber),
                 ),
                 _buildInfoField(
                   label: 'Date of Birth',
-                  value:
-                      driver.dateOfBirth?.toString().split(' ')[0] ??
-                      'Not provided',
+                  value: () {
+                    final dob = _fromRaw(raw, ['date_of_birth', 'dob', 'birth_date', 'birthday']);
+                    if (dob != null) return dob.split(' ')[0];
+                    return driver.dateOfBirth?.toString().split(' ')[0] ?? 'Not provided';
+                  }(),
                 ),
               ],
             ),
@@ -173,14 +243,20 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
               children: [
                 _buildInfoField(
                   label: 'Contact Name',
-                  value: driver.emergencyContact ?? 'Not provided',
+                  value: _fromRaw(raw, ['emergency_contact_name', 'emergency_contact']) ?? driver.emergencyContact ?? 'Not provided',
                 ),
                 _buildInfoField(
                   label: 'Contact Phone',
-                  value: driver.emergencyPhone ?? 'Not provided',
+                  value: _fromRaw(raw, ['emergency_contact_phone', 'emergency_phone']) ?? driver.emergencyPhone ?? 'Not provided',
                 ),
               ],
             ),
+
+            // Additional details from response body (fields not in standard sections)
+            if (raw != null && raw.isNotEmpty) ...[
+              SizedBox(height: 24.h),
+              _buildAdditionalDetailsSection(raw),
+            ],
 
             SizedBox(height: 24.h),
 
@@ -222,9 +298,10 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            style: TextStyle(
+              fontSize: 16.sp,
               fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
+              color: const Color(0xFF1E293B),
             ),
           ),
           SizedBox(height: 16.h),
@@ -246,7 +323,8 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         children: [
           Text(
             label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            style: TextStyle(
+              fontSize: 13.sp,
               color: AppTheme.textSecondary,
               fontWeight: FontWeight.w500,
             ),
@@ -256,16 +334,20 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
             decoration: BoxDecoration(
-              color: AppTheme.backgroundColor,
+              color: AppTheme.surfaceBlue,
               borderRadius: BorderRadius.circular(8.r),
               border: Border.all(color: AppTheme.borderColor),
             ),
             child: Text(
-              value.isEmpty ? 'Not provided' : value,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: value.isEmpty
-                    ? AppTheme.textTertiary
-                    : AppTheme.textPrimary,
+              value.isEmpty || value == 'Not provided' ? 'Not provided' : value,
+              maxLines: maxLines,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w400,
+                color: (value.isEmpty || value == 'Not provided')
+                    ? const Color(0xFF64748B)
+                    : const Color(0xFF1E293B),
               ),
             ),
           ),
@@ -298,6 +380,66 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         ),
       ),
     );
+  }
+
+  /// Additional fields from API response not in standard sections
+  static const _displayedKeys = {
+    'first_name', 'firstname', 'last_name', 'lastname', 'email', 'phone', 'phone_number', 'mobile',
+    'address', 'residential_address', 'license_number', 'license_no', 'license', 'driving_license', 'driver_license',
+    'date_of_birth', 'dob', 'birth_date', 'birthday', 'emergency_contact_name', 'emergency_contact',
+    'emergency_contact_phone', 'emergency_phone', 'id', 'user_id', 'driver_id', 'status', 'profile_image',
+    'avatar', 'profile_picture', 'created_at', 'updated_at', 'user_type', 'is_active',
+  };
+
+  Widget _buildAdditionalDetailsSection(Map<String, dynamic> raw) {
+    // Flatten profile_data and driver_info into raw for display
+    final flat = Map<String, dynamic>.from(raw);
+    final pd = raw['profile_data'] as Map<String, dynamic>?;
+    if (pd != null) {
+      flat.addAll(pd);
+      final di = pd['driver_info'] ?? pd['driver'];
+      if (di is Map<String, dynamic>) flat.addAll(di);
+    }
+    final di = raw['driver_info'] as Map<String, dynamic>?;
+    if (di != null) flat.addAll(di);
+
+    final extra = <MapEntry<String, String>>[];
+    for (final e in flat.entries) {
+      final k = e.key.toString();
+      if (_displayedKeys.contains(k)) continue;
+      final v = e.value;
+      if (v == null) continue;
+      if (v is Map || v is List) continue; // skip nested
+      final s = v.toString().trim();
+      if (s.isEmpty) continue;
+      extra.add(MapEntry(k, s));
+    }
+    if (extra.isEmpty) return const SizedBox.shrink();
+
+    extra.sort((a, b) => a.key.compareTo(b.key));
+
+    return _buildInfoSection(
+      title: 'Additional Details',
+      children: extra.map((e) => _buildInfoField(
+        label: _formatLabel(e.key),
+        value: e.value,
+      )).toList(),
+    );
+  }
+
+  bool _isProfileIncomplete(Driver driver) {
+    final addressEmpty = driver.address == null || driver.address!.isEmpty;
+    final licenseEmpty = driver.licenseNumber.isEmpty;
+    final dobEmpty = driver.dateOfBirth == null;
+    final emergencyNameEmpty =
+        driver.emergencyContact == null || driver.emergencyContact!.isEmpty;
+    final emergencyPhoneEmpty =
+        driver.emergencyPhone == null || driver.emergencyPhone!.isEmpty;
+    return addressEmpty ||
+        licenseEmpty ||
+        dobEmpty ||
+        emergencyNameEmpty ||
+        emergencyPhoneEmpty;
   }
 
   void _showLogoutDialog() {

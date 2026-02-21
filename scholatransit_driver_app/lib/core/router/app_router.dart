@@ -8,6 +8,7 @@ import '../../features/auth/screens/register_screen.dart';
 import '../../features/auth/screens/otp_screen.dart';
 import '../../features/auth/screens/forgot_password_screen.dart';
 import '../../features/auth/screens/reset_password_screen.dart';
+import '../../features/auth/screens/change_password_prompt_screen.dart';
 import '../../features/dashboard/screens/dashboard_screen.dart';
 import '../../features/trips/screens/trips_screen.dart';
 import '../../features/trips/screens/trip_details_screen.dart';
@@ -21,6 +22,7 @@ import '../../features/notifications/screens/alert_details_screen.dart';
 import '../../features/communication/screens/conversations_screen.dart';
 import '../../features/communication/screens/chat_screen.dart';
 import '../../features/profile/screens/driver_profile_screen.dart';
+import '../../features/profile/screens/edit_profile_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/emergency/screens/emergency_screen.dart';
 import '../../features/emergency/screens/create_alert_screen.dart';
@@ -40,9 +42,44 @@ import '../../features/communication/screens/whatsapp_test_screen.dart';
 import '../../features/communication/screens/whatsapp_debug_screen.dart';
 import '../../features/communication/screens/contact_demo_screen.dart';
 
+/// Listenable that notifies when auth changes - triggers GoRouter redirect re-evaluation
+final _authRefreshNotifier = ValueNotifier<int>(0);
+
+/// Paths that do NOT require driver auth (public)
+bool _isPublicPath(String path) {
+  return path == '/splash' ||
+      path == '/login' ||
+      path.startsWith('/register') ||
+      path.startsWith('/otp') ||
+      path.startsWith('/forgot-password') ||
+      path.startsWith('/reset-password') ||
+      path.startsWith('/change-password-prompt') ||
+      path.startsWith('/parent/');
+}
+
+/// Driver app paths need auth - everything except public paths
+bool _requiresDriverAuth(String path) {
+  return !_isPublicPath(path);
+}
+
 final appRouterProvider = Provider<GoRouter>((ref) {
+  ref.listen<AuthState>(authProvider, (previous, next) {
+    if (previous?.isAuthenticated == true && !next.isAuthenticated) {
+      _authRefreshNotifier.value++;
+    }
+  });
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: _authRefreshNotifier,
+    redirect: (context, state) {
+      final auth = ref.read(authProvider);
+      final path = state.uri.path;
+      if (_requiresDriverAuth(path) &&
+          (!auth.isAuthenticated || auth.driver == null)) {
+        return '/login';
+      }
+      return null;
+    },
     routes: [
       // Splash route
       GoRoute(
@@ -75,6 +112,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/reset-password',
         name: 'reset-password',
         builder: (context, state) => const ResetPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/change-password-prompt',
+        name: 'change-password-prompt',
+        builder: (context, state) => const ChangePasswordPromptScreen(),
       ),
 
       // Main app routes
@@ -499,6 +541,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 body: Center(child: CircularProgressIndicator()),
               );
             },
+            routes: [
+              GoRoute(
+                path: 'edit',
+                name: 'edit-profile',
+                builder: (context, state) {
+                  final authState = ref.watch(authProvider);
+                  if (authState.isAuthenticated && authState.driver != null) {
+                    return const EditProfileScreen();
+                  }
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    context.go('/profile');
+                  });
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/settings',

@@ -37,48 +37,62 @@ class SettingsScreen extends ConsumerWidget {
 
             SizedBox(height: 24.h),
 
-            // User Profile Section
+            // User Profile Section - tap to view full profile details
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 24.w),
               child: Row(
                 children: [
-                  // Profile Picture
-                  Container(
-                    width: 60.w,
-                    height: 60.w,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.person,
-                      color: Colors.grey[600],
-                      size: 30.w,
-                    ),
-                  ),
-
-                  SizedBox(width: 16.w),
-
-                  // Welcome Message
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  GestureDetector(
+                    onTap: () => context.go('/profile'),
+                    child: Row(
                       children: [
-                        Text(
-                          'Welcome',
-                          style: GoogleFonts.poppins(
-                            fontSize: 14.sp,
+                        // Profile Picture
+                        Container(
+                          width: 60.w,
+                          height: 60.w,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.person,
                             color: Colors.grey[600],
-                            fontWeight: FontWeight.w400,
+                            size: 30.w,
                           ),
                         ),
-                        SizedBox(height: 2.h),
-                        Text(
-                          authState.driver?.fullName ?? 'Mr. John Doe',
-                          style: GoogleFonts.poppins(
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
+                        SizedBox(width: 16.w),
+                        // Welcome Message
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Welcome',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14.sp,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                              SizedBox(height: 2.h),
+                              Text(
+                                authState.driver?.fullName ?? 'Mr. John Doe',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              SizedBox(height: 2.h),
+                              Text(
+                                'Tap to view full profile',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12.sp,
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -121,7 +135,7 @@ class SettingsScreen extends ConsumerWidget {
                       icon: Icons.person_outline,
                       title: 'User Profile',
                       onTap: () {
-                        // TODO: Navigate to user profile
+                        context.go('/profile');
                       },
                     ),
 

@@ -7,6 +7,14 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+// Load local.properties for secrets (gitignored)
+val localProperties = java.util.Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+val mapboxAccessToken = localProperties.getProperty("MAPBOX_ACCESS_TOKEN", "")
+
 android {
     namespace = "com.scholatransit.driver.scholatransit_driver_app"
     compileSdk = 36
@@ -37,8 +45,9 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        // Mapbox token
-        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"pk.eyJ1Ijoid2F5bmU5MzEiLCJhIjoiY21maW5qaWpjMGRpazJsc2VnNmRoOW0xaSJ9.S4led3XBi7bpACc4D2KyBQ\"")
+        // Mapbox token - from local.properties (add MAPBOX_ACCESS_TOKEN=your_token there)
+        buildConfigField("String", "MAPBOX_ACCESS_TOKEN", "\"$mapboxAccessToken\"")
+        resValue("string", "mapbox_access_token", mapboxAccessToken.ifEmpty { "YOUR_MAPBOX_ACCESS_TOKEN" })
 
         // Graphics and memory optimizations
         // Note: ABI filters are managed by Flutter when using --split-per-abi
