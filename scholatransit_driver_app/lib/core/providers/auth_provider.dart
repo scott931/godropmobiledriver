@@ -1175,6 +1175,46 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Change password (in-app). Use when driver must change default/temp password after login.
+  /// On success, clears mustChangePassword so user can proceed to dashboard.
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String newPasswordConfirm,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await ApiService.post<Map<String, dynamic>>(
+        AppConfig.passwordChangeEndpoint,
+        data: {
+          'old_password': currentPassword,
+          'new_password': newPassword,
+          'new_password_confirm': newPasswordConfirm,
+        },
+      );
+      if (response.success && response.data != null) {
+        final mustChange = response.data!['must_change_password'] as bool?;
+        state = state.copyWith(
+          isLoading: false,
+          error: null,
+          mustChangePassword: mustChange ?? false,
+        );
+        return true;
+      }
+      state = state.copyWith(
+        isLoading: false,
+        error: response.error ?? 'Failed to change password',
+      );
+      return false;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Failed to change password: $e',
+      );
+      return false;
+    }
+  }
+
   Future<bool> resetPassword({required String email}) async {
     state = state.copyWith(isLoading: true, error: null);
 

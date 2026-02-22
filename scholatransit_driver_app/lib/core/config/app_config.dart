@@ -13,6 +13,7 @@ class AppConfig {
       '/users/otp/register/complete-email/';
   static const String passwordResetEndpoint = '/users/password/reset/';
   static const String passwordResetConfirmEndpoint = '/users/password/reset/confirm/';
+  static const String passwordChangeEndpoint = '/users/password/change/';
   static const String logoutEndpoint = '/users/logout/';
   static const String refreshTokenEndpoint = '/users/refresh-token/';
   static const String profileEndpoint = '/users/me/';

@@ -17,7 +17,22 @@ class ChangePasswordPromptScreen extends ConsumerStatefulWidget {
 
 class _ChangePasswordPromptScreenState
     extends ConsumerState<ChangePasswordPromptScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _currentController = TextEditingController();
+  final _newController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
   bool _resetSent = false;
+
+  @override
+  void dispose() {
+    _currentController.dispose();
+    _newController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +112,7 @@ class _ChangePasswordPromptScreenState
               Text(
                 _resetSent
                     ? 'We\'ve sent password reset instructions to your email. Check your inbox and follow the link to set a new password.'
-                    : 'For your security, we recommend changing your password. We\'ll send a reset link to your email.',
+                    : 'For security, set a new password. Use your current (temporary) password below, then choose a new one.',
                 style: TextStyle(
                   fontSize: 14.sp,
                   color: Colors.black87,
@@ -106,73 +121,9 @@ class _ChangePasswordPromptScreenState
                 ),
               ),
 
-              if (email.isNotEmpty) ...[
-                SizedBox(height: 16.h),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.email_outlined, size: 20.sp, color: Colors.grey[600]),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: Text(
-                          email,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: Colors.black87,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              SizedBox(height: _resetSent ? 24.h : 28.h),
 
-              SizedBox(height: 40.h),
-
-              if (!_resetSent) ...[
-                // Send Reset Link Button (mandatory - no skip allowed)
-                SizedBox(
-                  width: double.infinity,
-                  height: 50.h,
-                  child: ElevatedButton(
-                    onPressed: authState.isLoading ? null : _handleSendResetLink,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.r),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: authState.isLoading
-                        ? SizedBox(
-                            height: 20.h,
-                            width: 20.w,
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            'Send Reset Link',
-                            style: TextStyle(
-                              fontSize: 16.sp,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
-                ),
-              ] else ...[
-                // Reset sent - Continue to App
+              if (_resetSent)
                 SizedBox(
                   width: double.infinity,
                   height: 50.h,
@@ -195,8 +146,159 @@ class _ChangePasswordPromptScreenState
                       ),
                     ),
                   ),
+                )
+              else
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: _currentController,
+                        obscureText: _obscureCurrent,
+                        decoration: InputDecoration(
+                          labelText: 'Current password',
+                          hintText: 'Enter your current (temporary) password',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureCurrent
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              size: 22.sp,
+                            ),
+                            onPressed: () => setState(
+                                () => _obscureCurrent = !_obscureCurrent),
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Enter your current password';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 16.h),
+                      TextFormField(
+                        controller: _newController,
+                        obscureText: _obscureNew,
+                        decoration: InputDecoration(
+                          labelText: 'New password',
+                          hintText: 'At least 8 characters',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureNew
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              size: 22.sp,
+                            ),
+                            onPressed: () =>
+                                setState(() => _obscureNew = !_obscureNew),
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Enter a new password';
+                          }
+                          if (v.length < 8) {
+                            return 'Password must be at least 8 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 16.h),
+                      TextFormField(
+                        controller: _confirmController,
+                        obscureText: _obscureConfirm,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm new password',
+                          hintText: 'Re-enter new password',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirm
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              size: 22.sp,
+                            ),
+                            onPressed: () => setState(
+                                () => _obscureConfirm = !_obscureConfirm),
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Confirm your new password';
+                          }
+                          if (v != _newController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 28.h),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50.h,
+                        child: ElevatedButton(
+                          onPressed: authState.isLoading
+                              ? null
+                              : _handleChangePassword,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: authState.isLoading
+                              ? SizedBox(
+                                  height: 20.h,
+                                  width: 20.w,
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  'Change Password',
+                                  style: TextStyle(
+                                    fontSize: 16.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      if (email.isNotEmpty) ...[
+                        SizedBox(height: 16.h),
+                        Center(
+                          child: TextButton(
+                            onPressed: authState.isLoading
+                                ? null
+                                : _handleSendResetLink,
+                            child: Text(
+                              'I don\'t remember my password – send reset link',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                color: AppTheme.primaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
-              ],
 
               SizedBox(height: 20.h),
             ],
@@ -204,6 +306,31 @@ class _ChangePasswordPromptScreenState
         ),
       ),
     );
+  }
+
+  Future<void> _handleChangePassword() async {
+    if (!_formKey.currentState!.validate()) return;
+    final current = _currentController.text.trim();
+    final newP = _newController.text.trim();
+    final confirm = _confirmController.text.trim();
+    if (newP != confirm) return;
+
+    final success = await ref.read(authProvider.notifier).changePassword(
+          currentPassword: current,
+          newPassword: newP,
+          newPasswordConfirm: confirm,
+        );
+
+    if (!mounted) return;
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password changed. Welcome!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      context.go('/dashboard');
+    }
   }
 
   Future<void> _handleSendResetLink() async {
