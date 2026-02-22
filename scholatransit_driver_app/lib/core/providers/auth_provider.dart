@@ -162,7 +162,10 @@ String? _extractUserType(dynamic userObj, Map<String, dynamic>? data) {
   String? getFromMap(Map<String, dynamic>? m) {
     if (m == null) return null;
     final t = m['user_type'] as String? ?? m['role'] as String?;
-    if (t != null && t.toString().trim().isNotEmpty) return t;
+    if (t != null) {
+      final s = t.toString().trim();
+      if (s.isNotEmpty) return s;
+    }
     return null;
   }
   final map = _toStringKeyMap(userObj);
@@ -330,8 +333,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             return false;
           }
         }
-        // When user_type is null: backend does not send it in login response.
-        // Proceed to OTP so drivers can login. Backend should add user_type to block admins.
+        print('🔐 DEBUG: User type "$userType" allowed (driver) - proceeding to OTP');
 
         int? otpId;
         if (data['otp_id'] is int) {
