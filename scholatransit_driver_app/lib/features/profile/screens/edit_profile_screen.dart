@@ -19,7 +19,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _licenseController;
   late TextEditingController _emergencyNameController;
   late TextEditingController _emergencyPhoneController;
-  DateTime? _dateOfBirth;
+  DateTime? _hireDate;
 
   @override
   void initState() {
@@ -40,7 +40,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _emergencyPhoneController = TextEditingController(
       text: driver?.emergencyPhone ?? '',
     );
-    _dateOfBirth = driver?.dateOfBirth;
+    _hireDate = driver?.hireDate;
   }
 
   @override
@@ -53,15 +53,15 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.dispose();
   }
 
-  Future<void> _pickDateOfBirth() async {
+  Future<void> _pickHireDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _dateOfBirth ?? DateTime(1990),
+      initialDate: _hireDate ?? DateTime.now(),
       firstDate: DateTime(1940),
       lastDate: DateTime.now(),
     );
     if (picked != null) {
-      setState(() => _dateOfBirth = picked);
+      setState(() => _hireDate = picked);
     }
   }
 
@@ -74,7 +74,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       'phone_number': _phoneController.text.trim(),
       'address': _addressController.text.trim(),
       'license_number': _licenseController.text.trim(),
-      'date_of_birth': _dateOfBirth?.toIso8601String().split('T')[0],
+      'hire_date': _hireDate?.toIso8601String().split('T')[0],
       'emergency_contact': _emergencyNameController.text.trim(),
       'emergency_contact_name': _emergencyNameController.text.trim(),
       'emergency_phone': _emergencyPhoneController.text.trim(),
@@ -180,9 +180,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ),
                   SizedBox(height: 16.h),
                   _buildDateField(
-                    label: 'Date of Birth',
-                    value: _dateOfBirth,
-                    onTap: _pickDateOfBirth,
+                    label: 'Hire Date',
+                    value: _hireDate,
+                    onTap: _pickHireDate,
                   ),
                 ],
               ),

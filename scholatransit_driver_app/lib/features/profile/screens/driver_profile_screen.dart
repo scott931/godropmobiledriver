@@ -129,11 +129,11 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit Profile',
-            onPressed: () => context.push('/profile/edit'),
-          ),
+          // IconButton(
+          //   icon: const Icon(Icons.edit_outlined),
+          //   tooltip: 'Edit Profile',
+          //   onPressed: () => context.push('/profile/edit'),
+          // ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
@@ -190,11 +190,11 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                   value: _fromRaw(raw, ['license_number', 'license_no', 'license', 'driving_license', 'driver_license']) ?? (driver.licenseNumber.isEmpty ? 'Not provided' : driver.licenseNumber),
                 ),
                 _buildInfoField(
-                  label: 'Date of Birth',
+                  label: 'Hire Date',
                   value: () {
-                    final dob = _fromRaw(raw, ['date_of_birth', 'dob', 'birth_date', 'birthday']);
-                    if (dob != null) return dob.split(' ')[0];
-                    return driver.dateOfBirth?.toString().split(' ')[0] ?? 'Not provided';
+                    final hireDate = _fromRaw(raw, ['hire_date', 'hireDate', 'date_hired', 'employment_date']);
+                    if (hireDate != null) return hireDate.toString().split(' ')[0];
+                    return driver.hireDate?.toString().split(' ')[0] ?? 'Not provided';
                   }(),
                 ),
               ],
@@ -352,7 +352,8 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
   static const _displayedKeys = {
     'first_name', 'firstname', 'last_name', 'lastname', 'email', 'phone', 'phone_number', 'mobile',
     'address', 'residential_address', 'license_number', 'license_no', 'license', 'driving_license', 'driver_license',
-    'date_of_birth', 'dob', 'birth_date', 'birthday', 'emergency_contact_name', 'emergency_contact',
+    'date_of_birth', 'dob', 'birth_date', 'birthday', 'hire_date', 'hireDate', 'date_hired', 'employment_date',
+    'emergency_contact_name', 'emergency_contact',
     'emergency_contact_phone', 'emergency_phone', 'id', 'user_id', 'driver_id', 'status', 'profile_image',
     'avatar', 'profile_picture', 'created_at', 'updated_at', 'user_type', 'is_active',
     'school', 'school_id', 'school_name', 'last_login_ip', 'lastlogin_ip', 'last_login',

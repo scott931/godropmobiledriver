@@ -354,25 +354,25 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
 
           // Action Icons
-          Row(
-            children: [
-              // Camera Icon
-              _buildIconButton(
-                icon: Icons.camera_alt_outlined,
-                onTap: () {
-                  // TODO: Implement camera functionality
-                },
-              ),
-              SizedBox(width: 12.w),
-              // Pencil/Edit Icon
-              _buildIconButton(
-                icon: Icons.edit_outlined,
-                onTap: () {
-                  // TODO: Implement edit functionality
-                },
-              ),
-            ],
-          ),
+          // Row(
+          //   children: [
+          //     // Camera Icon
+          //     _buildIconButton(
+          //       icon: Icons.camera_alt_outlined,
+          //       onTap: () {
+          //         // TODO: Implement camera functionality
+          //       },
+          //     ),
+          //     SizedBox(width: 12.w),
+          //     // Pencil/Edit Icon
+          //     _buildIconButton(
+          //       icon: Icons.edit_outlined,
+          //       onTap: () {
+          //         // TODO: Implement edit functionality
+          //       },
+          //     ),
+          //   ],
+          // ),
         ],
       ),
     );

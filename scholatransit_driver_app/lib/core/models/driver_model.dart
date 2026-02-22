@@ -8,6 +8,7 @@ class Driver {
   final String status;
   final String? profileImage;
   final DateTime? dateOfBirth;
+  final DateTime? hireDate;
   final String? address;
   final String? emergencyContact;
   final String? emergencyPhone;
@@ -24,6 +25,7 @@ class Driver {
     required this.status,
     this.profileImage,
     this.dateOfBirth,
+    this.hireDate,
     this.address,
     this.emergencyContact,
     this.emergencyPhone,
@@ -76,6 +78,10 @@ class Driver {
         merged['dob'] ??
         merged['birth_date'] ??
         merged['birthday'];
+    final hireDateRaw = merged['hire_date'] ??
+        merged['hireDate'] ??
+        merged['date_hired'] ??
+        merged['employment_date'];
     final address = merged['address'] ?? merged['residential_address'];
     final emergencyContact =
         merged['emergency_contact_name'] ?? merged['emergency_contact'];
@@ -93,6 +99,9 @@ class Driver {
       profileImage: (merged['profile_image'] ?? merged['avatar'] ?? merged['profile_picture'])?.toString(),
       dateOfBirth: dateOfBirthRaw != null
           ? DateTime.tryParse(dateOfBirthRaw.toString())
+          : null,
+      hireDate: hireDateRaw != null
+          ? DateTime.tryParse(hireDateRaw.toString())
           : null,
       address: address?.toString(),
       emergencyContact: emergencyContact?.toString(),
@@ -117,6 +126,7 @@ class Driver {
       'status': status,
       'profile_image': profileImage,
       'date_of_birth': dateOfBirth?.toIso8601String(),
+      'hire_date': hireDate?.toIso8601String(),
       'address': address,
       'emergency_contact': emergencyContact,
       'emergency_phone': emergencyPhone,
@@ -135,6 +145,7 @@ class Driver {
     String? status,
     String? profileImage,
     DateTime? dateOfBirth,
+    DateTime? hireDate,
     String? address,
     String? emergencyContact,
     String? emergencyPhone,
@@ -151,6 +162,7 @@ class Driver {
       status: status ?? this.status,
       profileImage: profileImage ?? this.profileImage,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      hireDate: hireDate ?? this.hireDate,
       address: address ?? this.address,
       emergencyContact: emergencyContact ?? this.emergencyContact,
       emergencyPhone: emergencyPhone ?? this.emergencyPhone,

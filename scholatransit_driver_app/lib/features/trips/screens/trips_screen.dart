@@ -68,22 +68,22 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
                     // Navigation and Title
                     Row(
                       children: [
-                        GestureDetector(
-                          onTap: () => context.pop(),
-                          child: Container(
-                            padding: EdgeInsets.all(8.w),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            child: Icon(
-                              Icons.arrow_back,
-                              color: Colors.white,
-                              size: 20.w,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 16.w),
+                        // GestureDetector(
+                        //   onTap: () => context.pop(),
+                        //   child: Container(
+                        //     padding: EdgeInsets.all(8.w),
+                        //     decoration: BoxDecoration(
+                        //       color: Colors.white.withOpacity(0.2),
+                        //       borderRadius: BorderRadius.circular(8.r),
+                        //     ),
+                        //     child: Icon(
+                        //       Icons.arrow_back,
+                        //       color: Colors.white,
+                        //       size: 20.w,
+                        //     ),
+                        //   ),
+                        // ),
+                        // SizedBox(width: 16.w),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

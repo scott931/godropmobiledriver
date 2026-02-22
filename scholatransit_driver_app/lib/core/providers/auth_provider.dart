@@ -625,7 +625,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       }
 
-      // 3b. MERGE cached profile for missing fields (license_number, date_of_birth, address)
+      // 3b. MERGE cached profile for missing fields (license_number, hire_date, address)
       // Backend may not return these - use locally saved data from Edit Profile
       if (driverData != null && token != null) {
         final cached = StorageService.getUserProfile();
@@ -635,8 +635,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
               (driverData['address'] as String?)?.isEmpty == true;
           final missingLicense = driverData['license_number'] == null ||
               (driverData['license_number'] as String?)?.isEmpty == true;
-          final missingDob = driverData['date_of_birth'] == null;
-          if (missingAddress || missingLicense || missingDob) {
+          final missingHireDate = driverData['hire_date'] == null;
+          if (missingAddress || missingLicense || missingHireDate) {
             final cachedAddr = cachedUser['address'] ?? cachedUser['residential_address'];
             if (missingAddress && cachedAddr != null && cachedAddr.toString().trim().isNotEmpty) {
               driverData = {...driverData!, 'address': cachedAddr.toString()};
@@ -647,10 +647,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
               driverData = {...driverData!, 'license_number': cachedLicense.toString()};
               print('🔐 DEBUG: Merged license_number from cache');
             }
-            final cachedDob = cachedUser['date_of_birth'] ?? cachedUser['dob'];
-            if (missingDob && cachedDob != null) {
-              driverData = {...driverData!, 'date_of_birth': cachedDob};
-              print('🔐 DEBUG: Merged date_of_birth from cache');
+            final cachedHireDate = cachedUser['hire_date'] ?? cachedUser['hireDate'] ?? cachedUser['date_hired'];
+            if (missingHireDate && cachedHireDate != null) {
+              driverData = {...driverData!, 'hire_date': cachedHireDate};
+              print('🔐 DEBUG: Merged hire_date from cache');
             }
           }
         }
@@ -669,19 +669,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
           pdCheck?['vehicle_id'] != null ||
           diCheck?['assigned_vehicle'] != null ||
           diCheck?['vehicle'] != null;
-      final missingLicenseOrDob = driverData != null &&
+      final missingLicenseOrHireDate = driverData != null &&
           ((driverData['license_number'] == null ||
                   (driverData['license_number'] as String?)?.isEmpty == true) ||
-              (driverData['date_of_birth'] == null) ||
+              (driverData['hire_date'] == null) ||
               (driverData['address'] == null ||
                   (driverData['address'] as String?)?.isEmpty == true));
-      final shouldSupplement = missingLicenseOrDob || !hasVehicle;
+      final shouldSupplement = missingLicenseOrHireDate || !hasVehicle;
 
       if (shouldSupplement) {
         // 4a. Try GET /users/:id/ - Single User API (same as desktop driversAPI.getDriver)
         if (userId != null) {
           final userPath = AppConfig.userDetailsEndpoint.replaceFirst(':id', userId.toString());
-          print('🔐 DEBUG: Supplementing with Users API $userPath (license/dob/vehicle)');
+          print('🔐 DEBUG: Supplementing with Users API $userPath (license/hire_date/vehicle)');
           final userResp = await ApiService.get<Map<String, dynamic>>(userPath);
           if (userResp.success && userResp.data != null && userResp.data!.isNotEmpty) {
             final raw = userResp.data!;
@@ -695,7 +695,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 if (di != null) driverData = {...driverData!, ...di};
               }
             }
-            print('🔐 DEBUG: Merged from Users API: license=${driverData!['license_number']}, dob=${driverData['date_of_birth']}, address=${driverData['address']}');
+            print('🔐 DEBUG: Merged from Users API: license=${driverData!['license_number']}, hire_date=${driverData['hire_date']}, address=${driverData['address']}');
           }
         }
 
@@ -721,7 +721,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 if (di != null) driverData = {...driverData!, ...di};
               }
             }
-            print('🔐 DEBUG: Merged from /drivers/:id/: license=${driverData!['license_number']}, dob=${driverData['date_of_birth']}, address=${driverData['address']}');
+            print('🔐 DEBUG: Merged from /drivers/:id/: license=${driverData!['license_number']}, hire_date=${driverData['hire_date']}, address=${driverData['address']}');
           }
         }
       }
@@ -729,7 +729,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       print('🔐 DEBUG: Profile load - success: ${driverData != null}');
       if (driverData != null) {
         print('🔐 DEBUG: Driver data keys: ${driverData.keys.toList()}');
-        print('🔐 DEBUG: license_number=${driverData['license_number']}, date_of_birth=${driverData['date_of_birth']}, address=${driverData['address']}');
+        print('🔐 DEBUG: license_number=${driverData['license_number']}, hire_date=${driverData['hire_date']}, address=${driverData['address']}');
       }
 
       if (driverData != null && driverData.isNotEmpty) {
@@ -1404,7 +1404,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             _toStringKeyMap(data) ??
             <String, dynamic>{};
 
-        // Always merge updates into response - backend may not return address, license_number, date_of_birth
+        // Always merge updates into response - backend may not return address, license_number, hire_date
         final mergedJson = <String, dynamic>{
           ...driverJson,
           ...updates,
@@ -1412,7 +1412,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'phone_number': updates['phone_number'] ?? updates['phone'] ?? driverJson['phone_number'] ?? driverJson['phone'],
           'address': updates['address'] ?? driverJson['address'] ?? driverJson['residential_address'],
           'license_number': updates['license_number'] ?? driverJson['license_number'] ?? driverJson['license_no'],
-          'date_of_birth': updates['date_of_birth'] ?? driverJson['date_of_birth'] ?? driverJson['dob'],
+          'hire_date': updates['hire_date'] ?? driverJson['hire_date'] ?? driverJson['hireDate'] ?? driverJson['date_hired'],
           'emergency_contact': updates['emergency_contact'] ?? updates['emergency_contact_name'] ?? driverJson['emergency_contact'] ?? driverJson['emergency_contact_name'],
           'emergency_contact_name': updates['emergency_contact_name'] ?? updates['emergency_contact'] ?? driverJson['emergency_contact_name'] ?? driverJson['emergency_contact'],
           'emergency_phone': updates['emergency_phone'] ?? updates['emergency_contact_phone'] ?? driverJson['emergency_phone'] ?? driverJson['emergency_contact_phone'],
@@ -1429,7 +1429,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             phone: updates['phone'] ?? updates['phone_number'] ?? current.phone,
             address: updates['address']?.toString() ?? current.address,
             licenseNumber: updates['license_number']?.toString() ?? current.licenseNumber,
-            dateOfBirth: updates['date_of_birth'] != null ? DateTime.tryParse(updates['date_of_birth'].toString()) : current.dateOfBirth,
+            hireDate: updates['hire_date'] != null ? DateTime.tryParse(updates['hire_date'].toString()) : current.hireDate,
             emergencyContact: updates['emergency_contact'] ?? updates['emergency_contact_name'] ?? current.emergencyContact,
             emergencyPhone: updates['emergency_phone'] ?? updates['emergency_contact_phone'] ?? current.emergencyPhone,
           );
@@ -1450,7 +1450,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           phone: updates['phone'] ?? updates['phone_number'] ?? current.phone,
           address: (updates['address'] ?? updates['residential_address'])?.toString() ?? current.address,
           licenseNumber: (updates['license_number'] ?? updates['license_no'])?.toString() ?? current.licenseNumber,
-          dateOfBirth: (updates['date_of_birth'] != null ? DateTime.tryParse(updates['date_of_birth'].toString()) : null) ?? current.dateOfBirth,
+          hireDate: (updates['hire_date'] != null ? DateTime.tryParse(updates['hire_date'].toString()) : null) ?? current.hireDate,
           emergencyContact: (updates['emergency_contact'] ?? updates['emergency_contact_name'])?.toString() ?? current.emergencyContact,
           emergencyPhone: (updates['emergency_phone'] ?? updates['emergency_contact_phone'])?.toString() ?? current.emergencyPhone,
         );
