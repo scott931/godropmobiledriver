@@ -56,8 +56,10 @@ class AuthState {
 }
 
 /// Returns true if the user_type is allowed to log in to the driver app (drivers only).
+/// Admin, parent, and other non-driver roles are blocked. Unknown/null user_type is blocked
+/// to prevent admin access when the backend omits user_type.
 bool _isAllowedUserType(String? userType) {
-  if (userType == null) return true; // Backend may not always send it
+  if (userType == null || userType.toString().trim().isEmpty) return false;
   final role = UserRole.fromString(userType);
   return role == UserRole.driver;
 }
@@ -67,11 +69,17 @@ bool _isAllowedUserType(String? userType) {
 /// - status: 'active' -> allowed
 /// - status: 'suspended' -> blocked (temporary)
 /// - status: 'inactive' -> blocked (deactivated)
+/// Only block when we have explicit suspension/deactivation - assume active when status is missing or unrecognized.
 bool _isDriverActive(String? status) {
-  if (status == null) return true; // Assume active if not provided
+  if (status == null || status.toString().trim().isEmpty) return true;
   final s = status.toString().toLowerCase();
-  return s == 'active';
+  if (s == 'suspended' || s == 'inactive') return false;
+  return true; // active, on_leave, pending, or unknown -> allow
 }
+
+/// Message shown when a non-driver (admin, parent, etc.) tries to access the driver app.
+const String _kNonDriverBlockedMessage =
+    'Only drivers can access the application. Contact your admin for further assistance.';
 
 // Single canonical message - used everywhere for consistency
 const String _kSuspendedMessage =
@@ -143,34 +151,43 @@ Map<String, dynamic>? _toStringKeyMap(dynamic value) {
 }
 
 /// Extracts user_type from login/OTP response. Checks user object, profile_data, and root data.
+/// Also checks 'role' as some backends use that field instead of 'user_type'.
 String? _extractUserType(dynamic userObj, Map<String, dynamic>? data) {
+  String? getFromMap(Map<String, dynamic>? m) {
+    if (m == null) return null;
+    final t = m['user_type'] as String? ?? m['role'] as String?;
+    if (t != null && t.toString().trim().isNotEmpty) return t;
+    return null;
+  }
   final map = _toStringKeyMap(userObj);
   if (map != null) {
-    final t = map['user_type'] as String?;
-    if (t != null && t.toString().trim().isNotEmpty) return t;
+    final t = getFromMap(map);
+    if (t != null) return t;
     final pd = _toStringKeyMap(map['profile_data']);
     if (pd != null) {
-      final pt = pd['user_type'] as String?;
-      if (pt != null && pt.toString().trim().isNotEmpty) return pt;
+      final pt = getFromMap(pd);
+      if (pt != null) return pt;
     }
   }
   final dataMap = _toStringKeyMap(data);
-  if (dataMap != null) {
-    final rt = dataMap['user_type'] as String?;
-    if (rt != null && rt.toString().trim().isNotEmpty) return rt;
-  }
-  return null;
+  return getFromMap(dataMap);
 }
 
-/// Extract driver status from user/driver JSON (may be in profile_data).
-/// Handles both status: 'active'|'inactive' and is_active: true|false.
+/// Extract driver status from user/driver JSON. Must align with Driver model's merge sources:
+/// json, profile_data, driver_info, profile_data.driver_info, profile_data.driver.
 String? _getDriverStatusFromJson(dynamic json) {
   final map = _toStringKeyMap(json);
   if (map == null) return null;
   final profileData = _toStringKeyMap(map['profile_data']);
-  final status = map['status'] ?? profileData?['status'];
-  if (status != null) return status.toString();
-  final isActive = map['is_active'] ?? profileData?['is_active'];
+  final driverInfo = _toStringKeyMap(map['driver_info']) ??
+      _toStringKeyMap(profileData?['driver_info']) ??
+      _toStringKeyMap(profileData?['driver']);
+  // Check all merge sources (same order as Driver.fromJson)
+  final status = map['status'] ??
+      profileData?['status'] ??
+      driverInfo?['status'];
+  if (status != null && status.toString().trim().isNotEmpty) return status.toString();
+  final isActive = map['is_active'] ?? profileData?['is_active'] ?? driverInfo?['is_active'];
   if (isActive is bool) return isActive ? 'active' : 'inactive';
   return null;
 }
@@ -255,14 +272,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
         print('🔐 DEBUG: Login successful, processing response data');
 
-        // Block non-drivers before OTP - they stay on login with a notification
+        // Block non-drivers before OTP - they stay on login, never reach OTP page
         final userObj = data['user'] ?? data['user_data'] ?? data;
         final userType = _extractUserType(userObj, data);
-        if (userType != null && !_isAllowedUserType(userType)) {
+        if (!_isAllowedUserType(userType)) {
           print('🔐 DEBUG: User type "$userType" not allowed - blocking before OTP');
           state = state.copyWith(
             isLoading: false,
-            error: 'This app is for drivers only. Parent, admin, and administrator accounts cannot log in here.',
+            error: _kNonDriverBlockedMessage,
             otpId: null,
             registrationEmail: null,
           );
@@ -506,12 +523,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       // 3. FALLBACK: Load from cached profile when API fails
-      // CRITICAL: Do NOT use cache when we got 401/403 - indicates suspension/deactivation
-      final isAuthFailure = lastResponse?.statusCode == 401 ||
-          lastResponse?.statusCode == 403 ||
-          (lastResponse?.error ?? '').toLowerCase().contains('suspended') ||
-          (lastResponse?.error ?? '').toLowerCase().contains('inactive') ||
-          (lastResponse?.error ?? '').toLowerCase().contains('deactivated');
+      // Only skip cache on explicit 401/403 - avoid false positives from error strings
+      final isAuthFailure = lastResponse?.statusCode == 401 || lastResponse?.statusCode == 403;
       if ((driverData == null || driverData.isEmpty) &&
           token != null &&
           !isAuthFailure) {
@@ -632,13 +645,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       if (driverData != null && driverData.isNotEmpty) {
-        final userType = driverData['user_type'] as String?;
+        final userType = driverData['user_type'] as String? ?? driverData['role'] as String?;
         if (!_isAllowedUserType(userType)) {
           print('🔐 DEBUG: User type "$userType" not allowed in driver app');
           await logout();
           state = state.copyWith(
             isLoading: false,
-            error: 'This app is for drivers only. Admin and parent accounts cannot log in here.',
+            error: _kNonDriverBlockedMessage,
           );
           return;
         }
@@ -688,24 +701,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final lastError = lastResponse?.error ?? 'No profile data returned';
         print('🔐 DEBUG: Profile load failed: $lastError');
 
-        final isAuthError = lastResponse?.statusCode == 401 ||
-            lastResponse?.statusCode == 403 ||
-            lastError.contains('401') ||
-            lastError.contains('403') ||
-            (lastError.toLowerCase().contains('token') && lastError.toLowerCase().contains('expired'));
-        final isSuspensionError = lastError.toLowerCase().contains('suspended') ||
-            lastError.toLowerCase().contains('inactive') ||
-            lastError.toLowerCase().contains('deactivated');
-        if (isAuthError || isSuspensionError) {
-          print('🔐 DEBUG: Auth/suspension error - logging out');
-          final msg = isSuspensionError ? _normalizeApiError(lastError) : null;
-          await logout(suspensionError: msg);
-        } else {
-          state = state.copyWith(
-            isLoading: false,
-            error: 'Failed to load profile: $lastError',
-          );
-        }
+        // Do NOT auto-logout - user controls when to end session
+        // Just clear loading and optionally set error; keep user logged in
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Failed to load profile: $lastError',
+        );
       }
     } catch (e) {
       print('🔐 DEBUG: ERROR - Exception loading profile: $e');
@@ -829,12 +830,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         // If user object is present, use it to finalize auth without another API call
         final user = _toStringKeyMap(data['user']);
         if (user != null && user.isNotEmpty) {
-          final userType = user['user_type'] as String?;
+          final userType = user['user_type'] as String? ?? user['role'] as String?;
           if (!_isAllowedUserType(userType)) {
             await StorageService.clearAuthTokens();
             state = state.copyWith(
               isLoading: false,
-              error: 'This app is for drivers only. Admin and parent accounts cannot log in here.',
+              error: _kNonDriverBlockedMessage,
               otpId: null,
             );
             return false;
@@ -963,12 +964,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         // If user object is present, use it to finalize auth without another API call
         final user = _toStringKeyMap(data['user']);
         if (user != null && user.isNotEmpty) {
-          final userType = user['user_type'] as String?;
+          final userType = user['user_type'] as String? ?? user['role'] as String?;
           if (!_isAllowedUserType(userType)) {
             await StorageService.clearAuthTokens();
             state = state.copyWith(
               isLoading: false,
-              error: 'This app is for drivers only. Admin and parent accounts cannot register here.',
+              error: _kNonDriverBlockedMessage,
               otpId: null,
             );
             return false;
@@ -1087,7 +1088,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             if (!_isAllowedUserType(userType)) {
               state = state.copyWith(
                 isLoading: false,
-                error: 'This app is for drivers only. Admin and parent accounts cannot register here.',
+                error: _kNonDriverBlockedMessage,
               );
               return false;
             }

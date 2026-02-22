@@ -135,15 +135,78 @@ class RouteNotifier extends StateNotifier<RouteState> {
       List<RouteAssignment> assignments = [];
       List<Map<String, dynamic>> vehicles = [];
 
-      // Try /drivers/me/vehicles/ - uses auth token, no driver_id needed
-      var vehiclesResp = await ApiService.get<Map<String, dynamic>>(
-        AppConfig.driverMeVehiclesEndpoint,
-      );
-      if (vehiclesResp.success && vehiclesResp.data != null) {
-        vehicles = _parseVehiclesFromResponse(vehiclesResp.data!);
+      // 1. Primary: GET /api/v1/users/admin/drivers/:id/assignments/
+      if (driverId != null) {
+        final path = AppConfig.driverAdminAssignmentsEndpoint
+            .replaceFirst(':id', driverId.toString());
+        var assignmentsResp = await ApiService.get<Map<String, dynamic>>(path);
+        if (assignmentsResp.success && assignmentsResp.data != null) {
+          final data = assignmentsResp.data!;
+          final list = data['results'] as List? ??
+              data['assignments'] as List? ??
+              data['data'] as List? ??
+              data['vehicle_assignments'] as List?;
+          if (list != null && list.isNotEmpty) {
+            for (final item in list) {
+              if (item is Map) {
+                final m = Map<String, dynamic>.from(item);
+                try {
+                  final a = RouteAssignment.fromJson(m);
+                  if (a.vehicleId > 0) assignments.add(a);
+                } catch (_) {}
+                final v = m['vehicle'] ?? m['assigned_vehicle'];
+                int? vid = v is int
+                    ? v
+                    : (v is Map
+                        ? ((v['id'] ?? v['vehicle_id']) as int?)
+                        : null) ??
+                        (m['vehicle_id'] as int?);
+                if (vid == null && (m['id'] != null || m['vehicle_id'] != null)) {
+                  vid = (m['id'] ?? m['vehicle_id']) as int?;
+                }
+                if (vid != null &&
+                    vid > 0 &&
+                    !vehicles.any((e) => (e['id'] ?? e['vehicle_id']) == vid)) {
+                  String? name;
+                  String? plate;
+                  if (v is Map) {
+                    name = (v['name'] ?? v['license_plate'] ??
+                            v['license_plate_number'])
+                        ?.toString();
+                    plate = (v['license_plate'] ??
+                            v['license_plate_number'] ??
+                            name)
+                        ?.toString();
+                  }
+                  if (name == null || plate == null) {
+                    name ??= (m['name'] ?? m['vehicle_name'])?.toString();
+                    plate ??= (m['license_plate'] ?? m['license_plate_number'])?.toString();
+                  }
+                  vehicles.add({
+                    'id': vid,
+                    'vehicle_id': vid,
+                    'name': name ?? 'Vehicle $vid',
+                    'license': plate ?? vid.toString(),
+                    'license_plate': plate ?? vid.toString(),
+                  });
+                }
+              }
+            }
+          }
+        }
       }
 
-      // Try /vehicle-assignments/?driver_id=X - same structure desktop may use
+      // 2. Fallback: Try /drivers/me/vehicles/ - uses auth token, no driver_id needed
+      if (vehicles.isEmpty) {
+        var vehiclesResp = await ApiService.get<Map<String, dynamic>>(
+          AppConfig.driverMeVehiclesEndpoint,
+        );
+        if (vehiclesResp.success && vehiclesResp.data != null) {
+          vehicles = _parseVehiclesFromResponse(vehiclesResp.data!);
+        }
+      }
+
+      // 3. Fallback: Try /vehicle-assignments/?driver_id=X - same structure desktop may use
       if (driverId != null && vehicles.isEmpty) {
         final vaResp = await ApiService.get<Map<String, dynamic>>(
           AppConfig.vehicleAssignmentsEndpoint,

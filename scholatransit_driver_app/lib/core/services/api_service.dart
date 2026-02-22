@@ -7,11 +7,46 @@ class ApiService {
   static late Dio _dio;
   static final Connectivity _connectivity = Connectivity();
   static void Function(String message)? _onSuspensionDetected;
+  static Future<bool>? _refreshInProgress;
 
   /// Register callback for when API returns suspension/deactivation (401/403).
   /// Used to log out immediately when any API call hits a suspended account.
   static void setSuspensionCallback(void Function(String message)? callback) {
     _onSuspensionDetected = callback;
+  }
+
+  /// Attempt to refresh the access token. Returns true if successful.
+  static Future<bool> _attemptTokenRefresh() async {
+    if (_refreshInProgress != null) {
+      return _refreshInProgress!;
+    }
+    _refreshInProgress = _doTokenRefresh();
+    try {
+      return await _refreshInProgress!;
+    } finally {
+      _refreshInProgress = null;
+    }
+  }
+
+  static Future<bool> _doTokenRefresh() async {
+    try {
+      final refreshToken = StorageService.getRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) return false;
+      final response = await _dio.post<Map<String, dynamic>>(
+        AppConfig.refreshTokenEndpoint,
+        data: {'refresh': refreshToken},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data!;
+        final access =
+            data['access'] ?? data['access_token'] ?? '';
+        if (access.isNotEmpty) {
+          await StorageService.saveAuthToken(access);
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
   }
 
   static Future<void> init() async {
@@ -104,7 +139,7 @@ class ApiService {
   static Interceptor _errorInterceptor() {
     return InterceptorsWrapper(
       onError: (error, handler) async {
-        // If 401/403 with suspension/inactive on non-auth endpoints, invoke callback for immediate logout
+        // If 401 on non-auth endpoints: try token refresh first before logout
         final code = error.response?.statusCode;
         final path = error.requestOptions.path;
         final isAuthEndpoint = path.contains('/login/') ||
@@ -113,15 +148,23 @@ class ApiService {
             path.contains('/password/reset/') ||
             path.contains('/refresh-token/') ||
             path.contains('/logout');
-        // ANY 401/403 on protected endpoints = log out immediately (suspension, token invalid, etc.)
+        // 401: Try token refresh and retry - never auto-logout (user controls session)
         if (!isAuthEndpoint &&
-            (code == 401 || code == 403) &&
-            _onSuspensionDetected != null &&
+            code == 401 &&
             StorageService.getAuthToken() != null) {
-          final msg = _extractSuspensionMessage(error.response?.data) ??
-              'Your session has expired or your account is not active. Please sign in again.';
-          _onSuspensionDetected!(msg);
+          final refreshed = await _attemptTokenRefresh();
+          if (refreshed) {
+            try {
+              final response = await _dio.fetch(error.requestOptions);
+              handler.resolve(response);
+              return;
+            } catch (e) {
+              // Retry failed - pass error through, do not force logout
+            }
+          }
+          // Refresh failed: pass error to caller - do NOT invoke logout callback
         }
+        // 403: Pass through - do NOT auto-logout; user controls when to end session
         if (error.type == DioExceptionType.connectionTimeout ||
             error.type == DioExceptionType.receiveTimeout ||
             error.type == DioExceptionType.sendTimeout) {

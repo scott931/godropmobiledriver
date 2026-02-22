@@ -38,7 +38,8 @@ class Driver {
     if (status != null && status.isNotEmpty) return status;
     final isActive = json['is_active'];
     if (isActive is bool) return isActive ? 'active' : 'inactive';
-    return 'inactive';
+    // Assume active when API does not send status/is_active - avoid wrongly blocking users
+    return 'active';
   }
 
   static Map<String, dynamic>? _toMap(dynamic value) {

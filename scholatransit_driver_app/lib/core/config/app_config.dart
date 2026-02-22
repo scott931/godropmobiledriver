@@ -47,6 +47,9 @@ class AppConfig {
   static const String driverMeVehiclesEndpoint = '/drivers/me/vehicles/';
   /// Vehicle assignments (driver-vehicle link) - GET /vehicle-assignments/?driver_id=X
   static const String vehicleAssignmentsEndpoint = '/vehicle-assignments/';
+  /// Driver's assigned vehicles - GET /api/v1/users/admin/drivers/:id/assignments/
+  static const String driverAdminAssignmentsEndpoint =
+      '/users/admin/drivers/:id/assignments/';
 
   // Student Management Endpoints
   static const String studentsEndpoint = '/students/';

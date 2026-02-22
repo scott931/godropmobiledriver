@@ -149,41 +149,6 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
             // Profile Header
             _ProfileHeader(driver: driver),
 
-            // Prompt when profile is incomplete
-            if (_isProfileIncomplete(driver))
-              Padding(
-                padding: EdgeInsets.only(top: 16.h),
-                child: GestureDetector(
-                  onTap: () => context.push('/profile/edit'),
-                  child: Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: AppTheme.primaryColor, size: 20.w),
-                        SizedBox(width: 8.w),
-                        Expanded(
-                          child: Text(
-                            'Complete your profile – tap to add details',
-                            style: TextStyle(
-                              color: AppTheme.primaryColor,
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        Icon(Icons.chevron_right, color: AppTheme.primaryColor, size: 20.w),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
             SizedBox(height: 24.h),
 
             // Profile Information (prefer raw API response, fallback to Driver)
@@ -383,12 +348,14 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
   }
 
   /// Additional fields from API response not in standard sections
+  /// Excluded (commented out from display): status, user_type, school, school_id, last_login_ip
   static const _displayedKeys = {
     'first_name', 'firstname', 'last_name', 'lastname', 'email', 'phone', 'phone_number', 'mobile',
     'address', 'residential_address', 'license_number', 'license_no', 'license', 'driving_license', 'driver_license',
     'date_of_birth', 'dob', 'birth_date', 'birthday', 'emergency_contact_name', 'emergency_contact',
     'emergency_contact_phone', 'emergency_phone', 'id', 'user_id', 'driver_id', 'status', 'profile_image',
     'avatar', 'profile_picture', 'created_at', 'updated_at', 'user_type', 'is_active',
+    'school', 'school_id', 'school_name', 'last_login_ip', 'lastlogin_ip', 'last_login',
   };
 
   Widget _buildAdditionalDetailsSection(Map<String, dynamic> raw) {
@@ -425,21 +392,6 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
         value: e.value,
       )).toList(),
     );
-  }
-
-  bool _isProfileIncomplete(Driver driver) {
-    final addressEmpty = driver.address == null || driver.address!.isEmpty;
-    final licenseEmpty = driver.licenseNumber.isEmpty;
-    final dobEmpty = driver.dateOfBirth == null;
-    final emergencyNameEmpty =
-        driver.emergencyContact == null || driver.emergencyContact!.isEmpty;
-    final emergencyPhoneEmpty =
-        driver.emergencyPhone == null || driver.emergencyPhone!.isEmpty;
-    return addressEmpty ||
-        licenseEmpty ||
-        dobEmpty ||
-        emergencyNameEmpty ||
-        emergencyPhoneEmpty;
   }
 
   void _showLogoutDialog() {
@@ -534,41 +486,41 @@ class _ProfileHeader extends StatelessWidget {
           ),
           SizedBox(height: 8.h),
 
-          // Status Badge
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-            decoration: BoxDecoration(
-              color: _getStatusColor(driver.status).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12.r),
-              border: Border.all(
-                color: _getStatusColor(driver.status),
-                width: 1,
-              ),
-            ),
-            child: Text(
-              driver.status.toUpperCase(),
-              style: TextStyle(
-                color: _getStatusColor(driver.status),
-                fontWeight: FontWeight.bold,
-                fontSize: 12.sp,
-              ),
-            ),
-          ),
+          // Status Display field - commented out
+          // Container(
+          //   padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+          //   decoration: BoxDecoration(
+          //     color: _getStatusColor(driver.status).withOpacity(0.2),
+          //     borderRadius: BorderRadius.circular(12.r),
+          //     border: Border.all(
+          //       color: _getStatusColor(driver.status),
+          //       width: 1,
+          //     ),
+          //   ),
+          //   child: Text(
+          //     driver.status.toUpperCase(),
+          //     style: TextStyle(
+          //       color: _getStatusColor(driver.status),
+          //       fontWeight: FontWeight.bold,
+          //       fontSize: 12.sp,
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'active':
-        return AppTheme.successColor;
-      case 'inactive':
-        return AppTheme.errorColor;
-      case 'on_leave':
-        return AppTheme.warningColor;
-      default:
-        return AppTheme.textTertiary;
-    }
-  }
+  // Color _getStatusColor(String status) {
+  //   switch (status.toLowerCase()) {
+  //     case 'active':
+  //       return AppTheme.successColor;
+  //     case 'inactive':
+  //       return AppTheme.errorColor;
+  //     case 'on_leave':
+  //       return AppTheme.warningColor;
+  //     default:
+  //       return AppTheme.textTertiary;
+  //   }
+  // }
 }
