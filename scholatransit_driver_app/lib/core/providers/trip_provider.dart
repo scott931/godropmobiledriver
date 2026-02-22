@@ -138,6 +138,7 @@ class TripNotifier extends StateNotifier<TripState> {
   /// when driver ID is available (returns trips with vehicle data per trip). Falls back
   /// to /tracking/trips/active/ when no driver ID (e.g. before profile loads).
   Future<void> loadActiveTrips() async {
+    if (state.isLoading) return;
     state = state.copyWith(isLoading: true, error: null);
 
     final driverId = StorageService.getDriverId();

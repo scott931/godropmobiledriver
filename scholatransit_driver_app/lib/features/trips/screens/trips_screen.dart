@@ -30,16 +30,9 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
   Widget build(BuildContext context) {
     final tripState = ref.watch(tripProvider);
 
-    // Listen for authentication state changes and reload trips
+    // Listen for auth changes - only reset on logout (initState handles initial load)
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.isAuthenticated &&
-          previous?.isAuthenticated != next.isAuthenticated) {
-        // User just logged in, reload trips
-        print('🔄 DEBUG: User logged in, reloading trips...');
-        ref.read(tripProvider.notifier).loadActiveTrips();
-      } else if (!next.isAuthenticated && previous?.isAuthenticated == true) {
-        // User just logged out, reset trip state
-        print('🔄 DEBUG: User logged out, resetting trip state...');
+      if (previous != null && !next.isAuthenticated && previous!.isAuthenticated) {
         ref.read(tripProvider.notifier).resetState();
       }
     });

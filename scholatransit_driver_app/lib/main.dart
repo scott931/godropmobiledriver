@@ -143,11 +143,6 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      final authState = ref.read(authProvider);
-      if (authState.isAuthenticated && authState.driver != null) {
-        // Silent background check on app resume - no loading, no UI refresh
-        ref.read(authProvider.notifier).refreshDriverProfileInBackground();
-      }
       _startStatusCheckIfAuthenticated();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
@@ -160,9 +155,7 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.isAuthenticated && previous?.isAuthenticated != true) {
-        _startStatusCheckIfAuthenticated();
-      } else if (!next.isAuthenticated) {
+      if (!next.isAuthenticated) {
         _statusCheckTimer?.cancel();
         _statusCheckTimer = null;
         // Redirect to login only when transitioning from authenticated (suspension/logout)

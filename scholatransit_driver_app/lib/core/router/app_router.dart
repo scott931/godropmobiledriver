@@ -67,13 +67,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     if (previous?.isAuthenticated == true && !next.isAuthenticated) {
       _authRefreshNotifier.value++;
     }
+    // Re-evaluate redirect when auth loads (to skip splash -> dashboard)
+    if (previous != null && next.isAuthenticated && !previous!.isAuthenticated) {
+      _authRefreshNotifier.value++;
+    }
+  });
+  ref.listen<ParentAuthState>(parentAuthProvider, (previous, next) {
+    if (previous != null && next.isAuthenticated && !previous!.isAuthenticated) {
+      _authRefreshNotifier.value++;
+    }
   });
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: _authRefreshNotifier,
     redirect: (context, state) {
       final auth = ref.read(authProvider);
+      final parentAuth = ref.read(parentAuthProvider);
       final path = state.uri.path;
+      // Skip splash when already authenticated - go straight to dashboard
+      if (path == '/splash') {
+        if (auth.isAuthenticated && auth.driver != null) return '/dashboard';
+        if (parentAuth.isAuthenticated && parentAuth.parent != null) {
+          return '/parent/dashboard';
+        }
+      }
       if (_requiresDriverAuth(path) &&
           (!auth.isAuthenticated || auth.driver == null)) {
         return '/login';

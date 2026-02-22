@@ -18,12 +18,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  bool _hasNavigated = false;
 
   @override
   void initState() {
     super.initState();
     _initializeAnimations();
     _navigateToNextScreen();
+  }
+
+  void _navigateOnce(void Function() navigate) {
+    if (_hasNavigated || !mounted) return;
+    _hasNavigated = true;
+    navigate();
   }
 
   void _initializeAnimations() {
@@ -59,6 +66,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   }
 
   void _checkAuthenticationAndNavigate() {
+    if (_hasNavigated || !mounted) return;
     final authState = ref.read(authProvider);
     final parentAuthState = ref.read(parentAuthProvider);
 
@@ -66,19 +74,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     print('🚀 DEBUG: Driver authenticated: ${authState.isAuthenticated}');
     print('🚀 DEBUG: Parent authenticated: ${parentAuthState.isAuthenticated}');
 
-    // Check if user is authenticated as driver
+    _hasNavigated = true;
     if (authState.isAuthenticated && authState.driver != null) {
       print('🚀 DEBUG: Driver authenticated, navigating to dashboard');
       context.go('/dashboard');
-    }
-    // Check if user is authenticated as parent
-    else if (parentAuthState.isAuthenticated &&
+    } else if (parentAuthState.isAuthenticated &&
         parentAuthState.parent != null) {
       print('🚀 DEBUG: Parent authenticated, navigating to parent dashboard');
       context.go('/parent/dashboard');
-    }
-    // If not authenticated, go to login
-    else {
+    } else {
       print('🚀 DEBUG: Not authenticated, navigating to login');
       context.go('/login');
     }
@@ -92,22 +96,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Listen for authentication state changes
+    // Listen for auth - navigate once when ready (router redirect may beat us)
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.isAuthenticated && next.driver != null && mounted) {
-        print(
-          '🚀 DEBUG: Driver authentication detected during splash, navigating to dashboard',
-        );
-        context.go('/dashboard');
+        _navigateOnce(() {
+          print('🚀 DEBUG: Driver auth detected, navigating to dashboard');
+          context.go('/dashboard');
+        });
       }
     });
 
     ref.listen<ParentAuthState>(parentAuthProvider, (previous, next) {
       if (next.isAuthenticated && next.parent != null && mounted) {
-        print(
-          '🚀 DEBUG: Parent authentication detected during splash, navigating to parent dashboard',
-        );
-        context.go('/parent/dashboard');
+        _navigateOnce(() {
+          print('🚀 DEBUG: Parent auth detected, navigating to parent dashboard');
+          context.go('/parent/dashboard');
+        });
       }
     });
 

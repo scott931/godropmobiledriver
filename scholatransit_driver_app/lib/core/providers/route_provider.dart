@@ -129,6 +129,7 @@ class RouteNotifier extends StateNotifier<RouteState> {
   }
 
   Future<void> loadDriverAssignments() async {
+    if (state.isLoading) return;
     state = state.copyWith(isLoading: true, error: null);
     try {
       final driverId = StorageService.getDriverId();

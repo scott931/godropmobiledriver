@@ -24,6 +24,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Point? _currentLocation;
   PointAnnotationManager? _pointAnnotationManager;
   PointAnnotation? _currentLocationAnnotation;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -264,17 +265,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final tripState = ref.watch(tripProvider);
     final routeState = ref.watch(routeProvider);
 
-    // Listen for authentication state changes and reload trips + assignments
+    // Listen for auth changes - only reset on logout (initState handles initial load)
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.isAuthenticated &&
-          previous?.isAuthenticated != next.isAuthenticated) {
-        // User just logged in, reload trips and vehicle assignments
-        print('🔄 DEBUG: User logged in, reloading trips and assignments...');
-        ref.read(tripProvider.notifier).loadActiveTrips();
-        ref.read(routeProvider.notifier).loadDriverAssignments();
-      } else if (!next.isAuthenticated && previous?.isAuthenticated == true) {
-        // User just logged out, reset trip state
-        print('🔄 DEBUG: User logged out, resetting trip state...');
+      if (previous != null && !next.isAuthenticated && previous!.isAuthenticated) {
         ref.read(tripProvider.notifier).resetState();
       }
     });
@@ -345,14 +338,25 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ],
         ),
       ),
-      body:       RefreshIndicator(
-        onRefresh: () async {
-          // Refresh driver profile to detect admin suspension/deactivation
-          await ref.read(authProvider.notifier).loadDriverProfile();
-          await ref.read(tripProvider.notifier).loadActiveTrips();
-          await ref.read(routeProvider.notifier).loadDriverAssignments();
-        },
-        child: SingleChildScrollView(
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () async {
+              if (_isRefreshing) return;
+              if (!mounted) return;
+              setState(() => _isRefreshing = true);
+              try {
+                // Refresh driver profile to get latest data (overlay shows "Refreshing..." below)
+                await ref.read(authProvider.notifier).loadDriverProfile();
+                if (!mounted) return;
+                await ref.read(tripProvider.notifier).loadActiveTrips();
+                if (!mounted) return;
+                await ref.read(routeProvider.notifier).loadDriverAssignments();
+              } finally {
+                if (mounted) setState(() => _isRefreshing = false);
+              }
+            },
+            child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,7 +684,58 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               SizedBox(height: 32.h),
             ],
           ),
-        ),
+            ),
+          ),
+          if (_isRefreshing)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black26,
+                child: Center(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 24.w,
+                      vertical: 16.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 32.w,
+                          height: 32.h,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              const Color(0xFF0052CC),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 12.h),
+                        Text(
+                          'Refreshing...',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       floatingActionButton: tripState.currentTrip != null
           ? Tooltip(
