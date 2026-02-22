@@ -53,7 +53,8 @@ class TripNotifier extends StateNotifier<TripState> {
 
   TripNotifier() : super(const TripState()) {
     _loadCurrentTrip();
-    _startPeriodicRefresh();
+    // Periodic refresh disabled - was causing whole-app UI refresh every 60s.
+    // Use pull-to-refresh on trips/dashboard screens for updates.
   }
 
   Future<void> _loadCurrentTrip() async {
@@ -1448,8 +1449,8 @@ class TripNotifier extends StateNotifier<TripState> {
   }
 
   void _startPeriodicRefresh() {
-    // Refresh trips every 30 seconds to get real-time updates
-    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    // Refresh trips every 60 seconds - background only, no loading state
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
       if (state.trips.isNotEmpty) {
         _refreshTripsSilently();
       }
@@ -1488,10 +1489,10 @@ class TripNotifier extends StateNotifier<TripState> {
   bool _hasTripStatusChanged(List<Trip> newTrips) {
     if (state.trips.length != newTrips.length) return true;
 
-    for (int i = 0; i < state.trips.length; i++) {
-      if (i < newTrips.length && state.trips[i].status != newTrips[i].status) {
-        return true;
-      }
+    final byId = {for (final t in newTrips) t.id: t};
+    for (final t in state.trips) {
+      final updated = byId[t.id];
+      if (updated == null || updated.status != t.status) return true;
     }
     return false;
   }

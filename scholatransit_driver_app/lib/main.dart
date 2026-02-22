@@ -133,17 +133,9 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
     _statusCheckTimer?.cancel();
     final authState = ref.read(authProvider);
     if (authState.isAuthenticated && authState.driver != null) {
-      // Immediate check + every 30s for real-time suspension/inactive detection
-      ref.read(authProvider.notifier).loadDriverProfile();
-      _statusCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-        if (!mounted) return;
-        final s = ref.read(authProvider);
-        if (!s.isAuthenticated) {
-          _statusCheckTimer?.cancel();
-          return;
-        }
-        ref.read(authProvider.notifier).loadDriverProfile();
-      });
+      // One-time background check on start - no periodic timer to avoid app refresh
+      // Suspension is also detected by API interceptor on 401/403
+      ref.read(authProvider.notifier).refreshDriverProfileInBackground();
     }
   }
 
@@ -153,7 +145,8 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
     if (state == AppLifecycleState.resumed) {
       final authState = ref.read(authProvider);
       if (authState.isAuthenticated && authState.driver != null) {
-        ref.read(authProvider.notifier).loadDriverProfile();
+        // Silent background check on app resume - no loading, no UI refresh
+        ref.read(authProvider.notifier).refreshDriverProfileInBackground();
       }
       _startStatusCheckIfAuthenticated();
     } else if (state == AppLifecycleState.paused ||

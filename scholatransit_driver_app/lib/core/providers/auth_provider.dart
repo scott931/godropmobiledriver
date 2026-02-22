@@ -487,6 +487,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _loadDriverProfile();
   }
 
+  /// Refresh driver profile in the background without showing loading or
+  /// triggering visible UI updates. Used for periodic suspension checks.
+  /// On success, updates driver data. On suspension/inactive, logs out.
+  /// On transient failure, keeps current state (no error overlay).
+  Future<void> refreshDriverProfileInBackground() async {
+    if (state.isLoading) return; // Skip if user-initiated refresh is in progress
+    await _loadDriverProfile(silent: true);
+  }
+
   /// Shared logic: validate user, persist profile, set auth state from OTP response user.
   /// Returns true if auth succeeded; false if user type or status blocked.
   Future<bool> _finalizeAuthFromOtpUser(Map<String, dynamic> user) async {
@@ -553,7 +562,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         _toStringKeyMap(map['profile']);
   }
 
-  Future<void> _loadDriverProfile() async {
+  Future<void> _loadDriverProfile({bool silent = false}) async {
     try {
       final token = StorageService.getAuthToken();
       print(
@@ -765,6 +774,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await StorageService.saveDriverId(idForApi is int ? idForApi : driver.id);
         await StorageService.saveUserProfile(driverData);
 
+        // In silent/background mode: skip state update if nothing meaningful changed.
+        // This prevents rebuilds every 30s. We only need to update when profile differs.
+        if (silent &&
+            state.driver != null &&
+            state.driver!.id == driver.id &&
+            state.driver!.status == driver.status) {
+          return; // No state change = no rebuild
+        }
+
         final mustChange = _extractMustChangePassword(driverData);
         state = state.copyWith(
           isLoading: false,
@@ -779,19 +797,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final lastError = lastResponse?.error ?? 'No profile data returned';
         print('🔐 DEBUG: Profile load failed: $lastError');
 
-        // Do NOT auto-logout - user controls when to end session
-        // Just clear loading and optionally set error; keep user logged in
-        state = state.copyWith(
-          isLoading: false,
-          error: 'Failed to load profile: $lastError',
-        );
+        // In silent/background mode, don't overwrite state on transient failure
+        if (!silent) {
+          // Do NOT auto-logout - user controls when to end session
+          // Just clear loading and optionally set error; keep user logged in
+          state = state.copyWith(
+            isLoading: false,
+            error: 'Failed to load profile: $lastError',
+          );
+        }
       }
     } catch (e) {
       print('🔐 DEBUG: ERROR - Exception loading profile: $e');
-      state = state.copyWith(
-        isLoading: false,
-        error: 'Failed to load profile: $e',
-      );
+      if (!silent) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Failed to load profile: $e',
+        );
+      }
     }
   }
 

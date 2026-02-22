@@ -70,7 +70,16 @@ class ApiService {
     _dio.interceptors.add(_errorInterceptor());
   }
 
+  /// Paths that return the current driver's account status. Only these can trigger suspension.
+  /// Trips, assignments, vehicles, etc. may contain "inactive" for entities and must NOT
+  /// trigger false logout.
+  static bool _isProfilePath(String path) {
+    return path.contains('/users/me') || path.contains('/drivers/profile');
+  }
+
   /// Checks successful responses (200) for suspended/inactive account indicators.
+  /// Only runs on profile-related endpoints to avoid false logouts from trips,
+  /// assignments, etc. where "inactive" may refer to entities, not the driver.
   static Interceptor _suspensionInterceptor() {
     return InterceptorsWrapper(
       onResponse: (response, handler) {
@@ -87,7 +96,8 @@ class ApiService {
         }
         if (response.statusCode == 200 &&
             StorageService.getAuthToken() != null &&
-            response.data != null) {
+            response.data != null &&
+            _isProfilePath(path)) {
           final suspensionMsg = _extractSuspensionMessage(response.data);
           if (suspensionMsg != null && _onSuspensionDetected != null) {
             _onSuspensionDetected!(suspensionMsg);
