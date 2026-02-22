@@ -133,12 +133,11 @@ class AppConfig {
   static const String locationHistoryKey = 'location_history';
   static const String notificationSettingsKey = 'notification_settings';
 
-  // Map Configuration
+  // Map Configuration (Mapbox SDK)
   // Set via: flutter run --dart-define=MAPBOX_ACCESS_TOKEN=your_token
   // Or add to local.properties: MAPBOX_ACCESS_TOKEN=your_token (see build.gradle.kts)
   static const String mapboxToken =
       String.fromEnvironment('MAPBOX_ACCESS_TOKEN', defaultValue: '');
-  static const String googleMapsApiKey = 'YOUR_GOOGLE_MAPS_API_KEY';
 
   // QR Code Configuration
   static const String qrCodePrefix = 'SCHOLATRANSIT_';

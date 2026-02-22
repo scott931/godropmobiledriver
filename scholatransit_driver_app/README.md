@@ -49,7 +49,7 @@ A comprehensive Flutter mobile application for school bus drivers to manage trip
 - **HTTP Client**: Dio
 - **Local Storage**: Hive + SharedPreferences
 - **Location**: Geolocator
-- **Maps**: Google Maps Flutter
+- **Maps**: Mapbox Maps Flutter
 - **Notifications**: Firebase Messaging
 - **UI**: Material Design 3
 
@@ -140,18 +140,6 @@ static const String apiVersion = '/api/v1';
    Or manually: `flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_token`
    
    See `android/local.properties.example` for details.
-
-#### Google Maps Setup
-1. Get a Google Maps API key
-2. Update `android/app/src/main/AndroidManifest.xml`:
-   ```xml
-   <meta-data android:name="com.google.android.geo.API_KEY"
-              android:value="YOUR_API_KEY"/>
-   ```
-3. Update `ios/Runner/AppDelegate.swift`:
-   ```swift
-   GMSServices.provideAPIKey("YOUR_API_KEY")
-   ```
 
 ## Features Overview
 
