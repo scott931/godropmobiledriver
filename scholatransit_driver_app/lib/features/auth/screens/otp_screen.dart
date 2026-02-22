@@ -44,16 +44,18 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     // Listen for successful driver authentication (admin and parent are restricted)
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.isAuthenticated && next.driver != null) {
-        // For register flow: new user has temp password, prompt to change before dashboard
-        // For login flow: existing user has already set their password, go straight to dashboard
-        if (flow == 'register') {
+        // New users: must change password before accessing app (backend flag or register flow)
+        // Existing users: go straight to dashboard
+        final mustChange = next.mustChangePassword ??
+            (flow == 'register'); // Fallback: register = new user
+        if (mustChange) {
           print(
-            '📱 DEBUG: Driver registration successful (new user), navigating to change password prompt',
+            '📱 DEBUG: New user - navigating to change password prompt',
           );
           context.go('/change-password-prompt');
         } else {
           print(
-            '📱 DEBUG: Driver login successful, navigating to dashboard',
+            '📱 DEBUG: Existing user - navigating to dashboard',
           );
           context.go('/dashboard');
         }

@@ -23,6 +23,9 @@ class AuthState {
   final String? error;
   final int? otpId;
   final String? registrationEmail;
+  /// True when user must change password before accessing app (e.g. new user with temp password).
+  /// Null when backend does not send this flag (use flow-based fallback).
+  final bool? mustChangePassword;
 
   const AuthState({
     this.isLoading = false,
@@ -32,6 +35,7 @@ class AuthState {
     this.error,
     this.otpId,
     this.registrationEmail,
+    this.mustChangePassword,
   });
 
   AuthState copyWith({
@@ -42,6 +46,7 @@ class AuthState {
     String? error,
     int? otpId,
     String? registrationEmail,
+    bool? mustChangePassword,
   }) {
     return AuthState(
       isLoading: isLoading ?? this.isLoading,
@@ -51,6 +56,7 @@ class AuthState {
       error: error,
       otpId: otpId ?? this.otpId,
       registrationEmail: registrationEmail ?? this.registrationEmail,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
     );
   }
 }
@@ -173,6 +179,22 @@ String? _extractUserType(dynamic userObj, Map<String, dynamic>? data) {
   return getFromMap(dataMap);
 }
 
+/// Extracts whether user must change password before accessing app.
+/// Checks explicit backend flags: must_change_password, is_first_login, force_password_change.
+/// Returns null when backend does not send any of these (use flow-based fallback).
+/// Note: We do NOT use password_changed - many backends default it to false, which would
+/// wrongly force all users to change password.
+bool? _extractMustChangePassword(Map<String, dynamic>? user) {
+  if (user == null) return null;
+  final v = user['must_change_password'];
+  if (v is bool) return v;
+  final first = user['is_first_login'];
+  if (first is bool) return first;
+  final force = user['force_password_change'];
+  if (force is bool) return force;
+  return null;
+}
+
 /// Extract driver status from user/driver JSON. Must align with Driver model's merge sources:
 /// json, profile_data, driver_info, profile_data.driver_info, profile_data.driver.
 String? _getDriverStatusFromJson(dynamic json) {
@@ -237,12 +259,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       // Clear any existing tokens before login
       await StorageService.clearAuthTokens();
 
+      // Use client: 'driver_app' so backend can reject non-drivers BEFORE sending OTP
       final response = await ApiService.post<Map<String, dynamic>>(
         AppConfig.loginEndpoint,
         data: {
           'email': email,
           'password': password,
           'source': 'mobile',
+          'client': 'driver_app',
           'device_info': {
             'user_agent': 'Flutter (${Platform.operatingSystem})',
             'device_type': 'mobile',
@@ -272,10 +296,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
         print('🔐 DEBUG: Login successful, processing response data');
 
-        // Block non-drivers before OTP - they stay on login, never reach OTP page
-        final userObj = data['user'] ?? data['user_data'] ?? data;
-        final userType = _extractUserType(userObj, data);
-        if (!_isAllowedUserType(userType)) {
+        // Block non-drivers BEFORE OTP so admins/parents never reach the OTP screen.
+        // Backend must include user_type in login response (user object or root-level).
+        final userObj = data['user'] ?? data['user_data'];
+        String? userType;
+        dynamic statusObj;
+        if (userObj != null) {
+          userType = _extractUserType(userObj, data);
+          statusObj = userObj;
+        } else {
+          userType = _extractUserType(data, data);
+        }
+        if (userType != null && !_isAllowedUserType(userType)) {
           print('🔐 DEBUG: User type "$userType" not allowed - blocking before OTP');
           state = state.copyWith(
             isLoading: false,
@@ -285,10 +317,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           );
           return false;
         }
-
-        // Block suspended/deactivated drivers before OTP - show suspension message on login
-        if (userObj is Map<String, dynamic>) {
-          final driverStatus = _getDriverStatusFromJson(userObj);
+        if (statusObj != null) {
+          final driverStatus = _getDriverStatusFromJson(statusObj);
           if (!_isDriverActive(driverStatus)) {
             print('🔐 DEBUG: Driver status "$driverStatus" - blocking before OTP');
             state = state.copyWith(
@@ -300,6 +330,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
             return false;
           }
         }
+        // When user_type is null: backend does not send it in login response.
+        // Proceed to OTP so drivers can login. Backend should add user_type to block admins.
 
         int? otpId;
         if (data['otp_id'] is int) {
@@ -451,6 +483,48 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> loadDriverProfile() async {
     state = state.copyWith(isLoading: true, error: null);
     await _loadDriverProfile();
+  }
+
+  /// Shared logic: validate user, persist profile, set auth state from OTP response user.
+  /// Returns true if auth succeeded; false if user type or status blocked.
+  Future<bool> _finalizeAuthFromOtpUser(Map<String, dynamic> user) async {
+    final userType = user['user_type'] as String? ?? user['role'] as String?;
+    if (!_isAllowedUserType(userType)) {
+      await StorageService.clearAuthTokens();
+      state = state.copyWith(
+        isLoading: false,
+        error: _kNonDriverBlockedMessage,
+        otpId: null,
+      );
+      return false;
+    }
+    final driverStatus = _getDriverStatusFromJson(user);
+    if (!_isDriverActive(driverStatus)) {
+      await StorageService.clearAuthTokens();
+      state = state.copyWith(
+        isLoading: false,
+        error: _getDriverStatusBlockedMessage(driverStatus),
+        otpId: null,
+      );
+      return false;
+    }
+    await StorageService.saveUserProfile(user);
+    final idForApi = user['driver_id'] ?? user['id'];
+    if (idForApi is int) {
+      await StorageService.saveDriverId(idForApi);
+    }
+    final driver = Driver.fromJson(user);
+    final mustChange = _extractMustChangePassword(_toStringKeyMap(user));
+    state = state.copyWith(
+      isLoading: false,
+      isAuthenticated: true,
+      driver: driver,
+      profileRawData: user,
+      error: null,
+      otpId: null,
+      mustChangePassword: mustChange,
+    );
+    return true;
   }
 
   /// Extracts user/driver object from profile API response.
@@ -689,12 +763,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
         await StorageService.saveDriverId(idForApi is int ? idForApi : driver.id);
         await StorageService.saveUserProfile(driverData);
 
+        final mustChange = _extractMustChangePassword(driverData);
         state = state.copyWith(
           isLoading: false,
           isAuthenticated: true,
           driver: driver,
           profileRawData: driverData,
           error: null,
+          mustChangePassword: mustChange,
         );
         print('🔐 DEBUG: Profile loaded successfully');
       } else {
@@ -830,50 +906,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         // If user object is present, use it to finalize auth without another API call
         final user = _toStringKeyMap(data['user']);
         if (user != null && user.isNotEmpty) {
-          final userType = user['user_type'] as String? ?? user['role'] as String?;
-          if (!_isAllowedUserType(userType)) {
-            await StorageService.clearAuthTokens();
-            state = state.copyWith(
-              isLoading: false,
-              error: _kNonDriverBlockedMessage,
-              otpId: null,
-            );
-            return false;
-          }
-
-          // Block suspended/deactivated drivers
-          final driverStatus = _getDriverStatusFromJson(user);
-          if (!_isDriverActive(driverStatus)) {
-            await StorageService.clearAuthTokens();
-            state = state.copyWith(
-              isLoading: false,
-              error: _getDriverStatusBlockedMessage(driverStatus),
-              otpId: null,
-            );
-            return false;
-          }
-
-          // Persist basic profile info
-          await StorageService.saveUserProfile(user);
-          // Prefer driver_id (drivers table) for trips/assignments API calls
-          final idForApi = user['driver_id'] ?? user['id'];
-          if (idForApi is int) {
-            await StorageService.saveDriverId(idForApi);
-          }
-
-          // Create driver object from user data
-          final driver = Driver.fromJson(user);
-
-          state = state.copyWith(
-            isLoading: false,
-            isAuthenticated: true,
-            driver: driver,
-            profileRawData: user,
-            error: null,
-            otpId: null,
-          );
-          print('🔐 DEBUG: OTP verification completed with user data');
-          return true;
+          final ok = await _finalizeAuthFromOtpUser(user);
+          if (ok) print('🔐 DEBUG: OTP verification completed with user data');
+          return ok;
         }
 
         // Fallback: if no user in response, try loading profile endpoint
@@ -964,52 +999,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         // If user object is present, use it to finalize auth without another API call
         final user = _toStringKeyMap(data['user']);
         if (user != null && user.isNotEmpty) {
-          final userType = user['user_type'] as String? ?? user['role'] as String?;
-          if (!_isAllowedUserType(userType)) {
-            await StorageService.clearAuthTokens();
-            state = state.copyWith(
-              isLoading: false,
-              error: _kNonDriverBlockedMessage,
-              otpId: null,
-            );
-            return false;
-          }
-
-          // Block suspended/deactivated drivers
-          final driverStatus = _getDriverStatusFromJson(user);
-          if (!_isDriverActive(driverStatus)) {
-            await StorageService.clearAuthTokens();
-            state = state.copyWith(
-              isLoading: false,
-              error: _getDriverStatusBlockedMessage(driverStatus),
-              otpId: null,
-            );
-            return false;
-          }
-
-          // Persist basic profile info
-          await StorageService.saveUserProfile(user);
-          // Prefer driver_id (drivers table) for trips/assignments API calls
-          final idForApi = user['driver_id'] ?? user['id'];
-          if (idForApi is int) {
-            await StorageService.saveDriverId(idForApi);
-          }
-
-          // Create driver object from user data
-          final driver = Driver.fromJson(user);
-
-          state = state.copyWith(
-            isLoading: false,
-            isAuthenticated: true,
-            driver: driver,
-            profileRawData: user,
-            error: null,
-            otpId: null,
-          );
-          print(
-            '🔐 DEBUG: Registration OTP verification completed with user data',
-          );
-          return true;
+          final ok = await _finalizeAuthFromOtpUser(user);
+          if (ok) print('🔐 DEBUG: Registration OTP verification completed with user data');
+          return ok;
         }
 
         // Fallback: if no user in response, try loading profile endpoint
@@ -1111,19 +1103,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
           );
 
           // Save user data if available
+          Map<String, dynamic>? userMap;
           if (completionResponse.user != null) {
-            await StorageService.saveUserProfile(
-              completionResponse.user!.toJson(),
-            );
+            userMap = completionResponse.user!.toJson();
+            await StorageService.saveUserProfile(userMap);
             await StorageService.saveDriverId(completionResponse.user!.id);
           }
+          // New users completing registration must change password
+          final mustChange = userMap != null
+              ? _extractMustChangePassword(userMap)
+              : true;
 
           state = state.copyWith(
             isLoading: false,
             isAuthenticated: true,
+            driver: completionResponse.user != null
+                ? Driver.fromJson(completionResponse.user!.toJson())
+                : null,
+            profileRawData: userMap,
             error: null,
             otpId: null,
             registrationEmail: null,
+            mustChangePassword: mustChange ?? true,
           );
           return true;
         } else {
