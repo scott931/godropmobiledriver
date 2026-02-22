@@ -564,11 +564,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       ApiResponse<Map<String, dynamic>>? lastResponse;
 
       // 1. Try /drivers/profile/ first (driver-specific endpoint)
+      // Cache-bust to ensure we get fresh status when admin suspends/inactivates
       print(
         '🔐 DEBUG: Trying ${AppConfig.driverProfileEndpoint}',
       );
       var response = await ApiService.get<Map<String, dynamic>>(
         AppConfig.driverProfileEndpoint,
+        queryParameters: {'_': DateTime.now().millisecondsSinceEpoch},
       );
       lastResponse = response;
       if (response.success && response.data != null) {
@@ -588,6 +590,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         response = await ApiService.get<Map<String, dynamic>>(
           AppConfig.profileEndpoint,
+          queryParameters: {'_': DateTime.now().millisecondsSinceEpoch},
         );
         lastResponse = response;
         if (response.success && response.data != null) {
@@ -737,14 +740,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final rawStatus = _getDriverStatusFromJson(driverData);
         final driver = Driver.fromJson(driverData);
 
-        // Block suspended/deactivated drivers from accessing the app
+        // Block suspended/deactivated drivers from accessing the app - logout immediately
         if (!_isDriverActive(rawStatus ?? driver.status)) {
-          print('🔐 DEBUG: Driver account not active (status: ${driver.status})');
-          await logout();
-          state = state.copyWith(
-            isLoading: false,
-            error: _getDriverStatusBlockedMessage(driver.status),
-          );
+          final msg = _getDriverStatusBlockedMessage(rawStatus ?? driver.status);
+          print('🔐 DEBUG: Driver account not active (status: ${driver.status}) - logging out immediately');
+          await logout(suspensionError: msg);
           return;
         }
 

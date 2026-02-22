@@ -111,6 +111,14 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _startStatusCheckIfAuthenticated();
+    _registerSuspensionCallback();
+  }
+
+  void _registerSuspensionCallback() {
+    ApiService.setSuspensionCallback((message) {
+      if (!mounted) return;
+      ref.read(authProvider.notifier).logout(suspensionError: message);
+    });
   }
 
   @override
@@ -125,8 +133,9 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
     _statusCheckTimer?.cancel();
     final authState = ref.read(authProvider);
     if (authState.isAuthenticated && authState.driver != null) {
-      // Check driver status every 5 min when app resumes - user controls session end
-      _statusCheckTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      // Immediate check + every 30s for real-time suspension/inactive detection
+      ref.read(authProvider.notifier).loadDriverProfile();
+      _statusCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
         if (!mounted) return;
         final s = ref.read(authProvider);
         if (!s.isAuthenticated) {

@@ -65,8 +65,37 @@ class ApiService {
 
     // Add interceptors
     _dio.interceptors.add(_authInterceptor());
+    _dio.interceptors.add(_suspensionInterceptor());
     _dio.interceptors.add(_loggingInterceptor());
     _dio.interceptors.add(_errorInterceptor());
+  }
+
+  /// Checks successful responses (200) for suspended/inactive account indicators.
+  static Interceptor _suspensionInterceptor() {
+    return InterceptorsWrapper(
+      onResponse: (response, handler) {
+        final path = response.requestOptions.path;
+        final isAuthEndpoint = path.contains('/login/') ||
+            path.contains('/register/') ||
+            path.contains('/otp/') ||
+            path.contains('/password/reset/') ||
+            path.contains('/refresh-token/') ||
+            path.contains('/logout');
+        if (isAuthEndpoint) {
+          handler.next(response);
+          return;
+        }
+        if (response.statusCode == 200 &&
+            StorageService.getAuthToken() != null &&
+            response.data != null) {
+          final suspensionMsg = _extractSuspensionMessage(response.data);
+          if (suspensionMsg != null && _onSuspensionDetected != null) {
+            _onSuspensionDetected!(suspensionMsg);
+          }
+        }
+        handler.next(response);
+      },
+    );
   }
 
   static Interceptor _authInterceptor() {
@@ -139,7 +168,6 @@ class ApiService {
   static Interceptor _errorInterceptor() {
     return InterceptorsWrapper(
       onError: (error, handler) async {
-        // If 401 on non-auth endpoints: try token refresh first before logout
         final code = error.response?.statusCode;
         final path = error.requestOptions.path;
         final isAuthEndpoint = path.contains('/login/') ||
@@ -148,10 +176,10 @@ class ApiService {
             path.contains('/password/reset/') ||
             path.contains('/refresh-token/') ||
             path.contains('/logout');
-        // 401: Try token refresh and retry - never auto-logout (user controls session)
-        if (!isAuthEndpoint &&
-            code == 401 &&
-            StorageService.getAuthToken() != null) {
+        final hasToken = StorageService.getAuthToken() != null;
+
+        // If 401 on non-auth endpoints: try token refresh first
+        if (!isAuthEndpoint && code == 401 && hasToken) {
           final refreshed = await _attemptTokenRefresh();
           if (refreshed) {
             try {
@@ -159,12 +187,20 @@ class ApiService {
               handler.resolve(response);
               return;
             } catch (e) {
-              // Retry failed - pass error through, do not force logout
+              // Retry failed - pass error through
             }
           }
-          // Refresh failed: pass error to caller - do NOT invoke logout callback
         }
-        // 403: Pass through - do NOT auto-logout; user controls when to end session
+
+        // Suspended/inactive account: any 401/403 with suspension message -> logout
+        if (!isAuthEndpoint && (code == 401 || code == 403) && hasToken) {
+          final data = error.response?.data;
+          final suspensionMsg = _extractSuspensionMessage(data);
+          if (suspensionMsg != null && _onSuspensionDetected != null) {
+            _onSuspensionDetected!(suspensionMsg);
+          }
+        }
+
         if (error.type == DioExceptionType.connectionTimeout ||
             error.type == DioExceptionType.receiveTimeout ||
             error.type == DioExceptionType.sendTimeout) {
@@ -184,8 +220,23 @@ class ApiService {
   }
 
   static String? _extractSuspensionMessage(dynamic data) {
-    if (data is! Map) return null;
-    final dataMap = Map<String, dynamic>.from(data);
+    if (data == null) return null;
+    final dataMap = data is Map ? Map<String, dynamic>.from(data) : null;
+    if (dataMap == null) return null;
+
+    // 1. Explicitly check user/driver status in nested objects (profile, trips, etc.)
+    final status = _getStatusFromResponse(dataMap);
+    if (status != null) {
+      final s = status.toLowerCase();
+      if (s == 'suspended') {
+        return 'Your account has been suspended. Please contact your administrator.';
+      }
+      if (s == 'inactive' || s == 'deactivated') {
+        return 'Your account has been deactivated. Please contact your administrator.';
+      }
+    }
+
+    // 2. Check error message content
     final dataStr = dataMap.toString().toLowerCase();
     if (!dataStr.contains('suspended') &&
         !dataStr.contains('inactive') &&
@@ -206,6 +257,9 @@ class ApiService {
       final list = dataMap['non_field_errors'] as List;
       raw = list.isNotEmpty ? list.first.toString() : null;
     }
+    if (raw == null) {
+      raw = dataMap['message']?.toString() ?? dataMap['detail']?.toString();
+    }
     final lower = (raw ?? dataStr).toLowerCase();
     if (lower.contains('inactive') || lower.contains('deactivated')) {
       return 'Your account has been deactivated. Please contact your administrator.';
@@ -214,6 +268,41 @@ class ApiService {
       return 'Your account has been suspended. Please contact your administrator.';
     }
     return raw ?? 'Your account is not active. Please contact your administrator.';
+  }
+
+  /// Extracts status from user/driver in response (supports nested profile_data, driver_info).
+  static String? _getStatusFromResponse(Map<String, dynamic> data) {
+    String? getStatus(Map<String, dynamic>? m) {
+      if (m == null) return null;
+      final s = m['status']?.toString();
+      if (s != null && s.trim().isNotEmpty) return s;
+      final isActive = m['is_active'];
+      if (isActive is bool && !isActive) return 'inactive';
+      return null;
+    }
+    Map<String, dynamic>? fromDynamic(dynamic v) =>
+        v is Map ? Map<String, dynamic>.from(v) : null;
+    // Check data.driver, data.driver_profile, data.user (common profile wrappers)
+    final driver = fromDynamic(data['driver']) ?? fromDynamic(data['driver_profile']);
+    if (driver != null) {
+      final s = getStatus(driver);
+      if (s != null) return s;
+    }
+    final user = fromDynamic(data['user']);
+    if (user != null) {
+      final s = getStatus(user);
+      if (s != null) return s;
+      final pd = fromDynamic(user['profile_data']);
+      if (pd != null) {
+        final ps = getStatus(pd);
+        if (ps != null) return ps;
+        final di = fromDynamic(pd['driver_info']) ?? fromDynamic(pd['driver']);
+        if (di != null) return getStatus(di);
+      }
+    }
+    final nested = fromDynamic(data['data']);
+    if (nested != null) return _getStatusFromResponse(nested);
+    return getStatus(data);
   }
 
   // Generic HTTP methods
