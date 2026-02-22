@@ -36,14 +36,30 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
     return words.map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ');
   }
 
-  /// Get value from raw API response, trying multiple key variants
+  /// Get value from raw API response, trying multiple key variants.
+  /// Checks top-level and nested profile_data, driver_info (same flatten as Additional Details).
   static String? _fromRaw(Map<String, dynamic>? raw, List<String> keys) {
     if (raw == null) return null;
+    final flat = _flattenRawForLookup(raw);
     for (final k in keys) {
-      final v = raw[k];
+      final v = flat[k];
       if (v != null && v.toString().trim().isNotEmpty) return v.toString();
     }
     return null;
+  }
+
+  /// Flatten raw API response for lookup (profile_data, driver_info merged into top level).
+  static Map<String, dynamic> _flattenRawForLookup(Map<String, dynamic> raw) {
+    final flat = Map<String, dynamic>.from(raw);
+    final pd = raw['profile_data'] as Map<String, dynamic>?;
+    if (pd != null) {
+      flat.addAll(pd);
+      final di = pd['driver_info'] ?? pd['driver'];
+      if (di is Map<String, dynamic>) flat.addAll(Map<String, dynamic>.from(di));
+    }
+    final diRoot = raw['driver_info'] as Map<String, dynamic>?;
+    if (diRoot != null) flat.addAll(Map<String, dynamic>.from(diRoot));
+    return flat;
   }
 
   @override
@@ -214,14 +230,23 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
                   label: 'Contact Phone',
                   value: _fromRaw(raw, ['emergency_contact_phone', 'emergency_phone']) ?? driver.emergencyPhone ?? 'Not provided',
                 ),
+                _buildInfoField(
+                  label: 'Emergency Contact Relationship',
+                  value: _fromRaw(raw, [
+                    'emergency_contact_relationship',
+                    'emergency_contact_relationship_type',
+                    'emergency_contact_relation',
+                    'emergency_relationship',
+                  ]) ?? 'Not provided',
+                ),
               ],
             ),
 
-            // Additional details from response body (fields not in standard sections)
-            if (raw != null && raw.isNotEmpty) ...[
-              SizedBox(height: 24.h),
-              _buildAdditionalDetailsSection(raw),
-            ],
+            // Additional details from response body (fields not in standard sections) - commented out
+            // if (raw != null && raw.isNotEmpty) ...[
+            //   SizedBox(height: 24.h),
+            //   _buildAdditionalDetailsSection(raw),
+            // ],
 
             SizedBox(height: 24.h),
 
@@ -348,15 +373,23 @@ class _DriverProfileScreenState extends ConsumerState<DriverProfileScreen> {
   }
 
   /// Additional fields from API response not in standard sections
-  /// Excluded (commented out from display): status, user_type, school, school_id, last_login_ip
+  /// Excluded (commented out from display): username, status, user_type, user_type_display,
+  /// status_display, school, school_id, last_login_ip, must_change_password, is_verified
   static const _displayedKeys = {
     'first_name', 'firstname', 'last_name', 'lastname', 'email', 'phone', 'phone_number', 'mobile',
-    'address', 'residential_address', 'license_number', 'license_no', 'license', 'driving_license', 'driver_license',
-    'date_of_birth', 'dob', 'birth_date', 'birthday', 'hire_date', 'hireDate', 'date_hired', 'employment_date',
-    'emergency_contact_name', 'emergency_contact',
-    'emergency_contact_phone', 'emergency_phone', 'id', 'user_id', 'driver_id', 'status', 'profile_image',
-    'avatar', 'profile_picture', 'created_at', 'updated_at', 'user_type', 'is_active',
-    'school', 'school_id', 'school_name', 'last_login_ip', 'lastlogin_ip', 'last_login',
+    'username', 'address', 'residential_address',     'license_number', 'license_no', 'license',
+    'driving_license', 'driver_license',
+    'license_expiry', 'license_expiry_date', 'license_expiration', 'license_expiration_date', 'driving_license_expiry',
+    'date_of_birth', 'dob', 'birth_date', 'birthday',
+    'hire_date', 'hireDate', 'date_hired', 'employment_date',     'emergency_contact_name', 'emergency_contact',
+    'emergency_contact_phone', 'emergency_phone',
+    'emergency_contact_relationship', 'emergency_contact_relationship_type', 'emergency_contact_relation', 'emergency_relationship',
+    'id', 'user_id', 'driver_id', 'status', 'profile_image',
+    'avatar', 'profile_picture', 'created_at', 'updated_at', 'user_type', 'userType',
+    'user_type_display', 'userTypeDisplay', 'status_display', 'statusDisplay',
+    'is_active', 'school', 'school_id', 'school_name', 'last_login_ip', 'lastlogin_ip', 'last_login',
+    'must_change_password', 'mustChangePassword', 'is_first_login', 'force_password_change',
+    'is_verified', 'isVerified',
   };
 
   Widget _buildAdditionalDetailsSection(Map<String, dynamic> raw) {

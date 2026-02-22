@@ -538,6 +538,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return true;
   }
 
+  /// Merges profile_data and driver_info from raw API response into driverData.
+  /// Backend often nests license_number, hire_date in profile_data.driver_info for existing users.
+  Map<String, dynamic> _mergeProfileDataFromRaw(
+    Map<String, dynamic> driverData,
+    Map<String, dynamic> raw,
+  ) {
+    final result = Map<String, dynamic>.from(driverData);
+    final pd = _toStringKeyMap(raw['profile_data']);
+    if (pd != null) {
+      result.addAll(pd);
+      final di = _toStringKeyMap(pd['driver_info'] ?? pd['driver']);
+      if (di != null) result.addAll(di);
+    }
+    final diRoot = _toStringKeyMap(raw['driver_info']);
+    if (diRoot != null) result.addAll(diRoot);
+    return result;
+  }
+
   /// Extracts user/driver object from profile API response.
   /// Handles: { success, user }, { data: { user } }, { data: {...} }, or flat object.
   Map<String, dynamic>? _extractUserFromResponse(dynamic data) {
@@ -584,10 +602,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       lastResponse = response;
       if (response.success && response.data != null) {
         final data = response.data!;
-        driverData = _toStringKeyMap(data['driver']) ??
+        var extracted = _toStringKeyMap(data['driver']) ??
             _toStringKeyMap(data['driver_profile']) ??
             _extractUserFromResponse(data);
-        if (driverData != null && driverData.isNotEmpty) {
+        if (extracted != null && extracted.isNotEmpty) {
+          driverData = _mergeProfileDataFromRaw(extracted, data);
           print('🔐 DEBUG: Got data from /drivers/profile/');
         }
       }
@@ -603,8 +622,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
         lastResponse = response;
         if (response.success && response.data != null) {
-          driverData = _extractUserFromResponse(response.data!);
-          if (driverData != null && driverData.isNotEmpty) {
+          final data = response.data!;
+          var extracted = _extractUserFromResponse(data);
+          if (extracted != null && extracted.isNotEmpty) {
+            driverData = _mergeProfileDataFromRaw(extracted, data);
             print('🔐 DEBUG: Got data from /users/me/');
           }
         }
@@ -625,32 +646,43 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       }
 
-      // 3b. MERGE cached profile for missing fields (license_number, hire_date, address)
+      // 3b. MERGE cached profile for missing fields (license_number, hire_date, address, license_expiry)
       // Backend may not return these - use locally saved data from Edit Profile
       if (driverData != null && token != null) {
         final cached = StorageService.getUserProfile();
         if (cached != null && cached.isNotEmpty) {
           final cachedUser = _extractUserFromResponse(cached) ?? cached;
+          final flat = _mergeProfileDataFromRaw(cachedUser, cached);
           final missingAddress = driverData!['address'] == null ||
               (driverData['address'] as String?)?.isEmpty == true;
           final missingLicense = driverData['license_number'] == null ||
               (driverData['license_number'] as String?)?.isEmpty == true;
           final missingHireDate = driverData['hire_date'] == null;
-          if (missingAddress || missingLicense || missingHireDate) {
-            final cachedAddr = cachedUser['address'] ?? cachedUser['residential_address'];
+          final missingLicenseExpiry = driverData['license_expiry'] == null &&
+              driverData['license_expiry_date'] == null &&
+              (driverData['license_expiration'] as String?)?.isEmpty == true &&
+              (driverData['license_expiration_date'] as String?)?.isEmpty == true;
+          if (missingAddress || missingLicense || missingHireDate || missingLicenseExpiry) {
+            final cachedAddr = flat['address'] ?? flat['residential_address'];
             if (missingAddress && cachedAddr != null && cachedAddr.toString().trim().isNotEmpty) {
               driverData = {...driverData!, 'address': cachedAddr.toString()};
               print('🔐 DEBUG: Merged address from cache');
             }
-            final cachedLicense = cachedUser['license_number'] ?? cachedUser['license_no'];
+            final cachedLicense = flat['license_number'] ?? flat['license_no'];
             if (missingLicense && cachedLicense != null && cachedLicense.toString().trim().isNotEmpty) {
               driverData = {...driverData!, 'license_number': cachedLicense.toString()};
               print('🔐 DEBUG: Merged license_number from cache');
             }
-            final cachedHireDate = cachedUser['hire_date'] ?? cachedUser['hireDate'] ?? cachedUser['date_hired'];
+            final cachedHireDate = flat['hire_date'] ?? flat['hireDate'] ?? flat['date_hired'];
             if (missingHireDate && cachedHireDate != null) {
               driverData = {...driverData!, 'hire_date': cachedHireDate};
               print('🔐 DEBUG: Merged hire_date from cache');
+            }
+            final cachedLicenseExpiry = flat['license_expiry'] ?? flat['license_expiry_date'] ??
+                flat['license_expiration'] ?? flat['license_expiration_date'];
+            if (missingLicenseExpiry && cachedLicenseExpiry != null && cachedLicenseExpiry.toString().trim().isNotEmpty) {
+              driverData = {...driverData!, 'license_expiry': cachedLicenseExpiry.toString()};
+              print('🔐 DEBUG: Merged license_expiry from cache');
             }
           }
         }
@@ -687,13 +719,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
             final raw = userResp.data!;
             final details = _extractUserFromResponse(raw) ?? _toStringKeyMap(raw);
             if (details != null) {
-              driverData = {...driverData!, ...details};
-              final pd = _toStringKeyMap(details['profile_data']);
-              if (pd != null) {
-                driverData = {...driverData!, ...pd};
-                final di = _toStringKeyMap(pd['driver_info'] ?? pd['driver']);
-                if (di != null) driverData = {...driverData!, ...di};
-              }
+              driverData = _mergeProfileDataFromRaw(
+                {...driverData!, ...details},
+                raw,
+              );
             }
             print('🔐 DEBUG: Merged from Users API: license=${driverData!['license_number']}, hire_date=${driverData['hire_date']}, address=${driverData['address']}');
           }
@@ -713,13 +742,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 _toStringKeyMap(raw['driver_profile']) ??
                 _toStringKeyMap(raw);
             if (details != null) {
-              driverData = {...driverData!, ...details};
-              final pd = _toStringKeyMap(details['profile_data']);
-              if (pd != null) {
-                driverData = {...driverData!, ...pd};
-                final di = _toStringKeyMap(pd['driver_info'] ?? pd['driver']);
-                if (di != null) driverData = {...driverData!, ...di};
-              }
+              driverData = _mergeProfileDataFromRaw(
+                {...driverData!, ...details},
+                raw,
+              );
             }
             print('🔐 DEBUG: Merged from /drivers/:id/: license=${driverData!['license_number']}, hire_date=${driverData['hire_date']}, address=${driverData['address']}');
           }
