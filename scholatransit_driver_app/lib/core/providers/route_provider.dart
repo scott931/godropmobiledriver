@@ -135,7 +135,15 @@ class RouteNotifier extends StateNotifier<RouteState> {
       List<RouteAssignment> assignments = [];
       List<Map<String, dynamic>> vehicles = [];
 
-      // 1. Primary: GET /api/v1/users/admin/drivers/:id/assignments/
+      // 1. Primary: GET /drivers/me/vehicles/ - assigned vehicle(s) for logged-in driver (no driver_id needed)
+      var vehiclesResp = await ApiService.get<Map<String, dynamic>>(
+        AppConfig.driverMeVehiclesEndpoint,
+      );
+      if (vehiclesResp.success && vehiclesResp.data != null) {
+        vehicles = _parseVehiclesFromResponse(vehiclesResp.data!);
+      }
+
+      // 2. Assignments (routes/vehicle context): GET /api/v1/users/admin/drivers/:id/assignments/
       if (driverId != null) {
         final path = AppConfig.driverAdminAssignmentsEndpoint
             .replaceFirst(':id', driverId.toString());
@@ -193,16 +201,6 @@ class RouteNotifier extends StateNotifier<RouteState> {
               }
             }
           }
-        }
-      }
-
-      // 2. Fallback: Try /drivers/me/vehicles/ - uses auth token, no driver_id needed
-      if (vehicles.isEmpty) {
-        var vehiclesResp = await ApiService.get<Map<String, dynamic>>(
-          AppConfig.driverMeVehiclesEndpoint,
-        );
-        if (vehiclesResp.success && vehiclesResp.data != null) {
-          vehicles = _parseVehiclesFromResponse(vehiclesResp.data!);
         }
       }
 
