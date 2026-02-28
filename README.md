@@ -154,7 +154,7 @@ A comprehensive Flutter mobile application designed specifically for school bus 
 3. **Configure environment**
    - Update API endpoints in `lib/core/config/app_config.dart`
    - Configure Firebase for notifications
-   - Set up Google Maps API key
+   - Set up Mapbox access token (see Mapbox Setup below)
 
 4. **Run the app**
    ```bash
@@ -179,17 +179,14 @@ static const String apiVersion = '/api/v1';
    - `ios/Runner/GoogleService-Info.plist`
 4. Enable Firebase Messaging
 
-#### **Google Maps Setup**
-1. Get a Google Maps API key
-2. Update `android/app/src/main/AndroidManifest.xml`:
-   ```xml
-   <meta-data android:name="com.google.android.geo.API_KEY"
-              android:value="YOUR_API_KEY"/>
+#### **Mapbox Setup** (required for maps)
+1. Get a Mapbox access token at [account.mapbox.com](https://account.mapbox.com/access-tokens/)
+2. Add to `android/local.properties` (create if needed; this file is gitignored):
    ```
-3. Update `ios/Runner/AppDelegate.swift`:
-   ```swift
-   GMSServices.provideAPIKey("YOUR_API_KEY")
+   MAPBOX_ACCESS_TOKEN=pk.your_token_here
+   MAPBOX_DOWNLOADS_TOKEN=pk.your_token_here
    ```
+3. Run the app: `flutter run --dart-define=MAPBOX_ACCESS_TOKEN=pk.your_token`
 
 ## 📊 **API Endpoints**
 
