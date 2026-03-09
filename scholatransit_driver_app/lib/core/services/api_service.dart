@@ -165,10 +165,20 @@ class ApiService {
       },
       onError: (error, handler) {
         if (AppConfig.enableLogging) {
-          print(
-            '❌ API Error: ${error.response?.statusCode} ${error.requestOptions.uri}',
-          );
-          print('📥 Error: ${error.response?.data}');
+          final status = error.response?.statusCode;
+          final data = error.response?.data;
+          // When response is null, the failure is connection-level (timeout, unreachable, etc.)
+          if (error.response == null) {
+            print(
+              '❌ API Error: no response (${error.type}) ${error.requestOptions.uri}',
+            );
+            print('📥 Error: ${error.error ?? "connection failed or timeout"}');
+          } else {
+            print(
+              '❌ API Error: $status ${error.requestOptions.uri}',
+            );
+            print('📥 Error: $data');
+          }
         }
         handler.next(error);
       },
@@ -427,7 +437,7 @@ class ApiService {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.sendTimeout:
-        return 'Connection timeout. Please check your internet connection.';
+        return 'Connection timeout. The server may be starting up—please try again in a moment.';
       case DioExceptionType.badResponse:
         final statusCode = error.response?.statusCode;
         final data = error.response?.data;
@@ -502,11 +512,11 @@ class ApiService {
       case DioExceptionType.cancel:
         return 'Request was cancelled.';
       case DioExceptionType.connectionError:
-        return 'Connection error. Please check your internet connection.';
+        return 'Cannot reach server. It may be starting up—please try again in a moment.';
       case DioExceptionType.badCertificate:
         return 'Certificate error. Please check your connection.';
       case DioExceptionType.unknown:
-        return 'Unknown error occurred. Please try again.';
+        return 'Connection failed. Please try again in a moment.';
     }
   }
 }
