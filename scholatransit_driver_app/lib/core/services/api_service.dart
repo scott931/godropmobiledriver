@@ -166,6 +166,7 @@ class ApiService {
       onError: (error, handler) {
         if (AppConfig.enableLogging) {
           final status = error.response?.statusCode;
+<<<<<<< Updated upstream
           final data = error.response?.data;
           // When response is null, the failure is connection-level (timeout, unreachable, etc.)
           if (error.response == null) {
@@ -178,6 +179,17 @@ class ApiService {
               '❌ API Error: $status ${error.requestOptions.uri}',
             );
             print('📥 Error: $data');
+=======
+          final body = error.response?.data;
+          print(
+            '❌ API Error: ${status ?? 'no response'} ${error.requestOptions.uri}',
+          );
+          if (body != null) {
+            print('📥 Error: $body');
+          } else {
+            // No HTTP response - log connection/network failure
+            print('📥 Error: ${error.type} - ${error.message ?? error.error}');
+>>>>>>> Stashed changes
           }
         }
         handler.next(error);
