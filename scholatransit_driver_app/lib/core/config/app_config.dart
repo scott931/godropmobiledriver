@@ -1,7 +1,7 @@
 class AppConfig {
   // API Configuration
   static const String baseUrl =
-      'https://schooltransit-backend-staging-jgnc.onrender.com';
+      'https://schooltransit-backend-1008598403919.us-central1.run.app';
   static const String apiVersion = '/api/v1';
   static const String apiBaseUrl = '$baseUrl$apiVersion';
 
