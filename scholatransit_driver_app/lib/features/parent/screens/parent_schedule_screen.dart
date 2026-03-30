@@ -1,13 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../../core/models/parent_trip_model.dart';
 import '../../../core/providers/parent_provider.dart';
 
-class ParentScheduleScreen extends ConsumerWidget {
+class ParentScheduleScreen extends ConsumerStatefulWidget {
   const ParentScheduleScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ParentScheduleScreen> createState() =>
+      _ParentScheduleScreenState();
+}
+
+class _ParentScheduleScreenState extends ConsumerState<ParentScheduleScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(parentProvider.notifier).loadParentTrips();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final parentState = ref.watch(parentProvider);
 
     return Scaffold(
@@ -19,36 +34,88 @@ class ParentScheduleScreen extends ConsumerWidget {
       ),
       body: parentState.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _buildScheduleContent(context, ref, parentState),
+          : RefreshIndicator(
+              onRefresh: () async {
+                await ref.read(parentProvider.notifier).loadParentTrips();
+              },
+              child: _buildScheduleContent(context, parentState),
+            ),
     );
   }
 
-  Widget _buildScheduleContent(
-    BuildContext context,
-    WidgetRef ref,
-    parentState,
-  ) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(16.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildScheduleContent(BuildContext context, ParentState parentState) {
+    final trips = parentState.parentTrips;
+    if (trips.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          Text(
-            'Today\'s Schedule',
-            style: TextStyle(
-              fontSize: 20.sp,
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF0052CC),
-            ),
-          ),
-          SizedBox(height: 16.h),
-          if (parentState.activeTrips.isEmpty)
-            _buildEmptyState(context)
-          else
-            ...parentState.activeTrips.map(
-              (trip) => _buildTripCard(context, trip),
-            ),
+          SizedBox(height: 80.h),
+          _buildEmptyState(context),
         ],
+      );
+    }
+
+    final now = DateTime.now();
+    final upcoming = trips
+        .where(
+          (t) =>
+              !t.isActive &&
+              t.scheduledStartTime.isAfter(now.subtract(const Duration(minutes: 5))),
+        )
+        .toList();
+    final live = trips.where((t) => t.isActive).toList();
+    final pastToday = trips
+        .where(
+          (t) =>
+              !t.isActive &&
+              !t.scheduledStartTime.isAfter(now.subtract(const Duration(minutes: 5))),
+        )
+        .toList();
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.all(16.w),
+      children: [
+        Text(
+          'Your child’s trips',
+          style: TextStyle(
+            fontSize: 20.sp,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF0052CC),
+          ),
+        ),
+        SizedBox(height: 8.h),
+        Text(
+          'See pickup and drop-off times before the bus starts.',
+          style: TextStyle(fontSize: 14.sp, color: Colors.grey[700]),
+        ),
+        SizedBox(height: 20.h),
+        if (upcoming.isNotEmpty) ...[
+          _sectionTitle('Upcoming'),
+          ...upcoming.map((trip) => _buildTripCard(context, trip)),
+        ],
+        if (live.isNotEmpty) ...[
+          _sectionTitle('In progress'),
+          ...live.map((trip) => _buildTripCard(context, trip)),
+        ],
+        if (pastToday.isNotEmpty) ...[
+          _sectionTitle('Earlier today'),
+          ...pastToday.map((trip) => _buildTripCard(context, trip)),
+        ],
+      ],
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h, top: 8.h),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14.sp,
+          fontWeight: FontWeight.w600,
+          color: Colors.grey[800],
+        ),
       ),
     );
   }
@@ -61,7 +128,7 @@ class ParentScheduleScreen extends ConsumerWidget {
           Icon(Icons.schedule_outlined, size: 80.w, color: Colors.grey[400]),
           SizedBox(height: 16.h),
           Text(
-            'No Scheduled Trips',
+            'No trips scheduled',
             style: TextStyle(
               fontSize: 18.sp,
               fontWeight: FontWeight.w600,
@@ -69,17 +136,20 @@ class ParentScheduleScreen extends ConsumerWidget {
             ),
           ),
           SizedBox(height: 8.h),
-          Text(
-            'There are no scheduled trips for today.',
-            style: TextStyle(fontSize: 14.sp, color: Colors.grey[500]),
-            textAlign: TextAlign.center,
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24.w),
+            child: Text(
+              'When your child has a trip assigned, it will appear here before it begins.',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTripCard(BuildContext context, trip) {
+  Widget _buildTripCard(BuildContext context, ParentTrip trip) {
     return Card(
       margin: EdgeInsets.only(bottom: 16.h),
       elevation: 2,
@@ -123,25 +193,57 @@ class ParentScheduleScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            if (trip.children.isNotEmpty) ...[
+              SizedBox(height: 10.h),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.child_care, size: 18.w, color: Colors.grey[600]),
+                  SizedBox(width: 6.w),
+                  Expanded(
+                    child: Text(
+                      trip.children.map((c) => c.fullName).join(', '),
+                      style: TextStyle(fontSize: 14.sp, color: Colors.grey[800]),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             SizedBox(height: 12.h),
             Row(
               children: [
                 Icon(Icons.access_time, size: 16.w, color: Colors.grey[600]),
                 SizedBox(width: 4.w),
-                Text(
-                  'Scheduled: ${_formatTime(trip.scheduledStartTime)}',
-                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                Expanded(
+                  child: Text(
+                    'Scheduled: ${_formatTime(trip.scheduledStartTime)} – ${_formatTime(trip.scheduledEndTime)}',
+                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                  ),
                 ),
               ],
             ),
+            if (trip.isScheduled &&
+                trip.scheduledStartTime.isAfter(DateTime.now())) ...[
+              SizedBox(height: 6.h),
+              Text(
+                _startsInLabel(trip.scheduledStartTime),
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF0052CC),
+                ),
+              ),
+            ],
             SizedBox(height: 8.h),
             Row(
               children: [
                 Icon(Icons.person, size: 16.w, color: Colors.grey[600]),
                 SizedBox(width: 4.w),
-                Text(
-                  'Driver: ${trip.driverName}',
-                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                Expanded(
+                  child: Text(
+                    'Driver: ${trip.driverName}',
+                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                  ),
                 ),
               ],
             ),
@@ -151,24 +253,37 @@ class ParentScheduleScreen extends ConsumerWidget {
     );
   }
 
-  Color _getStatusColor(status) {
+  Color _getStatusColor(TripStatus status) {
     switch (status) {
-      case 'scheduled':
+      case TripStatus.scheduled:
         return Colors.blue;
-      case 'in_progress':
+      case TripStatus.inProgress:
         return Colors.green;
-      case 'completed':
+      case TripStatus.completed:
         return Colors.grey;
-      case 'cancelled':
+      case TripStatus.cancelled:
         return Colors.red;
-      case 'delayed':
+      case TripStatus.delayed:
         return Colors.orange;
-      default:
-        return Colors.blue;
     }
   }
 
   String _formatTime(DateTime time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _startsInLabel(DateTime scheduledStart) {
+    final d = scheduledStart.difference(DateTime.now());
+    if (d.isNegative) return 'Starting soon';
+    if (d.inDays >= 1) {
+      return 'Starts in ${d.inDays} day${d.inDays == 1 ? '' : 's'}';
+    }
+    if (d.inHours >= 1) {
+      return 'Starts in ${d.inHours} h ${d.inMinutes.remainder(60)} min';
+    }
+    if (d.inMinutes >= 1) {
+      return 'Starts in ${d.inMinutes} min';
+    }
+    return 'Starting soon';
   }
 }

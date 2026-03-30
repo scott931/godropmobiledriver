@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
-import '../services/storage_service.dart';
+import '../config/app_config.dart';
+import 'storage_service.dart';
+import 'truck_h3_service.dart';
 
 /// Service for updating driver location to Firestore
 /// 
@@ -128,6 +130,10 @@ class FirestoreLocationService {
     DateTime? timestamp,
   }) async {
     try {
+      final h3Index = (AppConfig.enableH3Tracking && TruckH3Service.isInitialized)
+          ? TruckH3Service.positionToH3String(latitude, longitude)
+          : null;
+
       final locationData = {
         'driverId': driverId,
         'latitude': latitude,
@@ -136,6 +142,8 @@ class FirestoreLocationService {
         if (accuracy != null) 'accuracy': accuracy,
         if (heading != null) 'heading': heading,
         if (speed != null) 'speed': speed,
+        if (h3Index != null) 'h3_index': h3Index,
+        if (h3Index != null) 'h3_resolution': TruckH3Service.routeResolution,
       };
 
       // Reference to the document using driverId as document ID

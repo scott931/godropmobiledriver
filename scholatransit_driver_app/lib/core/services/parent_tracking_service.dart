@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
+import '../config/app_config.dart';
 import '../models/parent_trip_model.dart';
 import '../models/parent_model.dart';
 import 'api_service.dart';
@@ -14,14 +15,103 @@ class ParentTrackingService {
   static Stream<ParentTrip> get tripStream => _tripController.stream;
   static Stream<Map<String, dynamic>> get etaStream => _etaController.stream;
 
-  /// Get active trips for parent's children
+  static List<ParentTrip> parseTripList(dynamic data) {
+    if (data == null) return [];
+    List<dynamic>? raw;
+    if (data is List) {
+      raw = data;
+    } else if (data is Map) {
+      final m = Map<String, dynamic>.from(data);
+      raw = (m['trips'] ?? m['results'] ?? m['data']) as List<dynamic>?;
+    }
+    if (raw == null) return [];
+    final out = <ParentTrip>[];
+    for (final item in raw) {
+      try {
+        if (item is Map<String, dynamic>) {
+          out.add(ParentTrip.fromJson(item));
+        } else if (item is Map) {
+          out.add(ParentTrip.fromJson(Map<String, dynamic>.from(item)));
+        }
+      } catch (e) {
+        print('⚠️ ParentTrackingService: skip trip parse: $e');
+      }
+    }
+    return out;
+  }
+
+  /// Trips currently in progress (live tracking).
   static Future<ApiResponse<List<ParentTrip>>> getActiveTrips() async {
-    return ApiService.get<List<ParentTrip>>('/parent/trips/active/');
+    final response = await ApiService.get<dynamic>(
+      AppConfig.parentTripsActiveEndpoint,
+    );
+    if (!response.success) {
+      return ApiResponse.error(response.error ?? 'Failed to load active trips');
+    }
+    return ApiResponse.success(parseTripList(response.data));
+  }
+
+  /// Scheduled or upcoming trips that have not started yet (and any extra rows the API returns).
+  static Future<ApiResponse<List<ParentTrip>>> getScheduledTrips() async {
+    Future<ApiResponse<List<ParentTrip>>> fromPath(
+      String path, {
+      Map<String, dynamic>? queryParameters,
+    }) async {
+      final r = await ApiService.get<dynamic>(
+        path,
+        queryParameters: queryParameters,
+      );
+      if (!r.success || r.data == null) {
+        return ApiResponse.error(r.error ?? 'Failed');
+      }
+      return ApiResponse.success(parseTripList(r.data));
+    }
+
+    var r = await fromPath(AppConfig.parentTripsScheduledEndpoint);
+    if (r.success) return r;
+
+    r = await fromPath(AppConfig.parentTripsUpcomingEndpoint);
+    if (r.success) return r;
+
+    r = await fromPath(
+      AppConfig.parentTripsListEndpoint,
+      queryParameters: {'status': 'scheduled'},
+    );
+    if (r.success) return r;
+
+    final all = await fromPath(AppConfig.parentTripsListEndpoint);
+    if (!all.success || all.data == null) {
+      return ApiResponse.success([]);
+    }
+    final now = DateTime.now();
+    final filtered = all.data!.where((t) {
+      if (t.status == TripStatus.completed || t.status == TripStatus.cancelled) {
+        return false;
+      }
+      if (t.isScheduled) return true;
+      if (t.isActive) return true;
+      return t.scheduledStartTime.isAfter(now.subtract(const Duration(hours: 12)));
+    }).toList();
+    return ApiResponse.success(filtered);
   }
 
   /// Get trip details with real-time location
   static Future<ApiResponse<ParentTrip>> getTripDetails(int tripId) async {
-    return ApiService.get<ParentTrip>('/parent/trips/$tripId/');
+    final response = await ApiService.get<dynamic>('/parent/trips/$tripId/');
+    if (!response.success || response.data == null) {
+      return ApiResponse.error(response.error ?? 'Failed to load trip');
+    }
+    final raw = response.data;
+    if (raw is! Map) {
+      return ApiResponse.error('Invalid trip response');
+    }
+    try {
+      return ApiResponse.success(
+        ParentTrip.fromJson(Map<String, dynamic>.from(raw)),
+      );
+    } catch (e) {
+      return ApiResponse.error('Failed to parse trip: $e');
+    }
   }
 
   /// Start real-time tracking for a trip

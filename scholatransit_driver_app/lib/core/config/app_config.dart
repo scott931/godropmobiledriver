@@ -2,6 +2,8 @@ class AppConfig {
   // API Configuration
   static const String baseUrl =
       'https://schooltransit-backend-1008598403919.us-central1.run.app';
+      
+      
   static const String apiVersion = '/api/v1';
   static const String apiBaseUrl = '$baseUrl$apiVersion';
 
@@ -78,6 +80,12 @@ class AppConfig {
   static const String parentNotificationStatusEndpoint =
       '/notifications/parents/status/';
 
+  /// Parent trip list (active / scheduled) — used with parent auth token
+  static const String parentTripsActiveEndpoint = '/parent/trips/active/';
+  static const String parentTripsScheduledEndpoint = '/parent/trips/scheduled/';
+  static const String parentTripsUpcomingEndpoint = '/parent/trips/upcoming/';
+  static const String parentTripsListEndpoint = '/parent/trips/';
+
   // Tracking Endpoints
   static const String trackingEndpoint = '/tracking/';
   static const String liveTrackingEndpoint = '/tracking/live/';
@@ -138,6 +146,13 @@ class AppConfig {
   // Or add to local.properties: MAPBOX_ACCESS_TOKEN=your_token (see build.gradle.kts)
   static const String mapboxToken =
       String.fromEnvironment('MAPBOX_ACCESS_TOKEN', defaultValue: '');
+
+  // H3 Geospatial Indexing (additive - does not affect existing tracking)
+  // Enable with: flutter run --dart-define=ENABLE_H3=true
+  static const bool enableH3Tracking = bool.fromEnvironment(
+    'ENABLE_H3',
+    defaultValue: false,
+  );
 
   // QR Code Configuration
   static const String qrCodePrefix = 'SCHOLATRANSIT_';

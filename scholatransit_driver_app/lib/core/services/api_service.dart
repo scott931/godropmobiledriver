@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../config/app_config.dart';
@@ -432,6 +434,56 @@ class ApiService {
     }
   }
 
+  /// Pulls the first meaningful string from [non_field_errors] (list or string) or list items.
+  static String? _firstNonFieldMessage(dynamic nonFieldErrors) {
+    if (nonFieldErrors is String) {
+      final t = nonFieldErrors.trim();
+      return t.isEmpty ? null : t;
+    }
+    if (nonFieldErrors is! List || nonFieldErrors.isEmpty) return null;
+    final first = nonFieldErrors.first;
+    if (first is String) {
+      final t = first.trim();
+      return t.isEmpty ? null : t;
+    }
+    if (first is Map) {
+      final fm = Map<String, dynamic>.from(first);
+      final s = fm['string'] ?? fm['message'] ?? fm['detail'];
+      if (s != null && s.toString().trim().isNotEmpty) return s.toString().trim();
+    }
+    final raw = first.toString();
+    final m = RegExp(r"string='([^']*)'").firstMatch(raw);
+    if (m != null) return m.group(1);
+    return raw.isNotEmpty ? raw : null;
+  }
+
+  /// Reads nested `error` / `non_field_errors` shapes (including JSON string `error`).
+  static String? _extractNestedApiErrorMessage(Map<String, dynamic> dataMap) {
+    dynamic err = dataMap['error'];
+    if (err is String) {
+      final trimmed = err.trim();
+      if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+        try {
+          err = jsonDecode(err);
+        } catch (_) {}
+      }
+    }
+    if (err is Map) {
+      final errMap = Map<String, dynamic>.from(err);
+      final fromNf = _firstNonFieldMessage(errMap['non_field_errors']);
+      if (fromNf != null) return fromNf;
+      final em = errMap['message'];
+      if (em != null && em.toString().trim().isNotEmpty) return em.toString().trim();
+    }
+    if (err is List && err.isNotEmpty) {
+      final f = err.first;
+      if (f is String && f.trim().isNotEmpty) return f.trim();
+    }
+    final root = _firstNonFieldMessage(dataMap['non_field_errors']);
+    if (root != null) return root;
+    return null;
+  }
+
   static String _handleDioError(DioException error) {
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
@@ -445,43 +497,19 @@ class ApiService {
         // Handle specific error messages from the API
         if (data is Map) {
           final dataMap = Map<String, dynamic>.from(data);
-          // Prefer error.non_field_errors - contains the actual reason (e.g. suspension)
-          final errorData = dataMap['error'];
-          if (errorData is Map) {
-            final errMap = Map<String, dynamic>.from(errorData);
-            final nonFieldErrors = errMap['non_field_errors'];
-            if (nonFieldErrors is List && nonFieldErrors.isNotEmpty) {
-              final first = nonFieldErrors.first;
-              String msg;
-              if (first is String) {
-                msg = first;
-              } else if (first is Map) {
-                final fm = Map<String, dynamic>.from(first);
-                final s = fm['string'] ?? fm['message'];
-                msg = s != null && s.toString().trim().isNotEmpty ? s.toString() : first.toString();
-              } else {
-                msg = first.toString();
-              }
-              final lower = msg.toLowerCase();
-              if (lower.contains('inactive') || lower.contains('deactivated')) {
-                return 'Your account has been deactivated. Please contact your administrator.';
-              }
-              if (lower.contains('suspended')) {
-                return 'Your account has been suspended. Please contact your administrator.';
-              }
-              return msg;
+          final nested = _extractNestedApiErrorMessage(dataMap);
+          if (nested != null && nested.isNotEmpty) {
+            final lower = nested.toLowerCase();
+            if (lower.contains('inactive') || lower.contains('deactivated')) {
+              return 'Your account has been deactivated. Please contact your administrator.';
             }
-            if (errMap['message'] != null) return errMap['message'].toString();
-          }
-          // Also check non_field_errors at root level
-          final rootNonField = dataMap['non_field_errors'];
-          if (rootNonField is List && rootNonField.isNotEmpty) {
-            final first = rootNonField.first;
-            final m = first is String ? first : first.toString();
-            final ml = m.toString().toLowerCase();
-            if (ml.contains('inactive') || ml.contains('deactivated')) return 'Your account has been deactivated. Please contact your administrator.';
-            if (ml.contains('suspended')) return 'Your account has been suspended. Please contact your administrator.';
-            return m;
+            if (lower.contains('suspended')) {
+              return 'Your account has been suspended. Please contact your administrator.';
+            }
+            if (lower.contains('invalid credential')) {
+              return 'Invalid credentials. Please check your email and password.';
+            }
+            return nested;
           }
           final dataStr = dataMap.toString().toLowerCase();
           if (dataStr.contains('inactive') || dataStr.contains('deactivated')) {

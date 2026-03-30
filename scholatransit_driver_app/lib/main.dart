@@ -20,6 +20,7 @@ import 'core/services/notification_service.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/firebase_notification_service.dart';
 import 'core/services/navigation_service.dart';
+import 'core/services/truck_h3_service.dart';
 import 'core/widgets/system_back_button_handler.dart';
 
 void main() async {
@@ -36,6 +37,11 @@ void main() async {
 
   // Initialize services
   await _initializeServices();
+
+  // Initialize H3 geospatial indexing when enabled (additive - no impact if disabled)
+  if (AppConfig.enableH3Tracking) {
+    await TruckH3Service.initialize();
+  }
 
   // Request permissions
   await _requestPermissions();

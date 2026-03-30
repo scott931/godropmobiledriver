@@ -27,12 +27,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _navigateToNextScreen();
   }
 
-  void _navigateOnce(void Function() navigate) {
-    if (_hasNavigated || !mounted) return;
-    _hasNavigated = true;
-    navigate();
-  }
-
   void _initializeAnimations() {
     _animationController = AnimationController(
       duration: const Duration(seconds: 2),
@@ -97,21 +91,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     // Listen for auth - navigate once when ready (router redirect may beat us)
+    // Auth may finish after the 2s timer already sent us to /login; do not use
+    // _navigateOnce here — it would block this exit once _hasNavigated is true.
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (next.isAuthenticated && next.driver != null && mounted) {
-        _navigateOnce(() {
-          print('🚀 DEBUG: Driver auth detected, navigating to dashboard');
-          context.go('/dashboard');
-        });
+        print('🚀 DEBUG: Driver auth detected, navigating to dashboard');
+        context.go('/dashboard');
       }
     });
 
     ref.listen<ParentAuthState>(parentAuthProvider, (previous, next) {
       if (next.isAuthenticated && next.parent != null && mounted) {
-        _navigateOnce(() {
-          print('🚀 DEBUG: Parent auth detected, navigating to parent dashboard');
-          context.go('/parent/dashboard');
-        });
+        print('🚀 DEBUG: Parent auth detected, navigating to parent dashboard');
+        context.go('/parent/dashboard');
       }
     });
 

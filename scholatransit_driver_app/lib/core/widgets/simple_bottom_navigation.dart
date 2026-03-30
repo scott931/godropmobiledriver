@@ -146,9 +146,9 @@ class _SimpleBottomNavigationState extends State<SimpleBottomNavigation> {
                 index: 0,
               ),
               _buildNavItem(
-                icon: Icons.directions_bus_outlined,
-                activeIcon: Icons.directions_bus_rounded,
-                label: 'Trips',
+                icon: Icons.calendar_month_outlined,
+                activeIcon: Icons.calendar_month_rounded,
+                label: 'Schedule',
                 index: 1,
               ),
               _buildNavItem(

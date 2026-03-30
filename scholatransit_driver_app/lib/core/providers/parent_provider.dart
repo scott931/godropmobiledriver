@@ -8,7 +8,10 @@ class ParentState {
   final bool isLoading;
   final Parent? parent;
   final List<Child> children;
+  /// In-progress trips only (live map / tracking).
   final List<ParentTrip> activeTrips;
+  /// Scheduled and active trips for the schedule screen (deduped, sorted by start time).
+  final List<ParentTrip> parentTrips;
   final List<ParentTrip> tripHistory;
   final List<Map<String, dynamic>> notifications;
   final String? error;
@@ -20,6 +23,7 @@ class ParentState {
     this.parent,
     this.children = const [],
     this.activeTrips = const [],
+    this.parentTrips = const [],
     this.tripHistory = const [],
     this.notifications = const [],
     this.error,
@@ -32,6 +36,7 @@ class ParentState {
     Parent? parent,
     List<Child>? children,
     List<ParentTrip>? activeTrips,
+    List<ParentTrip>? parentTrips,
     List<ParentTrip>? tripHistory,
     List<Map<String, dynamic>>? notifications,
     String? error,
@@ -43,6 +48,7 @@ class ParentState {
       parent: parent ?? this.parent,
       children: children ?? this.children,
       activeTrips: activeTrips ?? this.activeTrips,
+      parentTrips: parentTrips ?? this.parentTrips,
       tripHistory: tripHistory ?? this.tripHistory,
       notifications: notifications ?? this.notifications,
       error: error,
@@ -78,8 +84,7 @@ class ParentNotifier extends StateNotifier<ParentState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Load active trips
-      await loadActiveTrips();
+      await loadParentTrips();
 
       // Load trip history
       await loadTripHistory();
@@ -96,14 +101,40 @@ class ParentNotifier extends StateNotifier<ParentState> {
     }
   }
 
-  Future<void> loadActiveTrips() async {
+  /// Loads trips in progress plus scheduled/upcoming so parents see the child’s trip before it starts.
+  Future<void> loadParentTrips() async {
     try {
-      final response = await ParentTrackingService.getActiveTrips();
-      if (response.success && response.data != null) {
-        state = state.copyWith(activeTrips: response.data!);
+      final activeResp = await ParentTrackingService.getActiveTrips();
+      final scheduledResp = await ParentTrackingService.getScheduledTrips();
+
+      final merged = <ParentTrip>[];
+      final ids = <int>{};
+
+      void addTrips(List<ParentTrip>? list) {
+        if (list == null) return;
+        for (final t in list) {
+          if (!ids.contains(t.id)) {
+            ids.add(t.id);
+            merged.add(t);
+          }
+        }
       }
+
+      if (activeResp.success) addTrips(activeResp.data);
+      if (scheduledResp.success) addTrips(scheduledResp.data);
+
+      merged.sort(
+        (a, b) => a.scheduledStartTime.compareTo(b.scheduledStartTime),
+      );
+
+      final inProgress = merged.where((t) => t.isActive).toList();
+
+      state = state.copyWith(
+        parentTrips: merged,
+        activeTrips: inProgress,
+      );
     } catch (e) {
-      print('❌ Failed to load active trips: $e');
+      print('❌ Failed to load parent trips: $e');
     }
   }
 
@@ -167,16 +198,24 @@ class ParentNotifier extends StateNotifier<ParentState> {
   }
 
   void _updateActiveTrip(ParentTrip trip) {
-    final updatedTrips = List<ParentTrip>.from(state.activeTrips);
-    final index = updatedTrips.indexWhere((t) => t.id == trip.id);
+    final updated = List<ParentTrip>.from(state.parentTrips);
+    final index = updated.indexWhere((t) => t.id == trip.id);
 
     if (index >= 0) {
-      updatedTrips[index] = trip;
+      updated[index] = trip;
     } else {
-      updatedTrips.add(trip);
+      updated.add(trip);
     }
 
-    state = state.copyWith(activeTrips: updatedTrips);
+    updated.sort(
+      (a, b) => a.scheduledStartTime.compareTo(b.scheduledStartTime),
+    );
+    final inProgress = updated.where((t) => t.isActive).toList();
+
+    state = state.copyWith(
+      parentTrips: updated,
+      activeTrips: inProgress,
+    );
   }
 
   void _updateETA(Map<String, dynamic> etaData) {

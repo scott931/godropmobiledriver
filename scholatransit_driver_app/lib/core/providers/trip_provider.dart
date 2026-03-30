@@ -10,6 +10,7 @@ import '../services/eta_notification_service.dart';
 import '../services/notification_service.dart';
 import '../services/parent_notification_service.dart';
 import '../services/location_service.dart';
+import '../services/truck_h3_service.dart';
 import '../config/app_config.dart';
 
 class TripState {
@@ -191,6 +192,21 @@ class TripNotifier extends StateNotifier<TripState> {
         error: 'Failed to load active trips: $e',
       );
     }
+  }
+
+  /// Loads all trips assigned to this driver for the schedule screen (upcoming, active, past).
+  /// Unlike [loadActiveTrips], does not bail when already loading so pull-to-refresh works reliably.
+  Future<void> loadDriverSchedule() async {
+    final driverId = StorageService.getDriverId();
+    if (driverId != null) {
+      await loadDriverTrips(driverId);
+      final activeTrips = state.trips.where((trip) => trip.isActive).toList();
+      if (activeTrips.isNotEmpty) {
+        state = state.copyWith(currentTrip: activeTrips.first);
+      }
+      return;
+    }
+    await loadActiveTrips();
   }
 
   Future<void> loadAllTrips() async {
@@ -487,6 +503,11 @@ class TripNotifier extends StateNotifier<TripState> {
     double? accuracy,
   }) async {
     try {
+      final h3Index = (AppConfig.enableH3Tracking &&
+              TruckH3Service.isInitialized)
+          ? TruckH3Service.positionToH3String(latitude, longitude)
+          : null;
+
       final response = await ApiService.post<Map<String, dynamic>>(
         AppConfig.updateLocationEndpoint,
         data: {
@@ -497,6 +518,8 @@ class TripNotifier extends StateNotifier<TripState> {
           'speed': speed,
           'heading': heading,
           'accuracy': accuracy,
+          if (h3Index != null) 'h3_index': h3Index,
+          if (h3Index != null) 'h3_resolution': TruckH3Service.routeResolution,
         },
       );
 

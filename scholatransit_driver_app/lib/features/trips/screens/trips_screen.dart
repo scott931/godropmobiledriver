@@ -22,29 +22,41 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(tripProvider.notifier).loadActiveTrips();
+      ref.read(tripProvider.notifier).loadDriverSchedule();
     });
+  }
+
+  bool _canStartTrip(Trip trip) {
+    return trip.status == TripStatus.pending;
   }
 
   @override
   Widget build(BuildContext context) {
     final tripState = ref.watch(tripProvider);
 
-    // Listen for auth changes - only reset on logout (initState handles initial load)
     ref.listen<AuthState>(authProvider, (previous, next) {
       if (previous != null && !next.isAuthenticated && previous!.isAuthenticated) {
         ref.read(tripProvider.notifier).resetState();
       }
     });
 
-    // Get all trips without filtering
-    final filteredTrips = tripState.trips;
+    final trips = tripState.trips;
+    final upcoming = trips.where((t) => _canStartTrip(t)).toList()
+      ..sort((a, b) => a.scheduledStart.compareTo(b.scheduledStart));
+    final live = trips.where((t) => t.isActive).toList();
+    final past = trips
+        .where(
+          (t) =>
+              !t.isActive &&
+              (t.isCompleted || t.isCancelled || !_canStartTrip(t)),
+        )
+        .toList()
+      ..sort((a, b) => b.scheduledStart.compareTo(a.scheduledStart));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Column(
         children: [
-          // Modern Header with Gradient
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -56,63 +68,39 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
             child: SafeArea(
               child: Padding(
                 padding: EdgeInsets.all(20.w),
-                child: Column(
+                child: Row(
                   children: [
-                    // Navigation and Title
-                    Row(
-                      children: [
-                        // GestureDetector(
-                        //   onTap: () => context.pop(),
-                        //   child: Container(
-                        //     padding: EdgeInsets.all(8.w),
-                        //     decoration: BoxDecoration(
-                        //       color: Colors.white.withOpacity(0.2),
-                        //       borderRadius: BorderRadius.circular(8.r),
-                        //     ),
-                        //     child: Icon(
-                        //       Icons.arrow_back,
-                        //       color: Colors.white,
-                        //       size: 20.w,
-                        //     ),
-                        //   ),
-                        // ),
-                        // SizedBox(width: 16.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'My Trips',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 24.sp,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              SizedBox(height: 4.h),
-                              Text(
-                                '${filteredTrips.length} trips found',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14.sp,
-                                  color: Colors.white.withOpacity(0.8),
-                                ),
-                              ),
-                            ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'My schedule',
+                            style: GoogleFonts.poppins(
+                              fontSize: 24.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
-                        ),
-                        Container(
-                          padding: EdgeInsets.all(8.w),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8.r),
+                          SizedBox(height: 4.h),
+                          Text(
+                            '${trips.length} assignment${trips.length == 1 ? '' : 's'}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 14.sp,
+                              color: Colors.white.withOpacity(0.85),
+                            ),
                           ),
-                          child: Icon(
-                            Icons.filter_list,
-                            color: Colors.white,
-                            size: 20.w,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: tripState.isLoading
+                          ? null
+                          : () {
+                              ref.read(tripProvider.notifier).loadDriverSchedule();
+                            },
+                      icon: Icon(Icons.refresh, color: Colors.white, size: 24.w),
+                      tooltip: 'Refresh',
                     ),
                   ],
                 ),
@@ -120,7 +108,33 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
             ),
           ),
 
-          // Trips List
+          if (tripState.error != null && !tripState.isLoading)
+            Padding(
+              padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 0),
+              child: Material(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8.r),
+                child: Padding(
+                  padding: EdgeInsets.all(12.w),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, color: Colors.red.shade700, size: 20.w),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          tripState.error!,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13.sp,
+                            color: Colors.red.shade900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           Expanded(
             child: tripState.isLoading
                 ? Center(
@@ -130,67 +144,79 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
                       ),
                     ),
                   )
-                : filteredTrips.isEmpty
+                : trips.isEmpty
                 ? _EmptyState()
                 : RefreshIndicator(
                     onRefresh: () async {
-                      await ref.read(tripProvider.notifier).loadActiveTrips();
+                      await ref.read(tripProvider.notifier).loadDriverSchedule();
                     },
-                    child: ListView.builder(
-                      padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 80.h),
-                      itemCount: filteredTrips.length,
-                      itemBuilder: (context, index) {
-                        final trip = filteredTrips[index];
-                        return Padding(
-                          padding: EdgeInsets.only(bottom: 16.h),
-                          child: _ModernTripCard(
-                            trip: trip,
-                            onTap: () =>
-                                context.go('/trips/details/${trip.id}'),
-                            onStart: trip.status == TripStatus.pending
-                                ? () => _startTrip(trip)
-                                : null,
-                            onEnd: trip.status == TripStatus.inProgress
-                                ? () => _endTrip(trip)
-                                : null,
+                    child: ListView(
+                      padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 32.h),
+                      children: [
+                        if (upcoming.isNotEmpty) ...[
+                          _ScheduleSectionTitle(
+                            title: 'Upcoming',
+                            subtitle:
+                                'Start a trip when you are ready to depart.',
                           ),
-                        );
-                      },
+                          ...upcoming.map(
+                            (trip) => Padding(
+                              padding: EdgeInsets.only(bottom: 16.h),
+                              child: _ModernTripCard(
+                                trip: trip,
+                                useProminentStart: true,
+                                onTap: () =>
+                                    context.go('/trips/details/${trip.id}'),
+                                onStart: _canStartTrip(trip)
+                                    ? () => _startTrip(trip)
+                                    : null,
+                                onEnd: null,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (live.isNotEmpty) ...[
+                          _ScheduleSectionTitle(
+                            title: 'In progress',
+                            subtitle: 'Trip is running — end when finished.',
+                          ),
+                          ...live.map(
+                            (trip) => Padding(
+                              padding: EdgeInsets.only(bottom: 16.h),
+                              child: _ModernTripCard(
+                                trip: trip,
+                                useProminentStart: false,
+                                onTap: () =>
+                                    context.go('/trips/details/${trip.id}'),
+                                onStart: null,
+                                onEnd: () => _endTrip(trip),
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (past.isNotEmpty) ...[
+                          _ScheduleSectionTitle(
+                            title: 'Past',
+                            subtitle: 'Completed or cancelled trips.',
+                          ),
+                          ...past.map(
+                            (trip) => Padding(
+                              padding: EdgeInsets.only(bottom: 16.h),
+                              child: _ModernTripCard(
+                                trip: trip,
+                                useProminentStart: false,
+                                onTap: () =>
+                                    context.go('/trips/details/${trip.id}'),
+                                onStart: null,
+                                onEnd: null,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
           ),
-        ],
-      ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16.r),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF3B82F6).withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: FloatingActionButton(
-          onPressed: () => _showNewTripDialog(context),
-          backgroundColor: const Color(0xFF3B82F6),
-          child: Icon(Icons.add, color: Colors.white, size: 24.w),
-        ),
-      ),
-    );
-  }
-
-  void _showNewTripDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Start New Trip'),
-        content: const Text(
-          'This feature will be available soon. You can start trips from the trips list.',
-        ),
-        actions: [
-          TextButton(onPressed: () => context.pop(), child: const Text('OK')),
         ],
       ),
     );
@@ -290,17 +316,57 @@ class _TripsScreenState extends ConsumerState<TripsScreen> {
   }
 }
 
+class _ScheduleSectionTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _ScheduleSectionTitle({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12.h, top: 8.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1E3A8A),
+            ),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            subtitle,
+            style: GoogleFonts.poppins(
+              fontSize: 13.sp,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ModernTripCard extends StatefulWidget {
   final Trip trip;
   final VoidCallback? onTap;
   final VoidCallback? onStart;
   final VoidCallback? onEnd;
+  final bool useProminentStart;
 
   const _ModernTripCard({
     required this.trip,
     this.onTap,
     this.onStart,
     this.onEnd,
+    this.useProminentStart = false,
   });
 
   @override
@@ -611,8 +677,8 @@ class _ModernTripCardState extends State<_ModernTripCard> {
 
               // Trip Details and Actions
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Trip Details
                   Expanded(
                     child: Row(
                       children: [
@@ -631,8 +697,8 @@ class _ModernTripCardState extends State<_ModernTripCard> {
                     ),
                   ),
 
-                  // Action Button
-                  if (widget.onStart != null || widget.onEnd != null)
+                  if (!widget.useProminentStart &&
+                      (widget.onStart != null || widget.onEnd != null))
                     Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 16.w,
@@ -650,7 +716,9 @@ class _ModernTripCardState extends State<_ModernTripCard> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              widget.onStart != null ? Icons.play_arrow : Icons.stop,
+                              widget.onStart != null
+                                  ? Icons.play_arrow
+                                  : Icons.stop,
                               color: Colors.white,
                               size: 16.w,
                             ),
@@ -669,6 +737,32 @@ class _ModernTripCardState extends State<_ModernTripCard> {
                     ),
                 ],
               ),
+
+              if (widget.useProminentStart && widget.onStart != null) ...[
+                SizedBox(height: 16.h),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: widget.onStart,
+                    icon: Icon(Icons.play_arrow, size: 22.w),
+                    label: Text(
+                      'Start trip',
+                      style: GoogleFonts.poppins(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF059669),
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 14.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -859,7 +953,7 @@ class _EmptyState extends StatelessWidget {
           ),
           SizedBox(height: 24.h),
           Text(
-            'No trips found',
+            'No schedule yet',
             style: GoogleFonts.poppins(
               fontSize: 20.sp,
               fontWeight: FontWeight.w600,
@@ -867,13 +961,16 @@ class _EmptyState extends StatelessWidget {
             ),
           ),
           SizedBox(height: 8.h),
-          Text(
-            'Your trips will appear here when assigned',
-            style: GoogleFonts.poppins(
-              fontSize: 14.sp,
-              color: Colors.grey[600],
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24.w),
+            child: Text(
+              'Assigned trips will show here. Pull down to refresh.',
+              style: GoogleFonts.poppins(
+                fontSize: 14.sp,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),

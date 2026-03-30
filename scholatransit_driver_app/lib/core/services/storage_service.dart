@@ -104,8 +104,12 @@ class StorageService {
     await setObject(AppConfig.userProfileKey, profile);
   }
 
+  /// Hive/JSON often deserialize as [Map<dynamic, dynamic>]; normalize for Dart typing.
   static Map<String, dynamic>? getUserProfile() {
-    return getObject<Map<String, dynamic>>(AppConfig.userProfileKey);
+    final raw = _box.get(AppConfig.userProfileKey);
+    if (raw == null) return null;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
   }
 
   static Future<void> clearUserProfile() async {
@@ -131,7 +135,10 @@ class StorageService {
   }
 
   static Map<String, dynamic>? getCurrentTrip() {
-    return getObject<Map<String, dynamic>>(AppConfig.currentTripKey);
+    final raw = _box.get(AppConfig.currentTripKey);
+    if (raw == null) return null;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
   }
 
   static Future<void> clearCurrentTrip() async {

@@ -14,6 +14,8 @@ import '../../../core/models/trip_model.dart';
 import '../../../core/services/routing_service.dart';
 import '../../../core/services/realtime_distance_tracker.dart';
 import '../../../core/services/location_service_resolver.dart';
+import '../../../core/services/truck_h3_service.dart';
+import '../../../core/services/h3_mapbox_service.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
@@ -49,6 +51,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // Location guidance
   String? _locationGuidance;
   bool _showLocationGuidance = false;
+
+  // H3 geospatial indexing (additive - only used when AppConfig.enableH3Tracking)
+  final Set<BigInt> _traveledH3Cells = {};
+  BigInt? _currentH3Cell;
 
   @override
   void initState() {
@@ -166,6 +172,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
                     print('🗺️ DEBUG: Calling _addTripMarkers()...');
                     _addTripMarkers();
+
+                    // H3 layer (additive - only when enabled)
+                    if (AppConfig.enableH3Tracking) {
+                      _setupH3Layer(mapboxMap);
+                    }
                   },
                 ),
 
@@ -806,6 +817,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
             // Force distance update on location change
             RealtimeDistanceTracker.forceDistanceUpdate();
+
+            // H3 tracking (additive - only when enabled)
+            if (AppConfig.enableH3Tracking) {
+              _updateH3FromPosition(position);
+            }
           },
           onLocationError: (error) {
             print('❌ Map location error: $error');
@@ -875,6 +891,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _totalTripDistance = null;
       _progressPercentage = 0.0;
 
+      // Reset H3 traveled cells when trip ends
+      if (AppConfig.enableH3Tracking) {
+        _traveledH3Cells.clear();
+        _currentH3Cell = null;
+      }
+
       // Trigger UI update
       if (mounted) {
         setState(() {});
@@ -883,6 +905,56 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       print('✅ Distance tracking stopped');
     } catch (e) {
       print('❌ Error stopping distance tracking: $e');
+    }
+  }
+
+  /// Setup H3 GeoJSON source and FillLayer (additive - only when H3 enabled)
+  Future<void> _setupH3Layer(MapboxMap mapboxMap) async {
+    if (!AppConfig.enableH3Tracking || _mapboxMap == null) return;
+    try {
+      await mapboxMap.style.addSource(GeoJsonSource(
+        id: 'h3-cells-source',
+        data: '{"type":"FeatureCollection","features":[]}',
+      ));
+      await mapboxMap.style.addLayer(FillLayer(
+        id: 'h3-route-fill',
+        sourceId: 'h3-cells-source',
+        fillColor: Colors.blue.value,
+        fillOpacity: 0.4,
+      ));
+      print('✅ H3 layer added to map');
+    } catch (e) {
+      print('⚠️ H3 layer setup failed (non-fatal): $e');
+    }
+  }
+
+  /// Update H3 from position (additive - runs alongside existing handlers)
+  void _updateH3FromPosition(dynamic position) {
+    if (!AppConfig.enableH3Tracking || !TruckH3Service.isInitialized) return;
+    final lat = position.latitude as double;
+    final lng = position.longitude as double;
+    final h3Index = TruckH3Service.positionToH3(lat, lng);
+    if (h3Index == null) return;
+    if (h3Index != _currentH3Cell) {
+      _currentH3Cell = h3Index;
+      _traveledH3Cells.add(h3Index);
+      _updateH3Layer();
+    }
+  }
+
+  /// Update H3 GeoJSON source with traveled cells
+  Future<void> _updateH3Layer() async {
+    if (!AppConfig.enableH3Tracking ||
+        _mapboxMap == null ||
+        _traveledH3Cells.isEmpty) return;
+    try {
+      final geoJson = H3MapboxService.cellsToGeoJsonString(_traveledH3Cells.toList());
+      final source = await _mapboxMap!.style.getSource('h3-cells-source');
+      if (source != null && source is GeoJsonSource) {
+        await source.updateGeoJSON(geoJson);
+      }
+    } catch (e) {
+      print('⚠️ H3 layer update failed (non-fatal): $e');
     }
   }
 

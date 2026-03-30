@@ -30,6 +30,7 @@ dependencies:
   geocoding: ^3.0.0
   location: ^5.0.3
   mapbox_maps_flutter: ^2.11.0
+  h3_flutter_plus: ^1.0.0
 
   # Local Storage
   shared_preferences: ^2.2.3

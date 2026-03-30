@@ -120,9 +120,9 @@ class _ParentDashboardScreenState extends ConsumerState<ParentDashboardScreen> {
               // Welcome Section
               _buildWelcomeSection(authState.parent),
 
-              // Active Trips Section
-              if (parentState.activeTrips.isNotEmpty) ...[
-                _buildActiveTripsSection(parentState.activeTrips),
+              // Trip schedule (scheduled + in progress)
+              if (parentState.parentTrips.isNotEmpty) ...[
+                _buildTripScheduleSection(parentState.parentTrips),
                 SizedBox(height: 20.h),
               ],
 
@@ -202,22 +202,30 @@ class _ParentDashboardScreenState extends ConsumerState<ParentDashboardScreen> {
     );
   }
 
-  Widget _buildActiveTripsSection(List<ParentTrip> activeTrips) {
+  Widget _buildTripScheduleSection(List<ParentTrip> trips) {
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 20.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Active Trips',
+            'Trip schedule',
             style: GoogleFonts.poppins(
               fontSize: 18.sp,
               fontWeight: FontWeight.w600,
               color: Colors.black,
             ),
           ),
+          SizedBox(height: 4.h),
+          Text(
+            'Includes upcoming trips before they start',
+            style: GoogleFonts.poppins(
+              fontSize: 12.sp,
+              color: Colors.grey[600],
+            ),
+          ),
           SizedBox(height: 12.h),
-          ...activeTrips.map((trip) => BusTrackingCard(trip: trip)),
+          ...trips.map((trip) => BusTrackingCard(trip: trip)),
         ],
       ),
     );

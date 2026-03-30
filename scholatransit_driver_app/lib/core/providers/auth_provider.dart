@@ -499,7 +499,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Shared logic: validate user, persist profile, set auth state from OTP response user.
   /// Returns true if auth succeeded; false if user type or status blocked.
   Future<bool> _finalizeAuthFromOtpUser(Map<String, dynamic> user) async {
-    final userType = user['user_type'] as String? ?? user['role'] as String?;
+    // JSON/Hive use Map<dynamic, dynamic> at runtime — normalize before save/parse.
+    final u = Map<String, dynamic>.from(user);
+    final userType = u['user_type'] as String? ?? u['role'] as String?;
     if (!_isAllowedUserType(userType)) {
       await StorageService.clearAuthTokens();
       state = state.copyWith(
@@ -509,7 +511,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return false;
     }
-    final driverStatus = _getDriverStatusFromJson(user);
+    final driverStatus = _getDriverStatusFromJson(u);
     if (!_isDriverActive(driverStatus)) {
       await StorageService.clearAuthTokens();
       state = state.copyWith(
@@ -519,18 +521,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return false;
     }
-    await StorageService.saveUserProfile(user);
-    final idForApi = user['driver_id'] ?? user['id'];
+    await StorageService.saveUserProfile(u);
+    final idForApi = u['driver_id'] ?? u['id'];
     if (idForApi is int) {
       await StorageService.saveDriverId(idForApi);
     }
-    final driver = Driver.fromJson(user);
-    final mustChange = _extractMustChangePassword(_toStringKeyMap(user));
+    final driver = Driver.fromJson(u);
+    final mustChange = _extractMustChangePassword(_toStringKeyMap(u));
     state = state.copyWith(
       isLoading: false,
       isAuthenticated: true,
       driver: driver,
-      profileRawData: user,
+      profileRawData: u,
       error: null,
       otpId: null,
       mustChangePassword: mustChange,
@@ -639,7 +641,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
           !isAuthFailure) {
         final cached = StorageService.getUserProfile();
         if (cached != null && cached.isNotEmpty) {
-          driverData = _extractUserFromResponse(cached) ?? cached;
+          driverData =
+              _extractUserFromResponse(cached) ?? _toStringKeyMap(cached);
           if (driverData != null) {
             print('🔐 DEBUG: Using cached profile');
           }
@@ -651,38 +654,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (driverData != null && token != null) {
         final cached = StorageService.getUserProfile();
         if (cached != null && cached.isNotEmpty) {
-          final cachedUser = _extractUserFromResponse(cached) ?? cached;
-          final flat = _mergeProfileDataFromRaw(cachedUser, cached);
-          final missingAddress = driverData!['address'] == null ||
-              (driverData['address'] as String?)?.isEmpty == true;
-          final missingLicense = driverData['license_number'] == null ||
-              (driverData['license_number'] as String?)?.isEmpty == true;
-          final missingHireDate = driverData['hire_date'] == null;
-          final missingLicenseExpiry = driverData['license_expiry'] == null &&
-              driverData['license_expiry_date'] == null &&
-              (driverData['license_expiration'] as String?)?.isEmpty == true &&
-              (driverData['license_expiration_date'] as String?)?.isEmpty == true;
-          if (missingAddress || missingLicense || missingHireDate || missingLicenseExpiry) {
-            final cachedAddr = flat['address'] ?? flat['residential_address'];
-            if (missingAddress && cachedAddr != null && cachedAddr.toString().trim().isNotEmpty) {
-              driverData = {...driverData!, 'address': cachedAddr.toString()};
-              print('🔐 DEBUG: Merged address from cache');
-            }
-            final cachedLicense = flat['license_number'] ?? flat['license_no'];
-            if (missingLicense && cachedLicense != null && cachedLicense.toString().trim().isNotEmpty) {
-              driverData = {...driverData!, 'license_number': cachedLicense.toString()};
-              print('🔐 DEBUG: Merged license_number from cache');
-            }
-            final cachedHireDate = flat['hire_date'] ?? flat['hireDate'] ?? flat['date_hired'];
-            if (missingHireDate && cachedHireDate != null) {
-              driverData = {...driverData!, 'hire_date': cachedHireDate};
-              print('🔐 DEBUG: Merged hire_date from cache');
-            }
-            final cachedLicenseExpiry = flat['license_expiry'] ?? flat['license_expiry_date'] ??
-                flat['license_expiration'] ?? flat['license_expiration_date'];
-            if (missingLicenseExpiry && cachedLicenseExpiry != null && cachedLicenseExpiry.toString().trim().isNotEmpty) {
-              driverData = {...driverData!, 'license_expiry': cachedLicenseExpiry.toString()};
-              print('🔐 DEBUG: Merged license_expiry from cache');
+          final cachedUser =
+              _extractUserFromResponse(cached) ?? _toStringKeyMap(cached);
+          if (cachedUser != null && cachedUser.isNotEmpty) {
+            final flat = _mergeProfileDataFromRaw(cachedUser, cached);
+            final missingAddress = driverData!['address'] == null ||
+                (driverData['address'] as String?)?.isEmpty == true;
+            final missingLicense = driverData['license_number'] == null ||
+                (driverData['license_number'] as String?)?.isEmpty == true;
+            final missingHireDate = driverData['hire_date'] == null;
+            final missingLicenseExpiry = driverData['license_expiry'] == null &&
+                driverData['license_expiry_date'] == null &&
+                (driverData['license_expiration'] as String?)?.isEmpty == true &&
+                (driverData['license_expiration_date'] as String?)?.isEmpty == true;
+            if (missingAddress || missingLicense || missingHireDate || missingLicenseExpiry) {
+              final cachedAddr = flat['address'] ?? flat['residential_address'];
+              if (missingAddress && cachedAddr != null && cachedAddr.toString().trim().isNotEmpty) {
+                driverData = {...driverData!, 'address': cachedAddr.toString()};
+                print('🔐 DEBUG: Merged address from cache');
+              }
+              final cachedLicense = flat['license_number'] ?? flat['license_no'];
+              if (missingLicense && cachedLicense != null && cachedLicense.toString().trim().isNotEmpty) {
+                driverData = {...driverData!, 'license_number': cachedLicense.toString()};
+                print('🔐 DEBUG: Merged license_number from cache');
+              }
+              final cachedHireDate = flat['hire_date'] ?? flat['hireDate'] ?? flat['date_hired'];
+              if (missingHireDate && cachedHireDate != null) {
+                driverData = {...driverData!, 'hire_date': cachedHireDate};
+                print('🔐 DEBUG: Merged hire_date from cache');
+              }
+              final cachedLicenseExpiry = flat['license_expiry'] ?? flat['license_expiry_date'] ??
+                  flat['license_expiration'] ?? flat['license_expiration_date'];
+              if (missingLicenseExpiry && cachedLicenseExpiry != null && cachedLicenseExpiry.toString().trim().isNotEmpty) {
+                driverData = {...driverData!, 'license_expiry': cachedLicenseExpiry.toString()};
+                print('🔐 DEBUG: Merged license_expiry from cache');
+              }
             }
           }
         }
@@ -759,6 +765,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       if (driverData != null && driverData.isNotEmpty) {
+        driverData = Map<String, dynamic>.from(driverData);
         final userType = driverData['user_type'] as String? ?? driverData['role'] as String?;
         if (!_isAllowedUserType(userType)) {
           print('🔐 DEBUG: User type "$userType" not allowed in driver app');

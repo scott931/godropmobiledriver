@@ -67,13 +67,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     if (previous?.isAuthenticated == true && !next.isAuthenticated) {
       _authRefreshNotifier.value++;
     }
-    // Re-evaluate redirect when auth loads (to skip splash -> dashboard)
-    if (previous != null && next.isAuthenticated && !previous!.isAuthenticated) {
+    // Re-evaluate redirect when auth loads (to skip splash -> dashboard).
+    // Riverpod's first listener callback can pass previous == null, so we must
+    // refresh when session becomes valid or the splash timer may send users to
+    // /login while still unauthenticated in memory, then redirect never runs.
+    //
+    // Also: when previous is non-null, refresh on transition to authenticated.
+    if (previous != null && next.isAuthenticated && !previous.isAuthenticated) {
+      _authRefreshNotifier.value++;
+    }
+    if (previous == null && next.isAuthenticated && next.driver != null) {
       _authRefreshNotifier.value++;
     }
   });
   ref.listen<ParentAuthState>(parentAuthProvider, (previous, next) {
-    if (previous != null && next.isAuthenticated && !previous!.isAuthenticated) {
+    if (previous != null && next.isAuthenticated && !previous.isAuthenticated) {
+      _authRefreshNotifier.value++;
+    }
+    if (previous == null && next.isAuthenticated && next.parent != null) {
       _authRefreshNotifier.value++;
     }
   });
@@ -86,6 +97,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final path = state.uri.path;
       // Skip splash when already authenticated - go straight to dashboard
       if (path == '/splash') {
+        if (auth.isAuthenticated && auth.driver != null) return '/dashboard';
+        if (parentAuth.isAuthenticated && parentAuth.parent != null) {
+          return '/parent/dashboard';
+        }
+      }
+      // Session restored or auth finished after splash sent user to login
+      if (path == '/login') {
         if (auth.isAuthenticated && auth.driver != null) return '/dashboard';
         if (parentAuth.isAuthenticated && parentAuth.parent != null) {
           return '/parent/dashboard';
