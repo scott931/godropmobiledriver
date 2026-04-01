@@ -13,6 +13,16 @@ import '../services/location_service.dart';
 import '../services/truck_h3_service.dart';
 import '../config/app_config.dart';
 
+/// Outcome of driver check-in verify API ([AppConfig.checkinVerifyQrEndpoint] / pin).
+class DriverCheckinResult {
+  final bool success;
+  final String? message;
+  const DriverCheckinResult._(this.success, this.message);
+  factory DriverCheckinResult.ok() => const DriverCheckinResult._(true, null);
+  factory DriverCheckinResult.fail(String message) =>
+      DriverCheckinResult._(false, message);
+}
+
 class TripState {
   final bool isLoading;
   final List<Trip> trips;
@@ -1417,42 +1427,92 @@ class TripNotifier extends StateNotifier<TripState> {
     }
   }
 
-  Future<bool> checkInStudent(String studentId) async {
-    try {
-      print('🔍 Trip Provider: Checking in student with ID: $studentId');
+  /// POST `/checkin/verify/qr-code/` with the **full** scanned payload (not a parsed ID).
+  /// Backend records [CheckinSession] and updates transit status when appropriate.
+  Future<DriverCheckinResult> verifyCheckinWithQrCode({
+    required String qrCodeData,
+    required bool isPickup,
+  }) async {
+    final trimmed = qrCodeData.trim();
+    if (trimmed.isEmpty) {
+      return DriverCheckinResult.fail('Empty QR code');
+    }
 
-      // Validate student ID format
-      if (studentId.isEmpty) {
-        print('❌ Trip Provider: Empty student ID provided');
-        return false;
-      }
+    try {
+      final trip = state.currentTrip;
+      final checkinType = isPickup ? 'pickup' : 'dropoff';
+
+      final body = <String, dynamic>{
+        'qr_code_data': trimmed,
+        'checkin_type': checkinType,
+        if (trip?.vehicleId != null) 'vehicle_id': trip!.vehicleId,
+        if (trip?.routeId != null) 'route_id': trip!.routeId,
+      };
+
+      print(
+        '🔍 Trip Provider: POST ${AppConfig.checkinVerifyQrEndpoint} checkin_type=$checkinType',
+      );
 
       final response = await ApiService.post<Map<String, dynamic>>(
-        AppConfig.studentAttendanceEndpoint,
-        data: {
-          'student_id': studentId,
-          'action': 'check_in',
-          'timestamp': DateTime.now().toIso8601String(),
-        },
+        AppConfig.checkinVerifyQrEndpoint,
+        data: body,
       );
 
       if (response.success) {
-        print('✅ Trip Provider: Student check-in API call successful');
-        // Reload students to get updated status
         if (state.currentTrip != null) {
-          print('🔄 Trip Provider: Reloading students for current trip');
           await loadTripStudents(state.currentTrip!.id);
         }
-        return true;
-      } else {
-        print(
-          '❌ Trip Provider: Student check-in API call failed: ${response.error}',
-        );
-        return false;
+        return DriverCheckinResult.ok();
       }
+
+      final err = response.error ?? 'Verification failed';
+      print('❌ Trip Provider: QR verify failed: $err');
+      return DriverCheckinResult.fail(err);
     } catch (e) {
-      print('💥 Trip Provider: Exception during student check-in: $e');
-      return false;
+      print('💥 Trip Provider: Exception during QR verify: $e');
+      return DriverCheckinResult.fail('Network error: $e');
+    }
+  }
+
+  /// POST `/checkin/verify/pin-code/` (e.g. manual PIN entry with known student id).
+  Future<DriverCheckinResult> verifyCheckinWithPin({
+    required int studentId,
+    required String pinCode,
+    required bool isPickup,
+  }) async {
+    final pin = pinCode.trim();
+    if (pin.isEmpty) {
+      return DriverCheckinResult.fail('Empty PIN');
+    }
+
+    try {
+      final trip = state.currentTrip;
+      final checkinType = isPickup ? 'pickup' : 'dropoff';
+
+      final body = <String, dynamic>{
+        'student_id': studentId,
+        'pin_code': pin,
+        'checkin_type': checkinType,
+        if (trip?.vehicleId != null) 'vehicle_id': trip!.vehicleId,
+        if (trip?.routeId != null) 'route_id': trip!.routeId,
+      };
+
+      final response = await ApiService.post<Map<String, dynamic>>(
+        AppConfig.checkinVerifyPinEndpoint,
+        data: body,
+      );
+
+      if (response.success) {
+        if (state.currentTrip != null) {
+          await loadTripStudents(state.currentTrip!.id);
+        }
+        return DriverCheckinResult.ok();
+      }
+
+      final err = response.error ?? 'PIN verification failed';
+      return DriverCheckinResult.fail(err);
+    } catch (e) {
+      return DriverCheckinResult.fail('Network error: $e');
     }
   }
 

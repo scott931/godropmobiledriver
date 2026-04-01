@@ -38,13 +38,25 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.qr_code_scanner),
             onSelected: (value) {
-              if (value == 'camera') {
+              if (value == 'hub') {
+                context.go('/students/check-in');
+              } else if (value == 'camera') {
                 context.go('/students/qr-scanner');
               } else if (value == 'manual') {
                 context.go('/students/simple-qr-scanner');
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'hub',
+                child: Row(
+                  children: [
+                    Icon(Icons.fact_check_outlined),
+                    SizedBox(width: 8),
+                    Text('Check-in (QR & PIN)'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'camera',
                 child: Row(
@@ -114,24 +126,12 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
               ),
             ),
       floatingActionButton: tripState.currentTrip != null
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FloatingActionButton(
-                  onPressed: () => context.go('/students/simple-qr-scanner'),
-                  heroTag: 'manual',
-                  backgroundColor: Colors.green,
-                  child: const Icon(Icons.keyboard),
-                ),
-                SizedBox(height: 8.h),
-                FloatingActionButton.extended(
-                  onPressed: () => context.go('/students/qr-scanner'),
-                  heroTag: 'camera',
-                  icon: const Icon(Icons.qr_code_scanner),
-                  label: const Text('Camera Scan'),
-                  backgroundColor: AppTheme.primaryColor,
-                ),
-              ],
+          ? FloatingActionButton.extended(
+              onPressed: () => context.go('/students/check-in'),
+              heroTag: 'check-in-hub',
+              icon: const Icon(Icons.fact_check_outlined),
+              label: const Text('Bus check-in'),
+              backgroundColor: AppTheme.primaryColor,
             )
           : null,
     );

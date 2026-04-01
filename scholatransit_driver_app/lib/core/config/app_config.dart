@@ -59,11 +59,16 @@ class AppConfig {
   static const String studentStatusEndpoint = '/students/status/';
   static const String trackingStudentStatusUpdateEndpoint =
       '/tracking/student-status/update/';
+  /// Legacy — not implemented on backend; use [checkinVerifyQrEndpoint] / [checkinVerifyPinEndpoint].
   static const String studentAttendanceEndpoint = '/students/attendance/';
   static const String checkinQrCodesEndpoint = '/checkin/qr-codes/';
   static const String checkinPinsEndpoint = '/checkin/pins/';
   static const String checkinSessionsEndpoint = '/checkin/sessions/';
   static const String checkinRulesEndpoint = '/checkin/rules/';
+  /// Driver bus check-in: POST full [qr_code_data] from scan (e.g. STU_{id}_{ts}_{hex}).
+  static const String checkinVerifyQrEndpoint = '/checkin/verify/qr-code/';
+  /// Driver PIN check-in: requires [student_id], [pin_code], [checkin_type].
+  static const String checkinVerifyPinEndpoint = '/checkin/verify/pin-code/';
 
   // Notification Endpoints
   static const String notificationsEndpoint = '/notifications/';

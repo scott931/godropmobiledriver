@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -74,7 +73,7 @@ class _SimpleQRScannerScreenState extends ConsumerState<SimpleQRScannerScreen> {
                   ),
                   SizedBox(height: 8.h),
                   Text(
-                    'Enter the student QR code or ID manually',
+                    'Enter the full QR payload (e.g. STU_…) from the student card.',
                     style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
                     textAlign: TextAlign.center,
                   ),
@@ -88,8 +87,8 @@ class _SimpleQRScannerScreenState extends ConsumerState<SimpleQRScannerScreen> {
             TextField(
               controller: _qrCodeController,
               decoration: InputDecoration(
-                labelText: 'Student QR Code or ID',
-                hintText: 'Enter QR code or student ID',
+                labelText: 'Full QR code data',
+                hintText: 'STU_…',
                 prefixIcon: const Icon(Icons.qr_code),
                 border: const OutlineInputBorder(),
                 filled: true,
@@ -98,50 +97,6 @@ class _SimpleQRScannerScreenState extends ConsumerState<SimpleQRScannerScreen> {
               keyboardType: TextInputType.text,
               textInputAction: TextInputAction.done,
               onSubmitted: (value) => _processQRCode(value),
-            ),
-
-            SizedBox(height: 16.h),
-
-            // Quick Test Buttons
-            const Text(
-              'Quick Test:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8.h),
-            Wrap(
-              spacing: 8.w,
-              children: [
-                ElevatedButton(
-                  onPressed: () {
-                    _qrCodeController.text = 'SCHOLATRANSIT_12345';
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('SCHOLATRANSIT_'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    _qrCodeController.text = '12345';
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Numeric'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    _qrCodeController.text = '{"student_id": "12345"}';
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('JSON'),
-                ),
-              ],
             ),
 
             SizedBox(height: 24.h),
@@ -199,107 +154,29 @@ class _SimpleQRScannerScreenState extends ConsumerState<SimpleQRScannerScreen> {
 
   Future<void> _processQRCode(String code) async {
     if (code.trim().isEmpty) {
-      _showErrorDialog('Please enter a QR code or student ID');
+      _showErrorDialog('Please enter the full QR code string');
       return;
     }
 
     try {
-      print('🔍 Simple QR Scanner: Processing: $code');
+      final result = await ref.read(tripProvider.notifier).verifyCheckinWithQrCode(
+            qrCodeData: code.trim(),
+            isPickup: _isCheckIn,
+          );
 
-      final cleanCode = code.trim();
-      String? studentId;
-
-      // Try different formats
-      if (cleanCode.startsWith('SCHOLATRANSIT_')) {
-        studentId = cleanCode.substring(14);
-        print('🔍 Simple QR Scanner: SCHOLATRANSIT_ format: $studentId');
-      } else if (RegExp(r'^\d+$').hasMatch(cleanCode)) {
-        studentId = cleanCode;
-        print('🔍 Simple QR Scanner: Numeric format: $studentId');
-      } else if (cleanCode.startsWith('{') && cleanCode.endsWith('}')) {
-        try {
-          final jsonData = json.decode(cleanCode);
-          if (jsonData is Map<String, dynamic>) {
-            studentId =
-                jsonData['student_id']?.toString() ??
-                jsonData['id']?.toString() ??
-                jsonData['studentId']?.toString();
-            print('🔍 Simple QR Scanner: JSON format: $studentId');
-          }
-        } catch (e) {
-          print('🔍 Simple QR Scanner: JSON parsing failed: $e');
-        }
+      if (!mounted) return;
+      if (result.success) {
+        _showSuccessDialog();
+        _qrCodeController.clear();
       } else {
-        final numberMatch = RegExp(r'\d+').firstMatch(cleanCode);
-        if (numberMatch != null) {
-          studentId = numberMatch.group(0);
-          print('🔍 Simple QR Scanner: Extracted number: $studentId');
-        } else {
-          studentId = cleanCode;
-          print('🔍 Simple QR Scanner: Using entire code: $studentId');
-        }
-      }
-
-      if (studentId != null && studentId.isNotEmpty) {
-        final finalStudentId = studentId.trim();
-        if (finalStudentId.isEmpty) {
-          _showErrorDialog('Invalid student ID: Empty after processing');
-          return;
-        }
-
-        print('🔍 Simple QR Scanner: Final student ID: $finalStudentId');
-        await _processStudentAction(finalStudentId);
-      } else {
-        print('🔍 Simple QR Scanner: No student ID could be extracted');
-        _showInvalidCodeDialog();
+        _showErrorDialog(result.message ?? 'Verification failed');
       }
     } catch (e) {
-      print('🔍 Simple QR Scanner: Error: $e');
-      _showErrorDialog('Error processing QR code: $e');
+      _showErrorDialog('Error: $e');
     }
   }
 
-  Future<void> _processStudentAction(String studentId) async {
-    try {
-      print(
-        '🔍 Simple QR Scanner: Processing ${_isCheckIn ? 'check-in' : 'check-out'} for student: $studentId',
-      );
-
-      final success = await ref
-          .read(tripProvider.notifier)
-          .checkInStudent(studentId);
-
-      if (mounted) {
-        if (success) {
-          print(
-            '✅ Simple QR Scanner: Student ${_isCheckIn ? 'check-in' : 'check-out'} successful',
-          );
-          _showSuccessDialog(
-            studentId,
-            _isCheckIn ? 'checked in' : 'checked out',
-          );
-          _qrCodeController
-              .clear(); // Clear the input after successful processing
-        } else {
-          print(
-            '❌ Simple QR Scanner: Student ${_isCheckIn ? 'check-in' : 'check-out'} failed',
-          );
-          _showErrorDialog('Student not found or not assigned to current trip');
-        }
-      }
-    } catch (e) {
-      print(
-        '💥 Simple QR Scanner: Exception during ${_isCheckIn ? 'check-in' : 'check-out'}: $e',
-      );
-      if (mounted) {
-        _showErrorDialog(
-          'Error ${_isCheckIn ? 'checking in' : 'checking out'} student: $e',
-        );
-      }
-    }
-  }
-
-  void _showSuccessDialog(String studentId, String action) {
+  void _showSuccessDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -313,7 +190,11 @@ class _SimpleQRScannerScreenState extends ConsumerState<SimpleQRScannerScreen> {
             Text('${_isCheckIn ? 'Check-in' : 'Check-out'} Successful'),
           ],
         ),
-        content: Text('Student $studentId has been $action successfully.'),
+        content: Text(
+          _isCheckIn
+              ? 'Student verified and recorded on the bus.'
+              : 'Drop-off verified successfully.',
+        ),
         actions: [
           TextButton(onPressed: () => context.pop(), child: const Text('OK')),
         ],
@@ -340,33 +221,6 @@ class _SimpleQRScannerScreenState extends ConsumerState<SimpleQRScannerScreen> {
     );
   }
 
-  void _showInvalidCodeDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning, color: AppTheme.warningColor),
-            SizedBox(width: 8.w),
-            const Text('Invalid QR Code'),
-          ],
-        ),
-        content: const Text(
-          'This QR code is not valid for student check-in/check-out.\n\n'
-          'Supported formats:\n'
-          '• SCHOLATRANSIT_[StudentID]\n'
-          '• Numeric Student ID\n'
-          '• JSON format with student information\n'
-          '• Text containing student ID information\n\n'
-          'Please enter a valid student QR code.',
-        ),
-        actions: [
-          TextButton(onPressed: () => context.pop(), child: const Text('OK')),
-        ],
-      ),
-    );
-  }
-
   void _showStudentList() {
     context.pop();
   }
@@ -377,13 +231,9 @@ class _SimpleQRScannerScreenState extends ConsumerState<SimpleQRScannerScreen> {
       builder: (context) => AlertDialog(
         title: const Text('QR Code Help'),
         content: const Text(
-          'Enter the student QR code or ID in the text field above.\n\n'
-          'Supported formats:\n'
-          '• SCHOLATRANSIT_12345\n'
-          '• 12345 (numeric ID)\n'
-          '• {"student_id": "12345"} (JSON)\n'
-          '• Any text containing a number\n\n'
-          'Use the test buttons to try different formats.',
+          'The app sends the full QR string to the server (POST /checkin/verify/qr-code/). '
+          'Use the exact value encoded on the student card (e.g. STU_{id}_{timestamp}_{hex}). '
+          'Starting an active trip helps attach vehicle and route to the check-in.',
         ),
         actions: [
           TextButton(onPressed: () => context.pop(), child: const Text('OK')),

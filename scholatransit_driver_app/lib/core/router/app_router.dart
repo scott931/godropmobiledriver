@@ -17,6 +17,7 @@ import '../../features/students/screens/students_screen.dart';
 import '../../features/students/screens/student_details_screen.dart';
 import '../../features/students/screens/qr_scanner_screen.dart';
 import '../../features/students/screens/simple_qr_scanner_screen.dart';
+import '../../features/students/screens/student_checkin_hub_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/notifications/screens/alert_details_screen.dart';
 import '../../features/communication/screens/conversations_screen.dart';
@@ -307,6 +308,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 return const SimpleQRScannerScreen();
               }
               // Block non-drivers and redirect to login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                context.go('/login');
+              });
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/students/check-in',
+            name: 'student-check-in-hub',
+            builder: (context, state) {
+              final authState = ref.watch(authProvider);
+              if (authState.isAuthenticated && authState.driver != null) {
+                return const StudentCheckinHubScreen();
+              }
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 context.go('/login');
               });

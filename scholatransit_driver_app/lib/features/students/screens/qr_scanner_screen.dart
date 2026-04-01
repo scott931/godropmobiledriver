@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -317,105 +316,36 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
 
   Future<void> _processQRCode(String code) async {
     try {
-      print('🔍 QR Scanner: Processing QR code: $code');
-
       final cleanCode = code.trim();
       if (cleanCode.isEmpty) {
         _showErrorDialog('Empty QR code');
         return;
       }
 
-      String? studentId;
+      print(
+        '🔍 QR Scanner: Verify ${_isCheckIn ? "pickup" : "dropoff"} with full payload',
+      );
 
-      // Try different formats
-      if (cleanCode.startsWith('SCHOLATRANSIT_')) {
-        studentId = cleanCode.substring(14);
-        print('🔍 QR Scanner: SCHOLATRANSIT_ format: $studentId');
-      } else if (RegExp(r'^\d+$').hasMatch(cleanCode)) {
-        studentId = cleanCode;
-        print('🔍 QR Scanner: Numeric format: $studentId');
-      } else if (cleanCode.startsWith('{') && cleanCode.endsWith('}')) {
-        try {
-          final jsonData = json.decode(cleanCode);
-          if (jsonData is Map<String, dynamic>) {
-            studentId =
-                jsonData['student_id']?.toString() ??
-                jsonData['id']?.toString() ??
-                jsonData['studentId']?.toString();
-            print('🔍 QR Scanner: JSON format: $studentId');
-          }
-        } catch (e) {
-          print('🔍 QR Scanner: JSON parsing failed: $e');
-        }
+      final result = await ref.read(tripProvider.notifier).verifyCheckinWithQrCode(
+            qrCodeData: cleanCode,
+            isPickup: _isCheckIn,
+          );
+
+      if (!mounted) return;
+      if (result.success) {
+        _showSuccessDialog();
       } else {
-        final numberMatch = RegExp(r'\d+').firstMatch(cleanCode);
-        if (numberMatch != null) {
-          studentId = numberMatch.group(0);
-          print('🔍 QR Scanner: Extracted number: $studentId');
-        } else {
-          studentId = cleanCode;
-          print('🔍 QR Scanner: Using entire code: $studentId');
-        }
-      }
-
-      if (studentId != null && studentId.isNotEmpty) {
-        final finalStudentId = studentId.trim();
-        if (finalStudentId.isEmpty) {
-          _showErrorDialog('Invalid student ID: Empty after processing');
-          return;
-        }
-
-        print('🔍 QR Scanner: Final student ID: $finalStudentId');
-        await _processStudentAction(finalStudentId);
-      } else {
-        print('🔍 QR Scanner: No student ID could be extracted');
-        _showInvalidCodeDialog();
+        _showErrorDialog(result.message ?? 'Verification failed');
       }
     } catch (e) {
       print('🔍 QR Scanner: Error: $e');
-      _showErrorDialog('Error processing QR code: $e');
-    }
-  }
-
-  Future<void> _processStudentAction(String studentId) async {
-    try {
-      print(
-        '🔍 QR Scanner: Processing ${_isCheckIn ? 'check-in' : 'check-out'} for student: $studentId',
-      );
-
-      final success = await ref
-          .read(tripProvider.notifier)
-          .checkInStudent(studentId);
-
       if (mounted) {
-        if (success) {
-          print(
-            '✅ QR Scanner: Student ${_isCheckIn ? 'check-in' : 'check-out'} successful',
-          );
-          _showSuccessDialog(
-            studentId,
-            _isCheckIn ? 'checked in' : 'checked out',
-          );
-        } else {
-          print(
-            '❌ QR Scanner: Student ${_isCheckIn ? 'check-in' : 'check-out'} failed',
-          );
-          _showErrorDialog('Student not found or not assigned to current trip');
-        }
-      }
-    } catch (e) {
-      print(
-        '💥 QR Scanner: Exception during ${_isCheckIn ? 'check-in' : 'check-out'}: $e',
-      );
-      if (mounted) {
-        _showErrorDialog(
-          'Error ${_isCheckIn ? 'checking in' : 'checking out'} student: $e',
-        );
+        _showErrorDialog('Error processing QR code: $e');
       }
     }
   }
 
-  void _showSuccessDialog(String studentId, String action) {
+  void _showSuccessDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -429,7 +359,11 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
             Text('${_isCheckIn ? 'Check-in' : 'Check-out'} Successful'),
           ],
         ),
-        content: Text('Student $studentId has been $action successfully.'),
+        content: Text(
+          _isCheckIn
+              ? 'Student verified and recorded on the bus.'
+              : 'Drop-off verified successfully.',
+        ),
         actions: [
           TextButton(onPressed: () => context.pop(), child: const Text('OK')),
         ],
@@ -456,64 +390,31 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
     );
   }
 
-  void _showInvalidCodeDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning, color: AppTheme.warningColor),
-            SizedBox(width: 8.w),
-            const Text('Invalid QR Code'),
-          ],
-        ),
-        content: const Text(
-          'This QR code is not valid for student check-in/check-out.\n\n'
-          'Supported formats:\n'
-          '• SCHOLATRANSIT_[StudentID]\n'
-          '• Numeric Student ID\n'
-          '• JSON format with student information\n'
-          '• Text containing student ID information\n\n'
-          'Please scan a valid student QR code.',
-        ),
-        actions: [
-          TextButton(onPressed: () => context.pop(), child: const Text('OK')),
-        ],
-      ),
-    );
-  }
-
   void _showManualEntryDialog() {
-    final studentIdController = TextEditingController();
+    final payloadController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Manual Student ${_isCheckIn ? 'Check-in' : 'Check-out'}'),
+        title: Text('Manual ${_isCheckIn ? 'Check-in' : 'Check-out'}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Enter the student ID manually:'),
+            const Text(
+              'Paste the full QR payload from the student card (e.g. STU_…). '
+              'The server validates the complete string — not only the student number.',
+            ),
             SizedBox(height: 16.h),
             TextField(
-              controller: studentIdController,
+              controller: payloadController,
               decoration: const InputDecoration(
-                labelText: 'Student ID',
-                hintText: 'Enter student ID',
+                labelText: 'QR code data',
+                hintText: 'STU_…',
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.text,
-            ),
-            SizedBox(height: 16.h),
-            ElevatedButton(
-              onPressed: () {
-                studentIdController.text = '12345';
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Test with: 12345'),
+              maxLines: 2,
             ),
           ],
         ),
@@ -525,9 +426,8 @@ class _QRScannerScreenState extends ConsumerState<QRScannerScreen> {
           TextButton(
             onPressed: () {
               context.pop();
-              if (studentIdController.text.isNotEmpty) {
-                print('🧪 Manual Test: ${studentIdController.text}');
-                _processQRCode(studentIdController.text);
+              if (payloadController.text.isNotEmpty) {
+                _processQRCode(payloadController.text);
               }
             },
             child: Text(_isCheckIn ? 'Check In' : 'Check Out'),
