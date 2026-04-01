@@ -34,6 +34,7 @@ class TripState {
     bool? isLoading,
     List<Trip>? trips,
     Trip? currentTrip,
+    bool clearCurrentTrip = false,
     Trip? selectedTrip,
     List<Student>? students,
     String? error,
@@ -41,7 +42,7 @@ class TripState {
     return TripState(
       isLoading: isLoading ?? this.isLoading,
       trips: trips ?? this.trips,
-      currentTrip: currentTrip ?? this.currentTrip,
+      currentTrip: clearCurrentTrip ? null : (currentTrip ?? this.currentTrip),
       selectedTrip: selectedTrip ?? this.selectedTrip,
       students: students ?? this.students,
       error: error,
@@ -51,6 +52,7 @@ class TripState {
 
 class TripNotifier extends StateNotifier<TripState> {
   Timer? _refreshTimer;
+  Timer? _liveLocationTimer;
 
   TripNotifier() : super(const TripState()) {
     _loadCurrentTrip();
@@ -63,6 +65,7 @@ class TripNotifier extends StateNotifier<TripState> {
     if (currentTrip != null) {
       state = state.copyWith(currentTrip: Trip.fromJson(currentTrip));
     }
+    _syncLiveLocationTimer();
   }
 
   /// Client-side filtering: Filter trips to only show those assigned to the current driver
@@ -150,7 +153,10 @@ class TripNotifier extends StateNotifier<TripState> {
       final activeTrips = state.trips.where((trip) => trip.isActive).toList();
       if (activeTrips.isNotEmpty) {
         state = state.copyWith(currentTrip: activeTrips.first);
+      } else {
+        state = state.copyWith(clearCurrentTrip: true);
       }
+      _syncLiveLocationTimer();
       return;
     }
 
@@ -180,17 +186,20 @@ class TripNotifier extends StateNotifier<TripState> {
           currentTrip: currentTrip,
           error: null,
         );
+        _syncLiveLocationTimer();
       } else {
         state = state.copyWith(
           isLoading: false,
           error: response.error ?? 'Failed to load active trips',
         );
+        _syncLiveLocationTimer();
       }
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to load active trips: $e',
       );
+      _syncLiveLocationTimer();
     }
   }
 
@@ -203,7 +212,10 @@ class TripNotifier extends StateNotifier<TripState> {
       final activeTrips = state.trips.where((trip) => trip.isActive).toList();
       if (activeTrips.isNotEmpty) {
         state = state.copyWith(currentTrip: activeTrips.first);
+      } else {
+        state = state.copyWith(clearCurrentTrip: true);
       }
+      _syncLiveLocationTimer();
       return;
     }
     await loadActiveTrips();
@@ -416,6 +428,8 @@ class TripNotifier extends StateNotifier<TripState> {
         // Calculate ETA for the started trip
         await _calculateETAForTrip(trip, latitude, longitude);
 
+        _syncLiveLocationTimer();
+
         return true;
       } else {
         state = state.copyWith(
@@ -472,13 +486,15 @@ class TripNotifier extends StateNotifier<TripState> {
 
         state = state.copyWith(
           isLoading: false,
-          currentTrip: null,
+          clearCurrentTrip: true,
           trips: updatedTrips,
           error: null,
         );
 
         // Force a refresh of trips to ensure UI is updated
         await loadTrips();
+
+        _syncLiveLocationTimer();
 
         return true;
       } else {
@@ -508,16 +524,20 @@ class TripNotifier extends StateNotifier<TripState> {
           ? TruckH3Service.positionToH3String(latitude, longitude)
           : null;
 
+      final trip = state.currentTrip;
+      if (trip == null) return false;
+
       final response = await ApiService.post<Map<String, dynamic>>(
         AppConfig.updateLocationEndpoint,
         data: {
-          'trip_id': state.currentTrip?.id,
+          // Backend expects Trip.trip_id (string), not integer PK
+          'trip_id': trip.tripId,
           'latitude': latitude,
           'longitude': longitude,
-          'address': address,
-          'speed': speed,
-          'heading': heading,
-          'accuracy': accuracy,
+          if (address != null) 'address': address,
+          if (speed != null) 'speed': speed,
+          if (heading != null) 'heading': heading,
+          if (accuracy != null) 'accuracy': accuracy,
           if (h3Index != null) 'h3_index': h3Index,
           if (h3Index != null) 'h3_resolution': TruckH3Service.routeResolution,
         },
@@ -527,6 +547,49 @@ class TripNotifier extends StateNotifier<TripState> {
     } catch (e) {
       return false;
     }
+  }
+
+  /// Starts/stops periodic POSTs to [AppConfig.updateLocationEndpoint] while [TripState.currentTrip] is active.
+  void _syncLiveLocationTimer() {
+    _liveLocationTimer?.cancel();
+    _liveLocationTimer = null;
+    final trip = state.currentTrip;
+    if (trip == null || !trip.isActive) {
+      return;
+    }
+
+    final interval = Duration(seconds: AppConfig.locationUpdateInterval);
+    _liveLocationTimer = Timer.periodic(interval, (_) {
+      unawaited(_postLiveLocationTick());
+    });
+    unawaited(_postLiveLocationTick());
+  }
+
+  Future<void> _postLiveLocationTick() async {
+    final trip = state.currentTrip;
+    if (trip == null || !trip.isActive) {
+      _syncLiveLocationTimer();
+      return;
+    }
+    final pos = await LocationService.getCurrentPosition();
+    if (pos == null) return;
+
+    double? speedKmh;
+    if (pos.speed >= 0) {
+      speedKmh = pos.speed * 3.6;
+    }
+    double? heading = pos.heading;
+    if (heading < 0) {
+      heading = null;
+    }
+
+    await updateLocation(
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      speed: speedKmh,
+      heading: heading,
+      accuracy: pos.accuracy,
+    );
   }
 
   Future<void> loadTripStudents(int tripId) async {
@@ -1451,6 +1514,7 @@ class TripNotifier extends StateNotifier<TripState> {
   void resetState() {
     print('🔄 DEBUG: Resetting trip state...');
     state = const TripState();
+    _syncLiveLocationTimer();
   }
 
   void updateTripInList(Trip updatedTrip) {
@@ -1621,6 +1685,7 @@ class TripNotifier extends StateNotifier<TripState> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _liveLocationTimer?.cancel();
     super.dispose();
   }
 }

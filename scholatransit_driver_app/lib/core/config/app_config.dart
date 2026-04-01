@@ -116,7 +116,8 @@ class AppConfig {
   static const double defaultLatitude = -1.286389;
   static const double defaultLongitude = 36.817223;
   static const double locationAccuracyThreshold = 10.0; // meters
-  static const int locationUpdateInterval = 30; // seconds
+  /// How often to POST live GPS to the backend while a trip is in progress (seconds).
+  static const int locationUpdateInterval = 5;
 
   // Trip Configuration
   static const int maxTripDuration = 8; // hours
