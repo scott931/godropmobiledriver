@@ -1447,6 +1447,7 @@ class TripNotifier extends StateNotifier<TripState> {
         'checkin_type': checkinType,
         if (trip?.vehicleId != null) 'vehicle_id': trip!.vehicleId,
         if (trip?.routeId != null) 'route_id': trip!.routeId,
+        if (trip != null && trip.tripId.isNotEmpty) 'trip_id': trip.tripId,
       };
 
       print(
@@ -1495,6 +1496,7 @@ class TripNotifier extends StateNotifier<TripState> {
         'checkin_type': checkinType,
         if (trip?.vehicleId != null) 'vehicle_id': trip!.vehicleId,
         if (trip?.routeId != null) 'route_id': trip!.routeId,
+        if (trip != null && trip.tripId.isNotEmpty) 'trip_id': trip.tripId,
       };
 
       final response = await ApiService.post<Map<String, dynamic>>(
@@ -1510,6 +1512,44 @@ class TripNotifier extends StateNotifier<TripState> {
       }
 
       final err = response.error ?? 'PIN verification failed';
+      return DriverCheckinResult.fail(err);
+    } catch (e) {
+      return DriverCheckinResult.fail('Network error: $e');
+    }
+  }
+
+  /// POST `/checkin/verify/manual/` — driver selects student from roster (no QR/PIN).
+  Future<DriverCheckinResult> verifyCheckinManual({
+    required int studentId,
+    required bool isPickup,
+    String? notes,
+  }) async {
+    try {
+      final trip = state.currentTrip;
+      final checkinType = isPickup ? 'pickup' : 'dropoff';
+
+      final body = <String, dynamic>{
+        'student_id': studentId,
+        'checkin_type': checkinType,
+        if (trip?.vehicleId != null) 'vehicle_id': trip!.vehicleId,
+        if (trip?.routeId != null) 'route_id': trip!.routeId,
+        if (trip != null && trip.tripId.isNotEmpty) 'trip_id': trip.tripId,
+        if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      };
+
+      final response = await ApiService.post<Map<String, dynamic>>(
+        AppConfig.checkinVerifyManualEndpoint,
+        data: body,
+      );
+
+      if (response.success) {
+        if (state.currentTrip != null) {
+          await loadTripStudents(state.currentTrip!.id);
+        }
+        return DriverCheckinResult.ok();
+      }
+
+      final err = response.error ?? 'Manual check-in failed';
       return DriverCheckinResult.fail(err);
     } catch (e) {
       return DriverCheckinResult.fail('Network error: $e');

@@ -339,6 +339,8 @@ class Trip {
     print('🔍 DEBUG: Parsing trip status: "$status"');
     final parsedStatus = switch (status?.toLowerCase()) {
       'pending' => TripStatus.pending,
+      // Backend uses "scheduled" for not-yet-started trips; UI treats as pending.
+      'scheduled' => TripStatus.pending,
       'in_progress' || 'in-progress' || 'in progress' => TripStatus.inProgress,
       'completed' => TripStatus.completed,
       'cancelled' => TripStatus.cancelled,

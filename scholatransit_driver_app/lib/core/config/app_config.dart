@@ -69,6 +69,8 @@ class AppConfig {
   static const String checkinVerifyQrEndpoint = '/checkin/verify/qr-code/';
   /// Driver PIN check-in: requires [student_id], [pin_code], [checkin_type].
   static const String checkinVerifyPinEndpoint = '/checkin/verify/pin-code/';
+  /// Driver manual roster check-in (no QR/PIN).
+  static const String checkinVerifyManualEndpoint = '/checkin/verify/manual/';
 
   // Notification Endpoints
   static const String notificationsEndpoint = '/notifications/';
