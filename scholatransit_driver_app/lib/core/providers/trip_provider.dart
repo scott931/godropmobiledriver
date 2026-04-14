@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/trip_model.dart';
 import '../models/test_trip_factory.dart';
@@ -24,12 +25,43 @@ class DriverCheckinResult {
       DriverCheckinResult._(false, message);
 }
 
+class TripCompletionSummary {
+  final String tripId;
+  final DateTime completedAt;
+  final String endLocation;
+  final int studentCount;
+  final int pickedUpCount;
+  final int droppedOffCount;
+  final double? distanceKm;
+  final int? durationMinutes;
+
+  const TripCompletionSummary({
+    required this.tripId,
+    required this.completedAt,
+    required this.endLocation,
+    required this.studentCount,
+    required this.pickedUpCount,
+    required this.droppedOffCount,
+    this.distanceKm,
+    this.durationMinutes,
+  });
+
+  String get message {
+    final distanceText =
+        distanceKm != null ? ', ${distanceKm!.toStringAsFixed(1)} km' : '';
+    final durationText =
+        durationMinutes != null ? ', ${durationMinutes} min' : '';
+    return 'Trip $tripId completed. Students: $studentCount (picked: $pickedUpCount, dropped: $droppedOffCount)$distanceText$durationText.';
+  }
+}
+
 class TripState {
   final bool isLoading;
   final List<Trip> trips;
   final Trip? currentTrip;
   final Trip? selectedTrip;
   final List<Student> students;
+  final TripCompletionSummary? lastTripSummary;
   final String? error;
 
   const TripState({
@@ -38,6 +70,7 @@ class TripState {
     this.currentTrip,
     this.selectedTrip,
     this.students = const [],
+    this.lastTripSummary,
     this.error,
   });
 
@@ -48,6 +81,8 @@ class TripState {
     bool clearCurrentTrip = false,
     Trip? selectedTrip,
     List<Student>? students,
+    TripCompletionSummary? lastTripSummary,
+    bool clearLastTripSummary = false,
     String? error,
   }) {
     return TripState(
@@ -56,6 +91,9 @@ class TripState {
       currentTrip: clearCurrentTrip ? null : (currentTrip ?? this.currentTrip),
       selectedTrip: selectedTrip ?? this.selectedTrip,
       students: students ?? this.students,
+      lastTripSummary: clearLastTripSummary
+          ? null
+          : (lastTripSummary ?? this.lastTripSummary),
       error: error,
     );
   }
@@ -77,6 +115,82 @@ class TripNotifier extends StateNotifier<TripState> {
       state = state.copyWith(currentTrip: Trip.fromJson(currentTrip));
     }
     _syncLiveLocationTimer();
+  }
+
+  String? _currentUserRole() {
+    final profile = StorageService.getUserProfile();
+    if (profile == null) return null;
+
+    Map<String, dynamic>? asMap(dynamic value) {
+      if (value is Map<String, dynamic>) return value;
+      if (value is Map) return Map<String, dynamic>.from(value);
+      return null;
+    }
+
+    final profileData = asMap(profile['profile_data']);
+    final role = profile['user_type'] ??
+        profile['role'] ??
+        profileData?['user_type'] ??
+        profileData?['role'];
+    if (role == null) return null;
+    final normalized = role.toString().trim().toLowerCase();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  bool _canManageStudentCheckin() {
+    final role = _currentUserRole();
+    return role == 'driver' || role == 'admin' || role == 'super_admin';
+  }
+
+  bool _isSchoolDriverForTripStart() {
+    final profile = StorageService.getUserProfile();
+    if (profile == null) return false;
+
+    Map<String, dynamic>? asMap(dynamic value) {
+      if (value is Map<String, dynamic>) return value;
+      if (value is Map) return Map<String, dynamic>.from(value);
+      return null;
+    }
+
+    String normalize(dynamic value) =>
+        value == null ? '' : value.toString().trim().toLowerCase();
+
+    final profileData = asMap(profile['profile_data']);
+    final driverInfo = asMap(profile['driver_info']) ??
+        asMap(profileData?['driver_info']) ??
+        asMap(profileData?['driver']);
+
+    final role = normalize(
+      profile['user_type'] ??
+          profile['role'] ??
+          profileData?['user_type'] ??
+          profileData?['role'] ??
+          driverInfo?['user_type'] ??
+          driverInfo?['role'],
+    );
+
+    if (role == 'school_driver' || role == 'school driver') {
+      return true;
+    }
+
+    final schoolId = profile['school'] ??
+        profile['school_id'] ??
+        profileData?['school'] ??
+        profileData?['school_id'] ??
+        driverInfo?['school'] ??
+        driverInfo?['school_id'];
+
+    // Accept canonical driver role only when linked to a school context.
+    return role == 'driver' && schoolId != null;
+  }
+
+  Map<String, dynamic> _driverRequestPayload() {
+    final role = _currentUserRole() ?? 'unknown';
+    return {
+      // Backend compatibility: authorize check-in/check-out through driver request context.
+      'driver_request': true,
+      'requested_by_role': role,
+    };
   }
 
   /// When [AppConfig.seedTestActiveTrip] is true, persists an in-progress trip for the
@@ -421,6 +535,29 @@ class TripNotifier extends StateNotifier<TripState> {
     double? longitude,
     String? notes,
   }) async {
+    if (!_isSchoolDriverForTripStart()) {
+      state = state.copyWith(
+        error: 'Only school drivers are allowed to start trips.',
+      );
+      return false;
+    }
+
+    final gpsEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!gpsEnabled) {
+      state = state.copyWith(
+        error:
+            'GPS is required to start trip. Please enable location services.',
+      );
+      return false;
+    }
+
+    if (latitude == null || longitude == null) {
+      state = state.copyWith(
+        error: 'Current GPS location is required to start trip.',
+      );
+      return false;
+    }
+
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -487,6 +624,30 @@ class TripNotifier extends StateNotifier<TripState> {
     }
   }
 
+  TripCompletionSummary _buildTripSummary(Trip trip) {
+    var pickedUpCount = 0;
+    var droppedOffCount = 0;
+
+    for (final student in state.students) {
+      if (student.status == StudentStatus.pickedUp) {
+        pickedUpCount++;
+      } else if (student.status == StudentStatus.droppedOff) {
+        droppedOffCount++;
+      }
+    }
+
+    return TripCompletionSummary(
+      tripId: trip.tripId,
+      completedAt: trip.actualEnd ?? DateTime.now(),
+      endLocation: trip.endLocation ?? 'Unknown location',
+      studentCount: state.students.length,
+      pickedUpCount: pickedUpCount,
+      droppedOffCount: droppedOffCount,
+      distanceKm: trip.distance,
+      durationMinutes: trip.duration,
+    );
+  }
+
   Future<bool> endTrip({
     required String endLocation,
     double? latitude,
@@ -495,6 +656,34 @@ class TripNotifier extends StateNotifier<TripState> {
   }) async {
     if (state.currentTrip == null) {
       state = state.copyWith(error: 'No active trip to end');
+      return false;
+    }
+
+    // Backend-aligned guard: do not allow trip end while checked-in students
+    // are still not checked out.
+    await loadTripStudents(state.currentTrip!.id);
+    final notCheckedOut = state.students.where(
+      (s) =>
+          s.status == StudentStatus.onBus || s.status == StudentStatus.pickedUp,
+    );
+    final pendingList = notCheckedOut.toList();
+    final pendingCheckoutCount = pendingList.length;
+    if (pendingCheckoutCount > 0) {
+      final pendingNames = pendingList
+          .map((s) => s.fullName.trim())
+          .where((name) => name.isNotEmpty)
+          .toList();
+      final previewNames = pendingNames.take(3).join(', ');
+      final hasMore = pendingNames.length > 3;
+      final namesSuffix = previewNames.isEmpty
+          ? ''
+          : hasMore
+              ? ' Pending: $previewNames and ${pendingNames.length - 3} more.'
+              : ' Pending: $previewNames.';
+      state = state.copyWith(
+        error:
+            'Cannot end trip. $pendingCheckoutCount checked-in student(s) still need checkout.$namesSuffix',
+      );
       return false;
     }
 
@@ -514,6 +703,7 @@ class TripNotifier extends StateNotifier<TripState> {
 
       if (response.success && response.data != null) {
         final trip = Trip.fromJson(response.data!);
+        final summary = _buildTripSummary(trip);
         await StorageService.clearCurrentTrip();
 
         // Update the trips list to reflect the new status
@@ -528,6 +718,7 @@ class TripNotifier extends StateNotifier<TripState> {
           isLoading: false,
           clearCurrentTrip: true,
           trips: updatedTrips,
+          lastTripSummary: summary,
           error: null,
         );
 
@@ -660,61 +851,33 @@ class TripNotifier extends StateNotifier<TripState> {
       List<Student> studentsList = [];
       String? lastError;
 
-      // 1. Try route-specific passengers endpoint (most likely to work)
+      // 1. Try trip-specific passengers endpoint (supported by backend)
       try {
-        print('🚀 DEBUG: Trying route passengers endpoint...');
-        final routeResponse = await ApiService.get<Map<String, dynamic>>(
-          '${AppConfig.routesListEndpoint}${trip.routeId}/passengers',
+        print('🚀 DEBUG: Trying trip passengers endpoint...');
+        final tripResponse = await ApiService.get<Map<String, dynamic>>(
+          '${AppConfig.tripDetailsEndpoint}${trip.tripId}/passengers/',
         );
 
-        if (routeResponse.success && routeResponse.data != null) {
-          final data = routeResponse.data!;
+        if (tripResponse.success && tripResponse.data != null) {
+          final data = tripResponse.data!;
           studentsList =
               (data['results'] as List?)
                   ?.map((student) => Student.fromJson(student))
                   .toList() ??
               [];
           print(
-            '✅ DEBUG: Route passengers endpoint successful: ${studentsList.length} students',
+            '✅ DEBUG: Trip passengers endpoint successful: ${studentsList.length} students',
           );
         } else {
-          lastError = routeResponse.error;
-          print('❌ DEBUG: Route passengers failed: $lastError');
+          lastError = tripResponse.error;
+          print('❌ DEBUG: Trip passengers failed: $lastError');
         }
       } catch (e) {
         lastError = e.toString();
-        print('❌ DEBUG: Route passengers exception: $e');
+        print('❌ DEBUG: Trip passengers exception: $e');
       }
 
-      // 2. Try trip-specific passengers endpoint if route failed
-      if (studentsList.isEmpty) {
-        try {
-          print('🚀 DEBUG: Trying trip passengers endpoint...');
-          final tripResponse = await ApiService.get<Map<String, dynamic>>(
-            '${AppConfig.tripDetailsEndpoint}${trip.tripId}/passengers',
-          );
-
-          if (tripResponse.success && tripResponse.data != null) {
-            final data = tripResponse.data!;
-            studentsList =
-                (data['results'] as List?)
-                    ?.map((student) => Student.fromJson(student))
-                    .toList() ??
-                [];
-            print(
-              '✅ DEBUG: Trip passengers endpoint successful: ${studentsList.length} students',
-            );
-          } else {
-            lastError = tripResponse.error;
-            print('❌ DEBUG: Trip passengers failed: $lastError');
-          }
-        } catch (e) {
-          lastError = e.toString();
-          print('❌ DEBUG: Trip passengers exception: $e');
-        }
-      }
-
-      // 3. Try general students endpoint with filtering (may have permission issues)
+      // 2. Try general students endpoint with filtering (may have permission issues)
       if (studentsList.isEmpty) {
         try {
           print('🚀 DEBUG: Trying general students endpoint...');
@@ -803,72 +966,40 @@ class TripNotifier extends StateNotifier<TripState> {
       List<Student> studentsList = [];
       String? lastError;
 
-      // 1. Try route-specific passengers endpoint (most likely to work)
+      // Backend has no /routes/{id}/passengers endpoint; use students list + route filter.
       try {
         print(
-          '🚀 DEBUG: Trying route passengers endpoint for route $routeId...',
+          '🚀 DEBUG: Trying general students endpoint for route $routeId...',
         );
-        final routeResponse = await ApiService.get<Map<String, dynamic>>(
-          '${AppConfig.routesListEndpoint}$routeId/passengers',
+        final studentsResponse = await ApiService.get<Map<String, dynamic>>(
+          '${AppConfig.studentsEndpoint}students/?limit=500',
         );
 
-        if (routeResponse.success && routeResponse.data != null) {
-          final data = routeResponse.data!;
-          studentsList =
+        if (studentsResponse.success && studentsResponse.data != null) {
+          final data = studentsResponse.data!;
+          final allStudents =
               (data['results'] as List?)
                   ?.map((student) => Student.fromJson(student))
                   .toList() ??
               [];
+
+          // Filter students by route ID
+          studentsList = allStudents.where((student) {
+            return student.assignedRoute == routeId;
+          }).toList();
+
           print(
-            '✅ DEBUG: Route passengers endpoint successful for route $routeId: ${studentsList.length} students',
+            '✅ DEBUG: General students endpoint successful for route $routeId: ${studentsList.length} students (filtered from ${allStudents.length} total)',
           );
         } else {
-          lastError = routeResponse.error;
+          lastError = studentsResponse.error;
           print(
-            '❌ DEBUG: Route passengers failed for route $routeId: $lastError',
+            '❌ DEBUG: General students failed for route $routeId: $lastError',
           );
         }
       } catch (e) {
         lastError = e.toString();
-        print('❌ DEBUG: Route passengers exception for route $routeId: $e');
-      }
-
-      // 2. Try general students endpoint with filtering (may have permission issues)
-      if (studentsList.isEmpty) {
-        try {
-          print(
-            '🚀 DEBUG: Trying general students endpoint for route $routeId...',
-          );
-          final studentsResponse = await ApiService.get<Map<String, dynamic>>(
-            '${AppConfig.studentsEndpoint}students/?limit=500',
-          );
-
-          if (studentsResponse.success && studentsResponse.data != null) {
-            final data = studentsResponse.data!;
-            final allStudents =
-                (data['results'] as List?)
-                    ?.map((student) => Student.fromJson(student))
-                    .toList() ??
-                [];
-
-            // Filter students by route ID
-            studentsList = allStudents.where((student) {
-              return student.assignedRoute == routeId;
-            }).toList();
-
-            print(
-              '✅ DEBUG: General students endpoint successful for route $routeId: ${studentsList.length} students (filtered from ${allStudents.length} total)',
-            );
-          } else {
-            lastError = studentsResponse.error;
-            print(
-              '❌ DEBUG: General students failed for route $routeId: $lastError',
-            );
-          }
-        } catch (e) {
-          lastError = e.toString();
-          print('❌ DEBUG: General students exception for route $routeId: $e');
-        }
+        print('❌ DEBUG: General students exception for route $routeId: $e');
       }
 
       // Update state based on results
@@ -919,61 +1050,33 @@ class TripNotifier extends StateNotifier<TripState> {
       // Try multiple endpoints in order of preference
       List<Student> studentsList = [];
 
-      // 1. Try route-specific passengers endpoint (most likely to work)
+      // 1. Try trip-specific passengers endpoint (supported by backend)
       try {
-        print('🚀 DEBUG: Trying route passengers endpoint for count...');
-        final routeResponse = await ApiService.get<Map<String, dynamic>>(
-          '${AppConfig.routesListEndpoint}${trip.routeId}/passengers',
+        print('🚀 DEBUG: Trying trip passengers endpoint for count...');
+        final tripResponse = await ApiService.get<Map<String, dynamic>>(
+          '${AppConfig.tripDetailsEndpoint}${trip.tripId}/passengers/',
         );
 
-        if (routeResponse.success && routeResponse.data != null) {
-          final data = routeResponse.data!;
+        if (tripResponse.success && tripResponse.data != null) {
+          final data = tripResponse.data!;
           studentsList =
               (data['results'] as List?)
                   ?.map((student) => Student.fromJson(student))
                   .toList() ??
               [];
           print(
-            '✅ DEBUG: Route passengers endpoint successful for count: ${studentsList.length} students',
+            '✅ DEBUG: Trip passengers endpoint successful for count: ${studentsList.length} students',
           );
         } else {
           print(
-            '❌ DEBUG: Route passengers failed for count: ${routeResponse.error}',
+            '❌ DEBUG: Trip passengers failed for count: ${tripResponse.error}',
           );
         }
       } catch (e) {
-        print('❌ DEBUG: Route passengers exception for count: $e');
+        print('❌ DEBUG: Trip passengers exception for count: $e');
       }
 
-      // 2. Try trip-specific passengers endpoint if route failed
-      if (studentsList.isEmpty) {
-        try {
-          print('🚀 DEBUG: Trying trip passengers endpoint for count...');
-          final tripResponse = await ApiService.get<Map<String, dynamic>>(
-            '${AppConfig.tripDetailsEndpoint}${trip.tripId}/passengers',
-          );
-
-          if (tripResponse.success && tripResponse.data != null) {
-            final data = tripResponse.data!;
-            studentsList =
-                (data['results'] as List?)
-                    ?.map((student) => Student.fromJson(student))
-                    .toList() ??
-                [];
-            print(
-              '✅ DEBUG: Trip passengers endpoint successful for count: ${studentsList.length} students',
-            );
-          } else {
-            print(
-              '❌ DEBUG: Trip passengers failed for count: ${tripResponse.error}',
-            );
-          }
-        } catch (e) {
-          print('❌ DEBUG: Trip passengers exception for count: $e');
-        }
-      }
-
-      // 3. Try general students endpoint with filtering (may have permission issues)
+      // 2. Try general students endpoint with filtering (may have permission issues)
       if (studentsList.isEmpty) {
         try {
           print('🚀 DEBUG: Trying general students endpoint for count...');
@@ -1472,6 +1575,12 @@ class TripNotifier extends StateNotifier<TripState> {
     }
 
     try {
+      if (!_canManageStudentCheckin()) {
+        return DriverCheckinResult.fail(
+          'Check-in is restricted to driver or admin with driver request.',
+        );
+      }
+
       final trip = state.currentTrip;
       final checkinType = isPickup ? 'pickup' : 'dropoff';
 
@@ -1481,6 +1590,7 @@ class TripNotifier extends StateNotifier<TripState> {
         if (trip?.vehicleId != null) 'vehicle_id': trip!.vehicleId,
         if (trip?.routeId != null) 'route_id': trip!.routeId,
         if (trip != null && trip.tripId.isNotEmpty) 'trip_id': trip.tripId,
+        ..._driverRequestPayload(),
       };
 
       print(
@@ -1520,6 +1630,12 @@ class TripNotifier extends StateNotifier<TripState> {
     }
 
     try {
+      if (!_canManageStudentCheckin()) {
+        return DriverCheckinResult.fail(
+          'Check-in is restricted to driver or admin with driver request.',
+        );
+      }
+
       final trip = state.currentTrip;
       final checkinType = isPickup ? 'pickup' : 'dropoff';
 
@@ -1530,6 +1646,7 @@ class TripNotifier extends StateNotifier<TripState> {
         if (trip?.vehicleId != null) 'vehicle_id': trip!.vehicleId,
         if (trip?.routeId != null) 'route_id': trip!.routeId,
         if (trip != null && trip.tripId.isNotEmpty) 'trip_id': trip.tripId,
+        ..._driverRequestPayload(),
       };
 
       final response = await ApiService.post<Map<String, dynamic>>(
@@ -1558,6 +1675,12 @@ class TripNotifier extends StateNotifier<TripState> {
     String? notes,
   }) async {
     try {
+      if (!_canManageStudentCheckin()) {
+        return DriverCheckinResult.fail(
+          'Check-in is restricted to driver or admin with driver request.',
+        );
+      }
+
       final trip = state.currentTrip;
       final checkinType = isPickup ? 'pickup' : 'dropoff';
 
@@ -1568,6 +1691,7 @@ class TripNotifier extends StateNotifier<TripState> {
         if (trip?.routeId != null) 'route_id': trip!.routeId,
         if (trip != null && trip.tripId.isNotEmpty) 'trip_id': trip.tripId,
         if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+        ..._driverRequestPayload(),
       };
 
       final response = await ApiService.post<Map<String, dynamic>>(

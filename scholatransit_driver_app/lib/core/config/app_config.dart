@@ -42,14 +42,14 @@ class AppConfig {
   static const String routesAssignmentsEndpoint = '/routes/assignments/';
 
   // Driver Endpoints
-  static const String driverProfileEndpoint = '/drivers/profile/';
-  static const String driverAssignmentsEndpoint = '/drivers/assignments/';
-  /// Driver-specific assignments (may include vehicle) - GET /drivers/me/assignments/
-  static const String driverMeAssignmentsEndpoint = '/drivers/me/assignments/';
+  static const String driverProfileEndpoint = '/users/drivers/profile/';
+  static const String driverAssignmentsEndpoint = '/routes/assignments/';
+  /// Driver-specific assignments (backend-compatible fallback via routes assignments)
+  static const String driverMeAssignmentsEndpoint = '/routes/assignments/';
   /// Driver's assigned vehicles - GET /drivers/me/vehicles/
   static const String driverMeVehiclesEndpoint = '/drivers/me/vehicles/';
-  /// Vehicle assignments (driver-vehicle link) - GET /vehicle-assignments/?driver_id=X
-  static const String vehicleAssignmentsEndpoint = '/vehicle-assignments/';
+  /// Vehicle assignment data is served from route assignments on this backend.
+  static const String vehicleAssignmentsEndpoint = '/routes/assignments/';
   /// Driver's assigned vehicles - GET /api/v1/users/admin/drivers/:id/assignments/
   static const String driverAdminAssignmentsEndpoint =
       '/users/admin/drivers/:id/assignments/';
@@ -110,7 +110,7 @@ class AppConfig {
   static const String emergencyUpdatesEndpoint = '/emergency/alerts/';
 
   // Communication Endpoints
-  static const String conversationsEndpoint = '/communication/conversations/';
+  static const String conversationsEndpoint = '/communication/chats/';
 
   // Schools Endpoints
   static const String schoolsEndpoint = '/schools/';

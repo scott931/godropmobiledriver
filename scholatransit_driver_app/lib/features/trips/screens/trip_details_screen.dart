@@ -4,9 +4,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/trip_provider.dart';
-import '../../../core/providers/location_provider.dart';
 import '../../../core/models/trip_model.dart';
 import '../../../core/theme/app_theme.dart';
+import '../utils/trip_action_handler.dart';
 
 class TripDetailsScreen extends ConsumerStatefulWidget {
   final int tripId;
@@ -1096,95 +1096,12 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
   }
 
   Future<void> _startTrip(Trip trip) async {
-    // Get current location
-    final locationState = ref.read(locationProvider);
-    final currentPosition = locationState.currentPosition;
-
-    if (currentPosition == null) {
-      // Try to get current position if not available
-      await ref.read(locationProvider.notifier).getCurrentPosition();
-      final updatedPosition = ref.read(locationProvider).currentPosition;
-
-      if (updatedPosition == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Unable to get current location. Please enable location services.',
-              ),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
-        }
-        return;
-      }
-    }
-
-    final position =
-        currentPosition ?? ref.read(locationProvider).currentPosition!;
-
-    final success = await ref
-        .read(tripProvider.notifier)
-        .startTrip(
-          trip.tripId,
-          startLocation: trip.startLocation ?? 'Unknown Location',
-          latitude: position.latitude,
-          longitude: position.longitude,
-        );
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Trip ${trip.tripId} started successfully'),
-          backgroundColor: AppTheme.successColor,
-        ),
-      );
-    }
+    if (!mounted) return;
+    await TripActionHandler.startTrip(ref: ref, context: context, trip: trip);
   }
 
   Future<void> _endTrip(Trip trip) async {
-    // Get current location
-    final locationState = ref.read(locationProvider);
-    final currentPosition = locationState.currentPosition;
-
-    if (currentPosition == null) {
-      // Try to get current position if not available
-      await ref.read(locationProvider.notifier).getCurrentPosition();
-      final updatedPosition = ref.read(locationProvider).currentPosition;
-
-      if (updatedPosition == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Unable to get current location. Please enable location services.',
-              ),
-              backgroundColor: AppTheme.errorColor,
-            ),
-          );
-        }
-        return;
-      }
-    }
-
-    final position =
-        currentPosition ?? ref.read(locationProvider).currentPosition!;
-
-    final success = await ref
-        .read(tripProvider.notifier)
-        .endTrip(
-          endLocation: trip.endLocation ?? 'Unknown Location',
-          latitude: position.latitude,
-          longitude: position.longitude,
-        );
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Trip ${trip.tripId} ended successfully'),
-          backgroundColor: AppTheme.successColor,
-        ),
-      );
-    }
+    if (!mounted) return;
+    await TripActionHandler.endTrip(ref: ref, context: context, trip: trip);
   }
 }

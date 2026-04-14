@@ -592,7 +592,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       Map<String, dynamic>? driverData;
       ApiResponse<Map<String, dynamic>>? lastResponse;
 
-      // 1. Try /drivers/profile/ first (driver-specific endpoint)
+      // 1. Try /users/drivers/profile/ first (driver-specific endpoint)
       // Cache-bust to ensure we get fresh status when admin suspends/inactivates
       print(
         '🔐 DEBUG: Trying ${AppConfig.driverProfileEndpoint}',
@@ -609,7 +609,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             _extractUserFromResponse(data);
         if (extracted != null && extracted.isNotEmpty) {
           driverData = _mergeProfileDataFromRaw(extracted, data);
-          print('🔐 DEBUG: Got data from /drivers/profile/');
+          print('🔐 DEBUG: Got data from /users/drivers/profile/');
         }
       }
 
@@ -1421,7 +1421,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         data: updates,
       );
 
-      // Fallback to PUT /drivers/profile/ if PATCH /users/me/ fails (404, 405, etc.)
+      // Fallback to PUT /users/drivers/profile/ if PATCH /users/me/ fails (404, 405, etc.)
       if (!response.success || response.data == null) {
         response = await ApiService.put<Map<String, dynamic>>(
           AppConfig.driverProfileEndpoint,

@@ -10,7 +10,7 @@ class RouteState {
   final RouteInfo? routeDetails;
   final List<RouteStop> stops;
   final List<RouteAssignment> assignments;
-  /// Vehicles from /drivers/me/vehicles/ or similar direct vehicles API
+  /// Vehicles from /drivers/me/vehicles/ or route-assignment payloads
   final List<Map<String, dynamic>> vehicles;
   final String? error;
 
@@ -205,7 +205,7 @@ class RouteNotifier extends StateNotifier<RouteState> {
         }
       }
 
-      // 3. Fallback: Try /vehicle-assignments/?driver_id=X - same structure desktop may use
+      // 3. Fallback: query route assignments with driver_id for vehicle context
       if (driverId != null && vehicles.isEmpty) {
         final vaResp = await ApiService.get<Map<String, dynamic>>(
           AppConfig.vehicleAssignmentsEndpoint,
@@ -246,7 +246,7 @@ class RouteNotifier extends StateNotifier<RouteState> {
       }
 
       if (driverId != null) {
-        // 1. Try /drivers/me/assignments/ - driver-specific (no query param)
+        // 1. Try driver assignments endpoint (mapped to /routes/assignments/)
         var response = await ApiService.get<Map<String, dynamic>>(
           AppConfig.driverMeAssignmentsEndpoint,
         );
@@ -311,7 +311,7 @@ class RouteNotifier extends StateNotifier<RouteState> {
           }
         }
 
-        // 4. Try /drivers/assignments/ (uses auth, returns current driver's)
+        // 4. Final fallback: assignment endpoint mapped to /routes/assignments/
         if (assignments.isEmpty) {
           response = await ApiService.get<Map<String, dynamic>>(
             AppConfig.driverAssignmentsEndpoint,

@@ -14,6 +14,7 @@ import 'package:geolocator/geolocator.dart' as geolocator;
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/trip_provider.dart';
+import '../../../core/providers/location_provider.dart';
 import '../../../core/models/trip_model.dart';
 import '../../../core/services/routing_service.dart';
 import '../../../core/services/realtime_distance_tracker.dart';
@@ -60,6 +61,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   final Set<BigInt> _traveledH3Cells = {};
   BigInt? _currentH3Cell;
   ProviderSubscription<TripState>? _tripSubscription;
+  ProviderSubscription<LocationState>? _locationSubscription;
   StreamSubscription<geolocator.Position>? _mapPositionSubscription;
   String? _trackedTripId;
   Timer? _vehicleMotionTimer;
@@ -103,12 +105,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       tripProvider,
       _handleTripStateChange,
     );
+    _locationSubscription = ref.listenManual<LocationState>(
+      locationProvider,
+      _handleLocationStateChange,
+    );
   }
 
   @override
   void dispose() {
     _mapPositionSubscription?.cancel();
     _tripSubscription?.close();
+    _locationSubscription?.close();
     _vehicleMotionTimer?.cancel();
     _stationaryPulseTimer?.cancel();
     _vehicleMarkerImageBytes = null;
@@ -134,6 +141,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _clearRoutePolyline();
       _stopDistanceTracking();
     }
+  }
+
+  void _handleLocationStateChange(
+    LocationState? previous,
+    LocationState next,
+  ) {
+    if (!mounted) return;
+    final p = next.currentPosition;
+    if (p == null) return;
+
+    // Ignore repeated identical fixes from resolver/provider fan-out.
+    if (previous?.currentPosition != null) {
+      final prev = previous!.currentPosition!;
+      if (prev.latitude == p.latitude && prev.longitude == p.longitude) {
+        return;
+      }
+    }
+    _onMapGpsPosition(p);
   }
 
   void _initializeMap() async {
@@ -912,6 +937,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (!mounted) return;
     _handleIncomingVehicleLocation(position);
     RealtimeDistanceTracker.forceDistanceUpdate();
+    _updateRouteLineForProgress();
     if (AppConfig.enableH3Tracking) {
       _updateH3FromPosition(position);
     }
