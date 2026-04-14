@@ -191,11 +191,41 @@ class LocationServiceResolver {
     return status;
   }
 
+  /// Listen to GPS fixes without restarting the underlying stream.
+  /// Use when `getServiceStatus()['is_tracking']` is already true (e.g. after `initialize`)
+  /// so the map still receives emulator / `adb emu geo fix` updates.
+  static StreamSubscription<Position>? subscribeToPositionUpdates(
+    void Function(Position position) onData,
+  ) {
+    if (_streamFirstService == null || !_streamFirstService!.isTracking) {
+      print(
+        '⚠️ LocationServiceResolver.subscribeToPositionUpdates: stream not ready',
+      );
+      return null;
+    }
+    return _streamFirstService!.positionStream.listen(onData);
+  }
+
   /// Force accept a location (for emergency situations)
   static void forceAcceptLocation(Position position) {
     if (_streamFirstService != null) {
       _streamFirstService!.forceAcceptLocation(position);
     }
+  }
+
+  /// Pushes a fix into the shared position stream so MapScreen moves the puck
+  /// without real GPS. Starts tracking if needed (requires location permission).
+  static Future<void> injectSimulatedGps(Position position) async {
+    if (!_isInitialized || _streamFirstService == null) {
+      final ok = await initialize();
+      if (!ok || _streamFirstService == null) {
+        print(
+          '⚠️ LocationServiceResolver.injectSimulatedGps: could not start stream',
+        );
+        return;
+      }
+    }
+    _streamFirstService!.forceAcceptLocation(position);
   }
 
   /// Force restart location service (for debugging)

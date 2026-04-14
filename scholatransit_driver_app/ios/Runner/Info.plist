@@ -45,5 +45,16 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>GoDrop needs location to show live trip tracking and navigation.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>GoDrop needs background location during active trips so parents can see live vehicle movement.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>GoDrop uses your location in the background only while an active trip is running.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>fetch</string>
+	</array>
 </dict>
 </plist>

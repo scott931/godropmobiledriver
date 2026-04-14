@@ -4,9 +4,10 @@ import '../config/app_config.dart';
 import '../models/parent_trip_model.dart';
 import '../models/parent_model.dart';
 import 'api_service.dart';
+import 'location_service_resolver.dart';
 
 class ParentTrackingService {
-  static StreamSubscription<Position>? _locationSubscription;
+  static bool _resolverTrackingStarted = false;
   static final StreamController<ParentTrip> _tripController =
       StreamController<ParentTrip>.broadcast();
   static final StreamController<Map<String, dynamic>> _etaController =
@@ -117,16 +118,16 @@ class ParentTrackingService {
   /// Start real-time tracking for a trip
   static Future<bool> startTripTracking(int tripId) async {
     try {
-      // Start location stream
-      _locationSubscription =
-          Geolocator.getPositionStream(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.medium,
-              distanceFilter: 50,
-            ),
-          ).listen((position) {
-            _updateTripLocation(tripId, position);
-          });
+      // Start shared location pipeline (single source of truth)
+      final started = await LocationServiceResolver.startTracking(
+        onLocationUpdate: (position) {
+          _updateTripLocation(tripId, position);
+        },
+      );
+      _resolverTrackingStarted = started;
+      if (!started) {
+        return false;
+      }
 
       // Start trip updates
       _startTripUpdates(tripId);
@@ -139,8 +140,10 @@ class ParentTrackingService {
 
   /// Stop real-time tracking
   static Future<void> stopTripTracking() async {
-    await _locationSubscription?.cancel();
-    _locationSubscription = null;
+    if (_resolverTrackingStarted) {
+      await LocationServiceResolver.stopTracking();
+      _resolverTrackingStarted = false;
+    }
   }
 
   /// Update trip location and calculate ETA
@@ -268,7 +271,10 @@ class ParentTrackingService {
 
   /// Dispose resources
   static Future<void> dispose() async {
-    await _locationSubscription?.cancel();
+    if (_resolverTrackingStarted) {
+      await LocationServiceResolver.stopTracking();
+      _resolverTrackingStarted = false;
+    }
     await _tripController.close();
     await _etaController.close();
   }

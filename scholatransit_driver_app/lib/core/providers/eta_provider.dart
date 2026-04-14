@@ -4,7 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import '../models/eta_model.dart';
 import '../models/trip_model.dart';
 import '../services/eta_service.dart';
-import '../services/location_service.dart';
+import '../services/location_service_resolver.dart';
 
 class ETAState {
   final ETAInfo? currentETA;
@@ -53,8 +53,7 @@ class ETAState {
 
 class ETANotifier extends StateNotifier<ETAState> {
   Timer? _etaUpdateTimer;
-  Timer? _locationUpdateTimer;
-  StreamSubscription<Position>? _locationSubscription;
+  bool _resolverStarted = false;
   Trip? _currentTrip;
 
   ETANotifier() : super(const ETAState()) {
@@ -64,11 +63,11 @@ class ETANotifier extends StateNotifier<ETAState> {
   /// Initialize location tracking for ETA calculations
   void _initializeLocationTracking() async {
     try {
-      await LocationService.init();
-      _locationSubscription = LocationService.locationStream.listen(
-        (position) => _onLocationUpdate(position),
-        onError: (error) => _onLocationError(error),
+      final started = await LocationServiceResolver.startTracking(
+        onLocationUpdate: _onLocationUpdate,
+        onLocationError: (error) => _onLocationError(error),
       );
+      _resolverStarted = started;
     } catch (e) {
       state = state.copyWith(
         error: 'Failed to initialize location tracking: $e',
@@ -122,7 +121,7 @@ class ETANotifier extends StateNotifier<ETAState> {
   Future<void> _calculateETAForCurrentTrip() async {
     if (_currentTrip == null) return;
 
-    final currentPosition = LocationService.currentPosition;
+    final currentPosition = await LocationServiceResolver.getCurrentPosition();
     if (currentPosition == null) {
       print('❌ ETA Provider: No current position available');
       return;
@@ -185,7 +184,7 @@ class ETANotifier extends StateNotifier<ETAState> {
 
   /// Calculate ETA for a specific trip (without starting tracking)
   Future<ETAInfo?> calculateETAForTrip(Trip trip) async {
-    final currentPosition = LocationService.currentPosition;
+    final currentPosition = await LocationServiceResolver.getCurrentPosition();
     if (currentPosition == null) {
       print('❌ ETA Provider: No current position available');
       return null;
@@ -309,8 +308,9 @@ class ETANotifier extends StateNotifier<ETAState> {
   @override
   void dispose() {
     _etaUpdateTimer?.cancel();
-    _locationUpdateTimer?.cancel();
-    _locationSubscription?.cancel();
+    if (_resolverStarted) {
+      LocationServiceResolver.stopTracking();
+    }
     super.dispose();
   }
 }

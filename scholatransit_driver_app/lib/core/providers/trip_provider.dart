@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/trip_model.dart';
+import '../models/test_trip_factory.dart';
 import '../models/student_model.dart';
 import '../models/parent_model.dart';
 import '../services/api_service.dart';
@@ -75,6 +76,35 @@ class TripNotifier extends StateNotifier<TripState> {
     if (currentTrip != null) {
       state = state.copyWith(currentTrip: Trip.fromJson(currentTrip));
     }
+    _syncLiveLocationTimer();
+  }
+
+  /// When [AppConfig.seedTestActiveTrip] is true, persists an in-progress trip for the
+  /// logged-in driver so map/schedule flows work without backend data.
+  Future<void> seedTestActiveTripIfEnabled() async {
+    if (!AppConfig.seedTestActiveTrip) return;
+    final driverId = StorageService.getDriverId();
+    if (driverId == null) return;
+    final current = state.currentTrip;
+    if (current != null &&
+        current.isActive &&
+        !current.tripId.startsWith('TEST_')) {
+      return;
+    }
+
+    final variant = AppConfig.testTripSeedVariant.toLowerCase();
+    final trip = variant == 'pending'
+        ? TestTripFactory.pendingTrip(driverId: driverId)
+        : TestTripFactory.activeTrip(driverId: driverId);
+    await StorageService.saveCurrentTrip(trip.toJson());
+
+    final withoutTest =
+        state.trips.where((t) => t.tripId != trip.tripId).toList();
+    state = state.copyWith(
+      currentTrip: trip,
+      trips: [...withoutTest, trip],
+      error: null,
+    );
     _syncLiveLocationTimer();
   }
 
@@ -576,6 +606,9 @@ class TripNotifier extends StateNotifier<TripState> {
   }
 
   Future<void> _postLiveLocationTick() async {
+    if (AppConfig.useSimulatedVehicleMotion) {
+      return;
+    }
     final trip = state.currentTrip;
     if (trip == null || !trip.isActive) {
       _syncLiveLocationTimer();

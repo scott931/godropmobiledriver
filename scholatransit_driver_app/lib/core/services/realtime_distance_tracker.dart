@@ -6,6 +6,7 @@ import 'routing_service.dart';
 
 class RealtimeDistanceTracker {
   static Timer? _distanceUpdateTimer;
+  static StreamSubscription<Position>? _positionStreamSubscription;
   static bool _isTracking = false;
   static Trip? _currentTrip;
   static double? _totalTripDistance;
@@ -48,7 +49,7 @@ class RealtimeDistanceTracker {
         return false;
       }
 
-      // Ensure location service is running
+      // Ensure location service is running and distance reacts to each GPS fix
       if (!LocationServiceResolver.getServiceStatus()['is_tracking']) {
         print('⚠️ Location service not running, starting it...');
         final locationStarted = await LocationServiceResolver.startTracking(
@@ -60,6 +61,17 @@ class RealtimeDistanceTracker {
           print('❌ Failed to start location service for distance tracking');
           _onDistanceError?.call('Failed to start location service');
           return false;
+        }
+      } else {
+        await _positionStreamSubscription?.cancel();
+        _positionStreamSubscription =
+            LocationServiceResolver.subscribeToPositionUpdates(
+              _handleLocationUpdate,
+            );
+        if (_positionStreamSubscription == null) {
+          print(
+            '⚠️ Distance tracker: could not attach GPS listener (stream not ready)',
+          );
         }
       }
 
@@ -297,6 +309,9 @@ class RealtimeDistanceTracker {
   static void stopDistanceTracking() {
     try {
       print('📏 RealtimeDistanceTracker: Stopping distance tracking...');
+
+      _positionStreamSubscription?.cancel();
+      _positionStreamSubscription = null;
 
       _distanceUpdateTimer?.cancel();
       _distanceUpdateTimer = null;

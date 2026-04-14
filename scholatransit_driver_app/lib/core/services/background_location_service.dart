@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:location/location.dart' as location_package;
+import 'package:flutter/services.dart';
 
 class BackgroundLocationService {
+  static const MethodChannel _foregroundChannel = MethodChannel(
+    'com.scholatransit.driver/foreground_location_service',
+  );
   static bool _isBackgroundModeEnabled = false;
   static StreamSubscription<Position>? _backgroundSubscription;
 
@@ -96,6 +100,8 @@ class BackgroundLocationService {
         '🌙 BackgroundLocationService: Starting background location tracking...',
       );
 
+      await _startNativeForegroundService();
+
       // Start background location stream
       _backgroundSubscription =
           Geolocator.getPositionStream(
@@ -120,6 +126,10 @@ class BackgroundLocationService {
       print('✅ BackgroundLocationService: Background tracking started');
       return true;
     } catch (e) {
+      await _backgroundSubscription?.cancel();
+      _backgroundSubscription = null;
+      _isBackgroundModeEnabled = false;
+      await _stopNativeForegroundService();
       print(
         '❌ BackgroundLocationService: Failed to start background tracking: $e',
       );
@@ -140,6 +150,7 @@ class BackgroundLocationService {
       await _backgroundSubscription?.cancel();
       _backgroundSubscription = null;
       _isBackgroundModeEnabled = false;
+      await _stopNativeForegroundService();
 
       print('✅ BackgroundLocationService: Background tracking stopped');
     } catch (e) {
@@ -218,6 +229,24 @@ class BackgroundLocationService {
     } catch (e) {
       print('❌ Could not check battery optimization status: $e');
       return false;
+    }
+  }
+
+  static Future<void> _startNativeForegroundService() async {
+    try {
+      await _foregroundChannel.invokeMethod('startForegroundLocationService');
+      print('✅ Native foreground service started');
+    } catch (e) {
+      print('⚠️ Could not start native foreground service: $e');
+    }
+  }
+
+  static Future<void> _stopNativeForegroundService() async {
+    try {
+      await _foregroundChannel.invokeMethod('stopForegroundLocationService');
+      print('✅ Native foreground service stopped');
+    } catch (e) {
+      print('⚠️ Could not stop native foreground service: $e');
     }
   }
 

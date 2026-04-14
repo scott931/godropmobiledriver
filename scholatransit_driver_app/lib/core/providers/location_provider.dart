@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import '../services/location_service.dart';
-import '../services/firestore_location_service.dart';
+import '../services/location_service_resolver.dart';
 import '../services/api_service.dart';
 import '../config/app_config.dart';
 import '../models/location_model.dart';
@@ -43,6 +43,8 @@ class LocationState {
 }
 
 class LocationNotifier extends StateNotifier<LocationState> {
+  bool _resolverStarted = false;
+
   LocationNotifier() : super(const LocationState()) {
     _initializeLocationTracking();
   }
@@ -145,38 +147,27 @@ class LocationNotifier extends StateNotifier<LocationState> {
 
   Future<void> _initializeLocationTracking() async {
     try {
-      await LocationService.startLocationTracking();
-
-      // Listen to location updates
-      LocationService.locationStream.listen(
-        (position) {
+      final started = await LocationServiceResolver.startTracking(
+        onLocationUpdate: (position) {
           state = state.copyWith(
             isTracking: true,
             currentPosition: position,
             error: null,
           );
-
-          // Get address for current position
           _getCurrentAddress(position);
         },
-        onError: (error) {
-          state = state.copyWith(error: error.toString());
+        onLocationError: (error) {
+          state = state.copyWith(error: error);
         },
       );
 
-      // Start Firestore location updates
-      // This will automatically send location updates to Firestore
-      try {
-        await FirestoreLocationService.startLocationUpdates(
-          onError: (error) {
-            print('⚠️ Firestore location update error: $error');
-            // Don't update state error as this is a background service
-          },
+      if (!started) {
+        state = state.copyWith(
+          error: 'Failed to initialize resolver-based location tracking',
         );
-      } catch (e) {
-        print('⚠️ Failed to start Firestore location updates: $e');
-        // Continue without Firestore updates - location tracking still works
+        return;
       }
+      _resolverStarted = true;
     } catch (e) {
       state = state.copyWith(
         error: 'Failed to initialize location tracking: $e',
@@ -202,20 +193,25 @@ class LocationNotifier extends StateNotifier<LocationState> {
 
   Future<void> startTracking() async {
     try {
-      await LocationService.startLocationTracking();
-      
-      // Start Firestore location updates
-      try {
-        await FirestoreLocationService.startLocationUpdates(
-          onError: (error) {
-            print('⚠️ Firestore location update error: $error');
-          },
-        );
-      } catch (e) {
-        print('⚠️ Failed to start Firestore location updates: $e');
-        // Continue without Firestore updates
+      final started = await LocationServiceResolver.startTracking(
+        onLocationUpdate: (position) {
+          state = state.copyWith(
+            isTracking: true,
+            currentPosition: position,
+            error: null,
+          );
+          _getCurrentAddress(position);
+        },
+        onLocationError: (error) {
+          state = state.copyWith(error: error);
+        },
+      );
+
+      if (!started) {
+        state = state.copyWith(error: 'Failed to start location tracking');
+        return;
       }
-      
+      _resolverStarted = true;
       state = state.copyWith(isTracking: true, error: null);
     } catch (e) {
       state = state.copyWith(error: 'Failed to start location tracking: $e');
@@ -224,15 +220,11 @@ class LocationNotifier extends StateNotifier<LocationState> {
 
   Future<void> stopTracking() async {
     try {
-      await LocationService.stopLocationTracking();
-      
-      // Stop Firestore location updates
-      try {
-        await FirestoreLocationService.stopLocationUpdates();
-      } catch (e) {
-        print('⚠️ Failed to stop Firestore location updates: $e');
+      if (_resolverStarted) {
+        await LocationServiceResolver.stopTracking();
+        _resolverStarted = false;
       }
-      
+
       state = state.copyWith(isTracking: false, error: null);
     } catch (e) {
       state = state.copyWith(error: 'Failed to stop location tracking: $e');
@@ -241,7 +233,7 @@ class LocationNotifier extends StateNotifier<LocationState> {
 
   Future<Position?> getCurrentPosition() async {
     try {
-      final position = await LocationService.getCurrentPosition();
+      final position = await LocationServiceResolver.getCurrentPosition();
       if (position != null) {
         state = state.copyWith(currentPosition: position, error: null);
         await _getCurrentAddress(position);

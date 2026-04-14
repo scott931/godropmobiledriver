@@ -218,6 +218,20 @@ class StreamFirstLocationService {
 
   /// Determine if position should be accepted (with hysteresis)
   bool _shouldAcceptPosition(Position position, double score) {
+    // Real movement (emulator adb geo, vehicle): always accept so the app is not stuck
+    // on a stale fix when the quality heuristic is borderline.
+    if (_lastPosition != null) {
+      final moved = Geolocator.distanceBetween(
+        _lastPosition!.latitude,
+        _lastPosition!.longitude,
+        position.latitude,
+        position.longitude,
+      );
+      if (moved >= 5.0) {
+        return true;
+      }
+    }
+
     // Always accept if score is above accept threshold
     if (score >= _acceptThreshold) {
       return true;

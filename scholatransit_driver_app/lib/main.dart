@@ -11,6 +11,7 @@ import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/config/app_config.dart';
 import 'core/providers/auth_provider.dart';
+import 'core/providers/trip_provider.dart';
 import 'core/services/storage_service.dart';
 import 'core/services/api_service.dart';
 import 'core/services/location_health_monitor.dart';
@@ -21,6 +22,8 @@ import 'core/services/push_notification_service.dart';
 import 'core/services/firebase_notification_service.dart';
 import 'core/services/navigation_service.dart';
 import 'core/services/truck_h3_service.dart';
+import 'core/services/vehicle_movement_simulator.dart';
+import 'core/services/background_location_service.dart';
 import 'core/widgets/system_back_button_handler.dart';
 
 void main() async {
@@ -88,11 +91,15 @@ Future<void> _initializeServices() async {
   // Start background message checking service
   // This will check for new messages even when app is in background
   BackgroundMessageService.startBackgroundChecking();
+
+  // Prepare background location capabilities (best effort).
+  await BackgroundLocationService.initialize();
 }
 
 Future<void> _requestPermissions() async {
   // Request location permission
   await Permission.locationWhenInUse.request();
+  await Permission.locationAlways.request();
 
   // Request notification permission
   await Permission.notification.request();
@@ -118,6 +125,12 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
     WidgetsBinding.instance.addObserver(this);
     _startStatusCheckIfAuthenticated();
     _registerSuspensionCallback();
+    if (AppConfig.useSimulatedVehicleMotion) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        VehicleMovementSimulator.attach(ref);
+      });
+    }
   }
 
   void _registerSuspensionCallback() {
@@ -129,6 +142,7 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
 
   @override
   void dispose() {
+    VehicleMovementSimulator.detach();
     _statusCheckTimer?.cancel();
     _statusCheckTimer = null;
     WidgetsBinding.instance.removeObserver(this);
@@ -148,13 +162,27 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    BackgroundLocationService.handleAppLifecycleChange(state.name);
     if (state == AppLifecycleState.resumed) {
       _startStatusCheckIfAuthenticated();
+      final tripState = ref.read(tripProvider);
+      if (tripState.currentTrip != null) {
+        unawaited(BackgroundLocationService.stopBackgroundTracking());
+      }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
       _statusCheckTimer?.cancel();
       _statusCheckTimer = null;
+      final tripState = ref.read(tripProvider);
+      if (tripState.currentTrip != null) {
+        unawaited(
+          BackgroundLocationService.startBackgroundTracking(
+            onLocationError:
+                (error) => print('❌ Background location lifecycle error: $error'),
+          ),
+        );
+      }
     }
   }
 
@@ -171,6 +199,14 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
             ref.read(appRouterProvider).go('/login');
           });
         }
+      } else if (next.isAuthenticated &&
+          next.driver != null &&
+          AppConfig.seedTestActiveTrip &&
+          previous?.isAuthenticated != true) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          unawaited(ref.read(tripProvider.notifier).seedTestActiveTripIfEnabled());
+        });
       }
     });
     return ScreenUtilInit(

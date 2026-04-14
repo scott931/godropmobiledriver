@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import '../models/trip_model.dart';
 import '../models/eta_model.dart';
-import 'realtime_location_service.dart';
+import 'location_service_resolver.dart';
 import 'realtime_eta_updater.dart';
 
 class TripTrackingService {
@@ -47,18 +47,10 @@ class TripTrackingService {
       _onLocationUpdate = onLocationUpdate;
       _onETAUpdate = onETAUpdate;
 
-      // Initialize location service
-      final locationInitialized = await RealtimeLocationService.initialize();
-      if (!locationInitialized) {
-        print('❌ Failed to initialize location service');
-        return false;
-      }
-
       // Start location tracking
-      final locationStarted = await RealtimeLocationService.startTracking(
+      final locationStarted = await LocationServiceResolver.startTracking(
         onLocationUpdate: _handleLocationUpdate,
         onLocationError: _handleLocationError,
-        onSignificantLocationChange: _handleSignificantLocationChange,
       );
 
       if (!locationStarted) {
@@ -76,7 +68,7 @@ class TripTrackingService {
 
       if (!etaStarted) {
         print('❌ Failed to start ETA updates');
-        await RealtimeLocationService.stopTracking();
+        await LocationServiceResolver.stopTracking();
         return false;
       }
 
@@ -210,7 +202,7 @@ class TripTrackingService {
       RealtimeETAUpdater.stopETAUpdates();
 
       // Stop location tracking
-      await RealtimeLocationService.stopTracking();
+      await LocationServiceResolver.stopTracking();
 
       // Clear state
       _activeTrip = null;
@@ -236,14 +228,14 @@ class TripTrackingService {
 
   /// Get current location
   static Position? get currentLocation =>
-      RealtimeLocationService.currentPosition;
+      LocationServiceResolver.getServiceStatus()['last_position'] as Position?;
 
   /// Check if tracking is active
   static bool get isTracking => _isTracking;
 
   /// Get comprehensive tracking statistics
   static Map<String, dynamic> getTrackingStats() {
-    final locationStats = RealtimeLocationService.getLocationStats();
+    final locationStats = LocationServiceResolver.getServiceStatus();
     final etaStats = RealtimeETAUpdater.getETAStats();
 
     return {
@@ -277,7 +269,7 @@ class TripTrackingService {
   static Future<void> pauseTracking() async {
     if (_isTracking) {
       print('⏸️ TripTrackingService: Pausing tracking...');
-      await RealtimeLocationService.stopTracking();
+      await LocationServiceResolver.stopTracking();
       RealtimeETAUpdater.stopETAUpdates();
     }
   }

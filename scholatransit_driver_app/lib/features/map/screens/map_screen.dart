@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:geocoding/geocoding.dart' as geocoding;
+import 'package:geolocator/geolocator.dart' as geolocator;
 import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/trip_provider.dart';
@@ -55,6 +59,39 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // H3 geospatial indexing (additive - only used when AppConfig.enableH3Tracking)
   final Set<BigInt> _traveledH3Cells = {};
   BigInt? _currentH3Cell;
+  ProviderSubscription<TripState>? _tripSubscription;
+  StreamSubscription<geolocator.Position>? _mapPositionSubscription;
+  String? _trackedTripId;
+  Timer? _vehicleMotionTimer;
+  DateTime? _motionSegmentStartAt;
+  Duration _motionSegmentDuration = const Duration(milliseconds: 800);
+  Point? _motionStartPoint;
+  Point? _motionTargetPoint;
+  double _vehicleBearing = 0.0;
+  double _targetVehicleBearing = 0.0;
+  double _lastKnownSpeedMps = 0.0;
+  DateTime? _lastGpsUpdateAt;
+  DateTime? _lastCameraUpdateAt;
+  DateTime? _lastMotionTickAt;
+  Uint8List? _vehicleMarkerImageBytes;
+  Point? _filteredGpsPoint;
+  double _lastSegmentDistanceMeters = 0.0;
+  double _lastAnimationProgress = 0.0;
+  String _lastMotionSource = 'raw';
+  double _deadReckoningDistanceMeters = 0.0;
+  Timer? _stationaryPulseTimer;
+  double _pulseRadius = 10.0;
+  bool _pulseGrowing = true;
+  static const String _vehicleSourceId = 'vehicle-puck-source';
+  static const String _vehicleLayerId = 'vehicle-puck-layer';
+  static const String _vehicleShadowLayerId = 'vehicle-puck-shadow-layer';
+  static const String _vehicleHaloLayerId = 'vehicle-puck-halo-layer';
+  static const String _vehicleIconImageId = 'vehicle-puck-icon';
+  static const String _vehicleShadowImageId = 'vehicle-puck-shadow';
+
+  /// Avoid rebuilding [MapWidget] every 16ms; puck/camera update via Mapbox style APIs only.
+  static const Duration _motionUiSetStateMinInterval = Duration(milliseconds: 250);
+  DateTime? _lastMotionUiSetStateAt;
 
   @override
   void initState() {
@@ -62,6 +99,41 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeMap();
     });
+    _tripSubscription = ref.listenManual<TripState>(
+      tripProvider,
+      _handleTripStateChange,
+    );
+  }
+
+  @override
+  void dispose() {
+    _mapPositionSubscription?.cancel();
+    _tripSubscription?.close();
+    _vehicleMotionTimer?.cancel();
+    _stationaryPulseTimer?.cancel();
+    _vehicleMarkerImageBytes = null;
+    _stopDistanceTracking();
+    super.dispose();
+  }
+
+  void _handleTripStateChange(TripState? previous, TripState next) {
+    if (!mounted) return;
+
+    if (_mapboxMap != null && next.currentTrip != null) {
+      _loadTripRoute();
+      _addTripMarkers();
+
+      // Avoid restarting tracking for the same trip on every state emission.
+      final currentTripId = next.currentTrip!.tripId;
+      if (_trackedTripId != currentTripId) {
+        _trackedTripId = currentTripId;
+        _startDistanceTracking(next.currentTrip!);
+      }
+    } else if (_mapboxMap != null && next.currentTrip == null) {
+      _trackedTripId = null;
+      _clearRoutePolyline();
+      _stopDistanceTracking();
+    }
   }
 
   void _initializeMap() async {
@@ -91,10 +163,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         print('✅ Map initialized with LocationServiceResolver position');
         // Fly camera to the exact acquired GPS position
         if (_mapboxMap != null && _currentLocation != null) {
-          _mapboxMap!.flyTo(
-            CameraOptions(center: _currentLocation!, zoom: 16.0),
-            MapAnimationOptions(duration: 1200),
-          );
+          _animateCameraToPoint(_currentLocation!, forceImmediate: true);
         }
       } else {
         print(
@@ -110,31 +179,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final tripState = ref.watch(tripProvider);
-
-    // Watch for changes in trip state and update map accordingly
-    ref.listen(tripProvider, (previous, next) {
-      if (!mounted) return;
-
-      print('🔄 DEBUG: Trip provider state changed');
-      print('🔄 DEBUG: Previous currentTrip: ${previous?.currentTrip?.tripId}');
-      print('🔄 DEBUG: Next currentTrip: ${next.currentTrip?.tripId}');
-      print('🔄 DEBUG: Map ready: ${_mapboxMap != null}');
-
-      if (_mapboxMap != null && next.currentTrip != null) {
-        print('🔄 DEBUG: Triggering marker updates...');
-        _loadTripRoute();
-        _addTripMarkers();
-        _startDistanceTracking(next.currentTrip!);
-      } else if (_mapboxMap != null && next.currentTrip == null) {
-        print('🔄 DEBUG: No active trip - clearing route polyline...');
-        _clearRoutePolyline();
-        _stopDistanceTracking();
-      } else {
-        print(
-          '🔄 DEBUG: Skipping marker updates - map: ${_mapboxMap != null}, trip: ${next.currentTrip != null}',
-        );
-      }
-    });
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
@@ -161,6 +205,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     print('🗺️ DEBUG: Polyline annotation manager created');
 
                     _addTestMarker();
+                    await _setupVehiclePuckLayers();
                     _addCurrentLocationMarker();
 
                     // Force load active trips and then add markers
@@ -172,6 +217,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
                     print('🗺️ DEBUG: Calling _addTripMarkers()...');
                     _addTripMarkers();
+                    _handleTripStateChange(null, ref.read(tripProvider));
 
                     // H3 layer (additive - only when enabled)
                     if (AppConfig.enableH3Tracking) {
@@ -197,6 +243,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               destinationStreetName: _destinationStreetName,
             ),
           ),
+          if (AppConfig.showVehicleTrackingDebugOverlay)
+            Positioned(
+              top: 160.h,
+              left: 16.w,
+              child: _VehicleDebugOverlay(
+                speedMps: _lastKnownSpeedMps,
+                bearing: _vehicleBearing,
+                segmentMeters: _lastSegmentDistanceMeters,
+                animationMs: _motionSegmentDuration.inMilliseconds,
+                progress: _lastAnimationProgress,
+                source: _lastMotionSource,
+              ),
+            ),
 
           // Current Location Button
           Positioned(
@@ -353,38 +412,96 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  void _addCurrentLocationMarker() async {
-    if (_mapboxMap == null ||
-        _currentLocation == null ||
-        _pointAnnotationManager == null) {
+  Future<void> _addCurrentLocationMarker() async {
+    if (_mapboxMap == null || _currentLocation == null) {
       print('❌ Cannot add current location marker - missing dependencies');
       return;
     }
 
     try {
-      print(
-        '🔍 DEBUG: Adding current location marker at: ${_currentLocation!.coordinates.lat}, ${_currentLocation!.coordinates.lng}',
-      );
-
-      // Remove existing current location marker
-      if (_currentLocationAnnotation != null) {
-        await _pointAnnotationManager!.delete(_currentLocationAnnotation!);
-      }
-
-      // Create current location marker with dark green color
-      final currentLocationMarker = PointAnnotationOptions(
-        geometry: _currentLocation!,
-        image: await _createMarkerImage(Colors.green.shade800, '📍'),
-      );
-
-      _currentLocationAnnotation = await _pointAnnotationManager!.create(
-        currentLocationMarker,
-      );
-      print(
-        '✅ Current location marker added to map at: ${_currentLocation!.coordinates.lat}, ${_currentLocation!.coordinates.lng}',
-      );
+      await _updateVehiclePuckSource(_currentLocation!, _vehicleBearing);
     } catch (e) {
       print('❌ Error adding current location marker: $e');
+    }
+  }
+
+  /// Vehicle puck uses dedicated [GeoJsonSource] ids ([_vehicleSourceId], layers above).
+  /// Trip route uses [PolylineAnnotationManager] (annotation stack), not the same source.
+  Future<void> _setupVehiclePuckLayers() async {
+    if (_mapboxMap == null) return;
+    final style = _mapboxMap!.style;
+    try {
+      if (!await style.styleSourceExists(_vehicleSourceId)) {
+        await style.addSource(
+          GeoJsonSource(
+            id: _vehicleSourceId,
+            data: _vehicleFeatureCollectionJson(
+              _currentLocation ??
+                  Point(
+                    coordinates: Position(
+                      AppConfig.defaultLongitude,
+                      AppConfig.defaultLatitude,
+                    ),
+                  ),
+              _vehicleBearing,
+              _computeIconSizeForZoom(15.0),
+            ),
+          ),
+        );
+      }
+
+      await _ensureVehiclePuckImages();
+
+      if (!await style.styleLayerExists(_vehicleHaloLayerId)) {
+        await style.addLayer(
+          CircleLayer(
+            id: _vehicleHaloLayerId,
+            sourceId: _vehicleSourceId,
+            circleColor: Colors.blueAccent.value,
+            circleOpacity: 0.18,
+            circleRadius: _pulseRadius,
+            circlePitchAlignment: CirclePitchAlignment.MAP,
+            circlePitchScale: CirclePitchScale.MAP,
+          ),
+        );
+      }
+
+      if (!await style.styleLayerExists(_vehicleShadowLayerId)) {
+        await style.addLayer(
+          SymbolLayer(
+            id: _vehicleShadowLayerId,
+            sourceId: _vehicleSourceId,
+            iconImage: _vehicleShadowImageId,
+            iconAllowOverlap: true,
+            iconIgnorePlacement: true,
+            iconOpacity: 0.30,
+            iconOffset: [0.9, 1.2],
+            iconPitchAlignment: IconPitchAlignment.MAP,
+            iconRotationAlignment: IconRotationAlignment.MAP,
+            iconRotateExpression: ['get', 'bearing'],
+            iconSizeExpression: ['get', 'iconSize'],
+          ),
+        );
+      }
+
+      if (!await style.styleLayerExists(_vehicleLayerId)) {
+        await style.addLayer(
+          SymbolLayer(
+            id: _vehicleLayerId,
+            sourceId: _vehicleSourceId,
+            iconImage: _vehicleIconImageId,
+            iconAllowOverlap: true,
+            iconIgnorePlacement: true,
+            iconPitchAlignment: IconPitchAlignment.MAP,
+            iconRotationAlignment: IconRotationAlignment.MAP,
+            iconRotateExpression: ['get', 'bearing'],
+            iconSizeExpression: ['get', 'iconSize'],
+          ),
+        );
+      }
+      _startStationaryPulseTicker();
+    } catch (e) {
+      print('❌ Error setting up vehicle puck layers: $e');
     }
   }
 
@@ -791,38 +908,30 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  void _onMapGpsPosition(geolocator.Position position) {
+    if (!mounted) return;
+    _handleIncomingVehicleLocation(position);
+    RealtimeDistanceTracker.forceDistanceUpdate();
+    if (AppConfig.enableH3Tracking) {
+      _updateH3FromPosition(position);
+    }
+  }
+
   /// Start real-time distance tracking for a trip
   void _startDistanceTracking(Trip trip) async {
     try {
       print('📏 Starting distance tracking for trip ${trip.tripId}');
 
-      // Check if location service is already running
-      if (!LocationServiceResolver.getServiceStatus()['is_tracking']) {
+      await _mapPositionSubscription?.cancel();
+      _mapPositionSubscription = null;
+
+      final alreadyTracking =
+          LocationServiceResolver.getServiceStatus()['is_tracking'] == true;
+
+      if (!alreadyTracking) {
         print('⚠️ Location service not running, starting it first...');
         final locationStarted = await LocationServiceResolver.startTracking(
-          onLocationUpdate: (position) {
-            print(
-              '📍 Map received location update: ${position.latitude}, ${position.longitude}',
-            );
-
-            // Update current location and marker
-            setState(() {
-              _currentLocation = Point(
-                coordinates: Position(position.longitude, position.latitude),
-              );
-            });
-
-            // Update the current location marker with dark green color
-            _addCurrentLocationMarker();
-
-            // Force distance update on location change
-            RealtimeDistanceTracker.forceDistanceUpdate();
-
-            // H3 tracking (additive - only when enabled)
-            if (AppConfig.enableH3Tracking) {
-              _updateH3FromPosition(position);
-            }
-          },
+          onLocationUpdate: _onMapGpsPosition,
           onLocationError: (error) {
             print('❌ Map location error: $error');
           },
@@ -834,7 +943,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 _showLocationGuidance = true;
               });
 
-              // Auto-hide guidance after 10 seconds
               Timer(Duration(seconds: 10), () {
                 if (mounted) {
                   setState(() {
@@ -849,6 +957,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         if (!locationStarted) {
           print('❌ Failed to start location service');
           return;
+        }
+      } else {
+        print(
+          '📏 GPS stream already active — subscribing map to position updates (adb / emulator)',
+        );
+        _mapPositionSubscription =
+            LocationServiceResolver.subscribeToPositionUpdates(
+              _onMapGpsPosition,
+            );
+        if (_mapPositionSubscription == null) {
+          print(
+            '❌ Could not subscribe to GPS stream; try opening map after granting location permission',
+          );
         }
       }
 
@@ -883,7 +1004,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _stopDistanceTracking() {
     try {
       print('📏 Stopping distance tracking...');
+      _mapPositionSubscription?.cancel();
+      _mapPositionSubscription = null;
       RealtimeDistanceTracker.stopDistanceTracking();
+      _vehicleMotionTimer?.cancel();
+      _vehicleMotionTimer = null;
+      _lastMotionTickAt = null;
+      _deadReckoningDistanceMeters = 0.0;
 
       // Reset distance variables
       _remainingDistance = null;
@@ -1336,10 +1463,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         );
       }
       if (_mapboxMap != null && _currentLocation != null) {
-        _mapboxMap!.flyTo(
-          CameraOptions(center: _currentLocation!, zoom: 16.0),
-          MapAnimationOptions(duration: 900),
-        );
+        _animateCameraToPoint(_currentLocation!, forceImmediate: true);
       }
     }();
   }
@@ -1373,10 +1497,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
 
     if (target != null) {
-      _mapboxMap!.flyTo(
-        CameraOptions(center: target, zoom: 15.5),
-        MapAnimationOptions(duration: 1200),
-      );
+      _animateCameraToPoint(target, targetZoom: 15.5, forceImmediate: true);
       print(
         '✅ DEBUG: Map zoomed to exact target for status ${trip.status.name}',
       );
@@ -1384,6 +1505,581 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       print('❌ DEBUG: No valid target to zoom to');
     }
   }
+
+  void _handleIncomingVehicleLocation(dynamic position) {
+    print(
+      '📍 Map received location update: ${position.latitude}, ${position.longitude}',
+    );
+
+    final rawPoint = Point(
+      coordinates: Position(position.longitude, position.latitude),
+    );
+    final nextPoint = _applyGpsJitterFilter(rawPoint);
+    final now = DateTime.now();
+    final previousGpsAt = _lastGpsUpdateAt;
+    final previousPoint = _motionTargetPoint ?? _currentLocation;
+
+    _lastKnownSpeedMps = _extractSpeedMps(position);
+    if (_lastKnownSpeedMps <= 0.5 &&
+        previousPoint != null &&
+        previousGpsAt != null) {
+      final dt = now.difference(previousGpsAt).inMilliseconds / 1000.0;
+      if (dt > 0.2) {
+        final d = _distanceMeters(previousPoint, nextPoint);
+        final inferred = d / dt;
+        if (inferred > 0.5 && inferred < 60.0) {
+          _lastKnownSpeedMps = inferred;
+        }
+      }
+    }
+
+    if (AppConfig.debugVehicleLocationPackets) {
+      final interMs = previousGpsAt == null
+          ? null
+          : now.difference(previousGpsAt).inMilliseconds;
+      final segM = previousPoint == null
+          ? 0.0
+          : _distanceMeters(previousPoint, nextPoint);
+      debugPrint(
+        '[LiveMission] _handleIncomingVehicleLocation '
+        'lat=${position.latitude} lng=${position.longitude} '
+        'speedMps=${_lastKnownSpeedMps.toStringAsFixed(2)} '
+        'segmentM=${segM.toStringAsFixed(1)} interArrivalMs=$interMs',
+      );
+    }
+
+    _lastGpsUpdateAt = now;
+    _deadReckoningDistanceMeters = 0.0;
+    _lastMotionTickAt = now;
+
+    if (previousPoint == null || !AppConfig.enableVehicleInterpolation) {
+      _currentLocation = nextPoint;
+      _motionTargetPoint = nextPoint;
+      _targetVehicleBearing = _extractHeading(position) ?? _vehicleBearing;
+      _vehicleBearing = _targetVehicleBearing;
+      if (mounted) {
+        setState(() {});
+      }
+      _addCurrentLocationMarker();
+      if (AppConfig.enableVehicleFollowCamera) {
+        _animateCameraToPoint(nextPoint);
+      }
+      return;
+    }
+
+    _motionStartPoint = previousPoint;
+    _motionTargetPoint = nextPoint;
+    _lastSegmentDistanceMeters = _distanceMeters(_motionStartPoint!, _motionTargetPoint!);
+    _motionSegmentStartAt = now;
+    _motionSegmentDuration = _computeAdaptiveDuration(
+      _motionStartPoint!,
+      _motionTargetPoint!,
+      speedMps: _lastKnownSpeedMps,
+      interArrivalMs: previousGpsAt == null
+          ? null
+          : now.difference(previousGpsAt).inMilliseconds,
+    );
+
+    final computedBearing = _computeBearingDegrees(
+      _motionStartPoint!,
+      _motionTargetPoint!,
+    );
+    final incomingHeading = _extractHeading(position);
+    _targetVehicleBearing =
+        (incomingHeading != null && incomingHeading >= 0.0)
+            ? incomingHeading
+            : computedBearing;
+
+    _lastMotionUiSetStateAt = null;
+    _startVehicleMotionTicker();
+  }
+
+  void _startVehicleMotionTicker() {
+    _vehicleMotionTimer?.cancel();
+    _lastMotionUiSetStateAt = null;
+    _vehicleMotionTimer = Timer.periodic(
+      const Duration(milliseconds: 16),
+      (timer) {
+        if (!mounted || _motionStartPoint == null || _motionTargetPoint == null) {
+          timer.cancel();
+          return;
+        }
+        final now = DateTime.now();
+        final dtSeconds = _lastMotionTickAt == null
+            ? 0.016
+            : (now.difference(_lastMotionTickAt!).inMicroseconds / 1000000.0);
+        _lastMotionTickAt = now;
+
+        final elapsedMs =
+            now.difference(_motionSegmentStartAt!).inMilliseconds;
+        final totalMs = _motionSegmentDuration.inMilliseconds.clamp(1, 5000);
+        final t = (elapsedMs / totalMs).clamp(0.0, 1.0);
+        _lastAnimationProgress = t.toDouble();
+
+        final interpolated = _interpolatePoint(
+          _motionStartPoint!,
+          _motionTargetPoint!,
+          t.toDouble(),
+        );
+        _vehicleBearing = _interpolateBearing(
+          _vehicleBearing,
+          _targetVehicleBearing,
+          t.toDouble(),
+        );
+
+        _currentLocation = interpolated;
+        _updateVehicleAnnotation(interpolated, _vehicleBearing);
+        if (AppConfig.enableVehicleFollowCamera && _shouldUpdateCamera()) {
+          _animateCameraToPoint(
+            interpolated,
+            animationDuration:
+                AppConfig.adaptiveCameraDuration
+                    ? _motionSegmentDuration
+                    : const Duration(milliseconds: 500),
+          );
+        }
+
+        if (mounted) {
+          if (_lastMotionUiSetStateAt == null ||
+              now.difference(_lastMotionUiSetStateAt!) >=
+                  _motionUiSetStateMinInterval) {
+            _lastMotionUiSetStateAt = now;
+            setState(() {});
+          }
+        }
+
+        if (t >= 1.0 && !AppConfig.enableDeadReckoningBetweenPings) {
+          timer.cancel();
+        } else if (t >= 1.0 && AppConfig.enableDeadReckoningBetweenPings) {
+          final staleSeconds =
+              _lastGpsUpdateAt == null
+                  ? 0.0
+                  : now.difference(_lastGpsUpdateAt!).inMilliseconds / 1000.0;
+          if (staleSeconds > AppConfig.deadReckoningMaxSeconds) {
+            timer.cancel();
+            return;
+          }
+          final projected = _extrapolatePoint(interpolated, dtSeconds);
+          _lastMotionSource = 'dead_reckoning';
+          _currentLocation = projected;
+          _updateVehicleAnnotation(projected, _vehicleBearing);
+        }
+      },
+    );
+  }
+
+  Point _applyGpsJitterFilter(Point incoming) {
+    if (!AppConfig.enableGpsJitterFilter) {
+      _lastMotionSource = 'raw';
+      return incoming;
+    }
+    if (_filteredGpsPoint == null) {
+      _filteredGpsPoint = incoming;
+      _lastMotionSource = 'raw';
+      return incoming;
+    }
+
+    final alpha = AppConfig.gpsJitterEmaAlpha.clamp(0.05, 0.95);
+    final prevLat = _filteredGpsPoint!.coordinates.lat.toDouble();
+    final prevLng = _filteredGpsPoint!.coordinates.lng.toDouble();
+    final newLat = incoming.coordinates.lat.toDouble();
+    final newLng = incoming.coordinates.lng.toDouble();
+    final emaLat = prevLat + ((newLat - prevLat) * alpha);
+    final emaLng = prevLng + ((newLng - prevLng) * alpha);
+    _filteredGpsPoint = Point(coordinates: Position(emaLng, emaLat));
+    _lastMotionSource = 'ema';
+    return _filteredGpsPoint!;
+  }
+
+  bool _shouldUpdateCamera() {
+    final now = DateTime.now();
+    if (_lastCameraUpdateAt == null) {
+      _lastCameraUpdateAt = now;
+      return true;
+    }
+    final elapsed = now.difference(_lastCameraUpdateAt!);
+    if (elapsed.inMilliseconds >= AppConfig.followCameraMinUpdateMs) {
+      _lastCameraUpdateAt = now;
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> _updateVehicleAnnotation(Point point, double bearing) async {
+    await _updateVehiclePuckSource(point, bearing);
+  }
+
+  Future<void> _ensureVehiclePuckImages() async {
+    if (_mapboxMap == null) return;
+    final style = _mapboxMap!.style;
+    try {
+      final hasCar = await style.hasStyleImage(_vehicleIconImageId);
+      if (!hasCar) {
+        final carBytes = await _loadVehiclePuckPngOrFallback();
+        final carImage = await _decodePngToMbxImage(carBytes);
+        await style.addStyleImage(
+          _vehicleIconImageId,
+          1.0,
+          carImage,
+          false,
+          [],
+          [],
+          null,
+        );
+      }
+
+      final hasShadow = await style.hasStyleImage(_vehicleShadowImageId);
+      if (!hasShadow) {
+        final shadowBytes = await _createVehicleShadowImage();
+        final shadowImage = await _decodePngToMbxImage(shadowBytes);
+        await style.addStyleImage(
+          _vehicleShadowImageId,
+          1.0,
+          shadowImage,
+          false,
+          [],
+          [],
+          null,
+        );
+      }
+    } catch (e) {
+      print('❌ Error ensuring puck images: $e');
+    }
+  }
+
+  Future<Uint8List> _loadVehiclePuckPngOrFallback() async {
+    const candidates = [
+      'assets/images/car_top_view.png',
+      'assets/images/vehicle_top_view.png',
+      'assets/images/car_puck.png',
+    ];
+    for (final asset in candidates) {
+      try {
+        final data = await rootBundle.load(asset);
+        print('✅ Loaded vehicle puck asset: $asset');
+        return data.buffer.asUint8List();
+      } catch (_) {
+        // Try next candidate.
+      }
+    }
+    print('⚠️ No car asset found, using generated fallback puck');
+    return _createCarPuckFallbackImage();
+  }
+
+  Future<Uint8List> _createCarPuckFallbackImage() async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const size = 128.0;
+
+    final bodyPaint = Paint()..color = Colors.white;
+    final strokePaint = Paint()
+      ..color = const Color(0xFF111827)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4;
+    final windowPaint = Paint()..color = const Color(0xFF334155);
+
+    final body = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(28, 10, 72, 108),
+      const Radius.circular(24),
+    );
+    canvas.drawRRect(body, bodyPaint);
+    canvas.drawRRect(body, strokePaint);
+
+    final roof = RRect.fromRectAndRadius(
+      const Rect.fromLTWH(40, 28, 48, 58),
+      const Radius.circular(12),
+    );
+    canvas.drawRRect(roof, windowPaint);
+
+    final lightPaint = Paint()..color = const Color(0xFF60A5FA);
+    canvas.drawCircle(const Offset(64, 16), 4, lightPaint);
+    canvas.drawCircle(const Offset(64, 112), 4, lightPaint);
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    return png!.buffer.asUint8List();
+  }
+
+  Future<Uint8List> _createVehicleShadowImage() async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const size = 128.0;
+    final shadowPaint = Paint()..color = Colors.black.withOpacity(0.55);
+    canvas.drawOval(
+      const Rect.fromLTWH(24, 36, 80, 56),
+      shadowPaint,
+    );
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final png = await image.toByteData(format: ui.ImageByteFormat.png);
+    return png!.buffer.asUint8List();
+  }
+
+  Future<MbxImage> _decodePngToMbxImage(Uint8List pngBytes) async {
+    final codec = await ui.instantiateImageCodec(pngBytes);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    final raw = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    return MbxImage(
+      width: image.width,
+      height: image.height,
+      data: raw!.buffer.asUint8List(),
+    );
+  }
+
+  Future<void> _updateVehiclePuckSource(Point point, double bearing) async {
+    if (_mapboxMap == null) return;
+    try {
+      final source = await _mapboxMap!.style.getSource(_vehicleSourceId);
+      final cameraState = await _mapboxMap!.getCameraState();
+      final iconSize = _computeIconSizeForZoom(cameraState.zoom);
+      final geoJson = _vehicleFeatureCollectionJson(point, bearing, iconSize);
+      if (source != null && source is GeoJsonSource) {
+        await source.updateGeoJSON(geoJson);
+      }
+      _updateStationaryPulseVisibility();
+    } catch (e) {
+      print('❌ Error updating vehicle puck source: $e');
+    }
+  }
+
+  String _vehicleFeatureCollectionJson(Point point, double bearing, double iconSize) {
+    final feature = {
+      'type': 'FeatureCollection',
+      'features': [
+        {
+          'type': 'Feature',
+          'properties': {
+            'bearing': bearing,
+            'iconSize': iconSize,
+          },
+          'geometry': {
+            'type': 'Point',
+            'coordinates': [
+              point.coordinates.lng.toDouble(),
+              point.coordinates.lat.toDouble(),
+            ],
+          },
+        },
+      ],
+    };
+    return jsonEncode(feature);
+  }
+
+  double _computeIconSizeForZoom(double zoom) {
+    final normalized = ((zoom - 12.0) / 10.0).clamp(0.0, 1.0);
+    return 0.65 + (normalized * 0.75);
+  }
+
+  void _startStationaryPulseTicker() {
+    _stationaryPulseTimer?.cancel();
+    _stationaryPulseTimer = Timer.periodic(const Duration(milliseconds: 90), (_) async {
+      if (_mapboxMap == null || !mounted) return;
+      final isStationary = _lastKnownSpeedMps < 0.5;
+      if (!isStationary) return;
+      _pulseRadius += _pulseGrowing ? 0.8 : -0.8;
+      if (_pulseRadius >= 16) _pulseGrowing = false;
+      if (_pulseRadius <= 8) _pulseGrowing = true;
+      try {
+        await _mapboxMap!.style.setStyleLayerProperty(
+          _vehicleHaloLayerId,
+          'circle-radius',
+          _pulseRadius,
+        );
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _updateStationaryPulseVisibility() async {
+    if (_mapboxMap == null) return;
+    try {
+      await _mapboxMap!.style.setStyleLayerProperty(
+        _vehicleHaloLayerId,
+        'circle-opacity',
+        _lastKnownSpeedMps < 0.5 ? 0.18 : 0.0,
+      );
+    } catch (_) {}
+  }
+
+  Duration _computeAdaptiveDuration(
+    Point start,
+    Point end, {
+    required double speedMps,
+    int? interArrivalMs,
+  }) {
+    final distanceMeters = _distanceMeters(start, end);
+    final safeSpeed = speedMps > 0.5 ? speedMps : 6.0;
+    var estimatedMs = ((distanceMeters / safeSpeed) * 1000).round();
+    if (interArrivalMs != null && interArrivalMs > 0) {
+      final networkTargetMs = (interArrivalMs * 0.9).round();
+      estimatedMs = ((estimatedMs * 0.6) + (networkTargetMs * 0.4)).round();
+    }
+    final minMs = AppConfig.minVehicleAnimationMs;
+    final maxMs = AppConfig.maxVehicleAnimationMs;
+    final clamped = estimatedMs.clamp(minMs, maxMs);
+    return Duration(milliseconds: clamped);
+  }
+
+  void _animateCameraToPoint(
+    Point target, {
+    double? targetZoom,
+    Duration? animationDuration,
+    bool forceImmediate = false,
+  }) {
+    if (_mapboxMap == null) return;
+    var duration =
+        forceImmediate
+            ? const Duration(milliseconds: 900)
+            : (animationDuration ??
+                const Duration(milliseconds: AppConfig.minVehicleAnimationMs));
+    if (!forceImmediate) {
+      final dampedMs = (duration.inMilliseconds * AppConfig.followCameraDampingFactor)
+          .round()
+          .clamp(
+            AppConfig.minVehicleAnimationMs,
+            AppConfig.maxVehicleAnimationMs + 300,
+          );
+      duration = Duration(milliseconds: dampedMs);
+    }
+    if (AppConfig.useMapboxEaseCamera) {
+      _mapboxMap!.easeTo(
+        CameraOptions(center: target, zoom: targetZoom ?? 16.0),
+        MapAnimationOptions(duration: duration.inMilliseconds),
+      );
+    } else {
+      _mapboxMap!.flyTo(
+        CameraOptions(center: target, zoom: targetZoom ?? 16.0),
+        MapAnimationOptions(duration: duration.inMilliseconds),
+      );
+    }
+  }
+
+  double _extractSpeedMps(dynamic position) {
+    final speed = position.speed;
+    if (speed == null || speed.isNaN || speed.isInfinite || speed < 0) {
+      return 0.0;
+    }
+    return speed.toDouble();
+  }
+
+  double? _extractHeading(dynamic position) {
+    final heading = position.heading;
+    if (heading == null || heading.isNaN || heading.isInfinite || heading < 0) {
+      return null;
+    }
+    return heading.toDouble();
+  }
+
+  Point _interpolatePoint(Point start, Point end, double t) {
+    final startLat = start.coordinates.lat.toDouble();
+    final startLng = start.coordinates.lng.toDouble();
+    final endLat = end.coordinates.lat.toDouble();
+    final endLng = end.coordinates.lng.toDouble();
+    final lat = startLat + ((endLat - startLat) * t);
+    final lng = startLng + ((endLng - startLng) * t);
+    return Point(coordinates: Position(lng, lat));
+  }
+
+  Point _extrapolatePoint(Point current, double dtSeconds) {
+    final lastUpdateAt = _lastGpsUpdateAt;
+    if (lastUpdateAt == null || _lastKnownSpeedMps <= 0.5) {
+      return current;
+    }
+    final staleSeconds = DateTime.now().difference(lastUpdateAt).inMilliseconds / 1000.0;
+    if (staleSeconds < AppConfig.deadReckoningStartAfterSeconds) {
+      return current;
+    }
+    if (staleSeconds > AppConfig.deadReckoningMaxSeconds) {
+      return current;
+    }
+
+    final boundedDt = dtSeconds.clamp(0.0, 0.25);
+    var travelMeters = (_lastKnownSpeedMps * boundedDt).clamp(0.0, 4.0);
+    final remainingCap =
+        AppConfig.deadReckoningMaxDistanceMeters - _deadReckoningDistanceMeters;
+    if (remainingCap <= 0) {
+      return current;
+    }
+    if (travelMeters > remainingCap) {
+      travelMeters = remainingCap;
+    }
+    _deadReckoningDistanceMeters += travelMeters;
+    final next = _destinationPoint(
+      current.coordinates.lat.toDouble(),
+      current.coordinates.lng.toDouble(),
+      _vehicleBearing,
+      travelMeters,
+    );
+    return Point(coordinates: Position(next.$2, next.$1));
+  }
+
+  (double, double) _destinationPoint(
+    double startLat,
+    double startLng,
+    double bearingDeg,
+    double distanceMeters,
+  ) {
+    const earthRadius = 6371000.0;
+    final brng = _toRadians(bearingDeg);
+    final lat1 = _toRadians(startLat);
+    final lon1 = _toRadians(startLng);
+    final dr = distanceMeters / earthRadius;
+
+    final lat2 = math.asin(
+      math.sin(lat1) * math.cos(dr) +
+          math.cos(lat1) * math.sin(dr) * math.cos(brng),
+    );
+    final lon2 =
+        lon1 +
+        math.atan2(
+          math.sin(brng) * math.sin(dr) * math.cos(lat1),
+          math.cos(dr) - math.sin(lat1) * math.sin(lat2),
+        );
+    return (_toDegrees(lat2), _toDegrees(lon2));
+  }
+
+  double _distanceMeters(Point start, Point end) {
+    final lat1 = _toRadians(start.coordinates.lat.toDouble());
+    final lat2 = _toRadians(end.coordinates.lat.toDouble());
+    final dLat = _toRadians(
+      end.coordinates.lat.toDouble() - start.coordinates.lat.toDouble(),
+    );
+    final dLon = _toRadians(
+      end.coordinates.lng.toDouble() - start.coordinates.lng.toDouble(),
+    );
+    const earthRadius = 6371000.0;
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1) *
+            math.cos(lat2) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  double _computeBearingDegrees(Point start, Point end) {
+    final lat1 = _toRadians(start.coordinates.lat.toDouble());
+    final lat2 = _toRadians(end.coordinates.lat.toDouble());
+    final dLon = _toRadians(
+      end.coordinates.lng.toDouble() - start.coordinates.lng.toDouble(),
+    );
+    final y = math.sin(dLon) * math.cos(lat2);
+    final x =
+        math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+    final radians = math.atan2(y, x);
+    return (_toDegrees(radians) + 360.0) % 360.0;
+  }
+
+  double _interpolateBearing(double from, double to, double t) {
+    var delta = ((to - from + 540.0) % 360.0) - 180.0;
+    return (from + delta * t + 360.0) % 360.0;
+  }
+
+  double _toRadians(double degrees) => degrees * (math.pi / 180.0);
+  double _toDegrees(double radians) => radians * (180.0 / math.pi);
 
   Future<void> _clearRoutePolyline() async {
     if (_polylineAnnotationManager != null && _routePolyline != null) {
@@ -2579,6 +3275,55 @@ class _ForceRestartLocationButton extends StatelessWidget {
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(Icons.restart_alt, color: Colors.white, size: 24.w),
+      ),
+    );
+  }
+}
+
+class _VehicleDebugOverlay extends StatelessWidget {
+  final double speedMps;
+  final double bearing;
+  final double segmentMeters;
+  final int animationMs;
+  final double progress;
+  final String source;
+
+  const _VehicleDebugOverlay({
+    required this.speedMps,
+    required this.bearing,
+    required this.segmentMeters,
+    required this.animationMs,
+    required this.progress,
+    required this.source,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 220.w,
+      padding: EdgeInsets.all(10.w),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(10.r),
+      ),
+      child: DefaultTextStyle(
+        style: GoogleFonts.robotoMono(
+          fontSize: 10.sp,
+          color: Colors.white,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Tracking Telemetry'),
+            SizedBox(height: 4.h),
+            Text('speed: ${speedMps.toStringAsFixed(2)} m/s'),
+            Text('bearing: ${bearing.toStringAsFixed(1)} deg'),
+            Text('segment: ${segmentMeters.toStringAsFixed(1)} m'),
+            Text('anim: ${animationMs}ms'),
+            Text('t: ${progress.toStringAsFixed(2)}'),
+            Text('source: $source'),
+          ],
+        ),
       ),
     );
   }

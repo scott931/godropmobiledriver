@@ -4,7 +4,7 @@ import '../models/trip_model.dart';
 import '../models/eta_model.dart';
 import 'eta_service.dart';
 import 'routing_service.dart';
-import 'realtime_location_service.dart';
+import 'location_service_resolver.dart';
 
 class RealtimeETAUpdater {
   static Timer? _etaUpdateTimer;
@@ -79,7 +79,8 @@ class RealtimeETAUpdater {
     _etaUpdateTimer?.cancel();
 
     _etaUpdateTimer = Timer.periodic(_minETAUpdateInterval, (timer) async {
-      if (_currentTrip != null && RealtimeLocationService.isTracking) {
+      if (_currentTrip != null &&
+          LocationServiceResolver.getServiceStatus()['is_tracking'] == true) {
         await _updateETA();
       }
     });
@@ -90,7 +91,7 @@ class RealtimeETAUpdater {
     try {
       if (_currentTrip == null) return;
 
-      final currentPosition = RealtimeLocationService.currentPosition;
+      final currentPosition = await LocationServiceResolver.getCurrentPosition();
       if (currentPosition == null) {
         print('⚠️ No current position available for ETA update');
         return;
@@ -269,7 +270,8 @@ class RealtimeETAUpdater {
 
   /// Force immediate ETA update
   static Future<void> forceETAUpdate() async {
-    if (_currentTrip != null && RealtimeLocationService.isTracking) {
+    if (_currentTrip != null &&
+        LocationServiceResolver.getServiceStatus()['is_tracking'] == true) {
       print('🕐 Forcing immediate ETA update...');
       await _updateETA();
     }
@@ -300,7 +302,7 @@ class RealtimeETAUpdater {
   static Future<Map<String, dynamic>?> getRouteInfo() async {
     if (_currentTrip == null) return null;
 
-    final currentPosition = RealtimeLocationService.currentPosition;
+    final currentPosition = await LocationServiceResolver.getCurrentPosition();
     if (currentPosition == null) return null;
 
     try {

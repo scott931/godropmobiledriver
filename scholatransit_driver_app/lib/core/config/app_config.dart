@@ -125,6 +125,60 @@ class AppConfig {
   static const double locationAccuracyThreshold = 10.0; // meters
   /// How often to POST live GPS to the backend while a trip is in progress (seconds).
   static const int locationUpdateInterval = 5;
+  /// Enables smooth marker interpolation between GPS updates.
+  static const bool enableVehicleInterpolation = bool.fromEnvironment(
+    'ENABLE_VEHICLE_INTERPOLATION',
+    defaultValue: true,
+  );
+  /// Enables map follow mode while vehicle is moving.
+  static const bool enableVehicleFollowCamera = bool.fromEnvironment(
+    'ENABLE_VEHICLE_FOLLOW_CAMERA',
+    defaultValue: true,
+  );
+  /// Use adaptive camera animation duration based on speed and distance.
+  static const bool adaptiveCameraDuration = bool.fromEnvironment(
+    'ADAPTIVE_CAMERA_DURATION',
+    defaultValue: true,
+  );
+  /// Continue linear vehicle projection during sparse GPS intervals.
+  static const bool enableDeadReckoningBetweenPings = bool.fromEnvironment(
+    'ENABLE_DEAD_RECKONING',
+    defaultValue: true,
+  );
+  /// Balanced profile tuned for stop-go urban driving.
+  static const int minVehicleAnimationMs = 220;
+  static const int maxVehicleAnimationMs = 950;
+  static const int followCameraMinUpdateMs = 300;
+  /// Camera runs slightly behind marker for cinematic motion.
+  static const double followCameraDampingFactor = 1.15;
+  static const double deadReckoningStartAfterSeconds = 1.5;
+  static const double deadReckoningMaxSeconds = 4.5;
+  /// Hard safety cap for projected distance while waiting for new GPS.
+  static const double deadReckoningMaxDistanceMeters = 80.0;
+  /// Enables EMA smoothing for noisy GPS points before interpolation.
+  static const bool enableGpsJitterFilter = bool.fromEnvironment(
+    'ENABLE_GPS_JITTER_FILTER',
+    defaultValue: true,
+  );
+  /// Exponential moving average alpha (0-1). Higher tracks raw input faster.
+  static const double gpsJitterEmaAlpha = 0.28;
+  /// Uses Mapbox easeTo instead of flyTo for smoother follow.
+  static const bool useMapboxEaseCamera = bool.fromEnvironment(
+    'USE_MAPBOX_EASE_CAMERA',
+    defaultValue: true,
+  );
+  /// Shows movement diagnostics on top of map for tuning.
+  static const bool showVehicleTrackingDebugOverlay = bool.fromEnvironment(
+    'SHOW_TRACKING_DEBUG_OVERLAY',
+    defaultValue: false,
+  );
+
+  /// Log each GPS / live ping handled by MapScreen `_handleIncomingVehicleLocation` (e.g. ADB geo fix).
+  /// Run: `flutter run --dart-define=DEBUG_VEHICLE_LOCATION_PACKETS=true`
+  static const bool debugVehicleLocationPackets = bool.fromEnvironment(
+    'DEBUG_VEHICLE_LOCATION_PACKETS',
+    defaultValue: false,
+  );
 
   // Trip Configuration
   static const int maxTripDuration = 8; // hours
@@ -160,6 +214,34 @@ class AppConfig {
   static const bool enableH3Tracking = bool.fromEnvironment(
     'ENABLE_H3',
     defaultValue: false,
+  );
+
+  /// Synthetic moving GPS for integration tests. Skips real GPS POSTs while active.
+  /// Run: `flutter run --dart-define=SIMULATE_VEHICLE_MOVEMENT=true`
+  static const bool simulateVehicleMovement = bool.fromEnvironment(
+    'SIMULATE_VEHICLE_MOVEMENT',
+    defaultValue: false,
+  );
+
+  /// Drives [VehicleMovementSimulator]: fake GPS on the map without walking.
+  /// On when [simulateVehicleMovement] is set, or automatically with [seedTestActiveTrip].
+  static bool get useSimulatedVehicleMotion =>
+      simulateVehicleMovement || seedTestActiveTrip;
+
+  /// Injects an in-progress [Trip] when the driver logs in (no backend trip required).
+  /// Also turns on [useSimulatedVehicleMotion] so the map puck moves without walking.
+  /// Location API may reject unknown `trip_id` — map still animates via injected GPS.
+  /// Run: `flutter run --dart-define=TEST_ACTIVE_TRIP=true`
+  static const bool seedTestActiveTrip = bool.fromEnvironment(
+    'TEST_ACTIVE_TRIP',
+    defaultValue: false,
+  );
+
+  /// When [seedTestActiveTrip] is true: `active` (in-progress, default) or `pending` (scheduled, not started).
+  /// Run: `--dart-define=TEST_TRIP_VARIANT=pending`
+  static const String testTripSeedVariant = String.fromEnvironment(
+    'TEST_TRIP_VARIANT',
+    defaultValue: 'active',
   );
 
   // QR Code Configuration

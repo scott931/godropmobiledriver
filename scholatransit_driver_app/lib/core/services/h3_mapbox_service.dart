@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'truck_h3_service.dart';
-import 'package:h3_flutter_plus/h3_flutter_plus.dart';
 
 /// Converts H3 cells to GeoJSON FeatureCollection for Mapbox FillLayer.
 class H3MapboxService {

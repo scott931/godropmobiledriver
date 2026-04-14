@@ -341,7 +341,11 @@ class Trip {
       'pending' => TripStatus.pending,
       // Backend uses "scheduled" for not-yet-started trips; UI treats as pending.
       'scheduled' => TripStatus.pending,
-      'in_progress' || 'in-progress' || 'in progress' => TripStatus.inProgress,
+      'in_progress' ||
+      'in-progress' ||
+      'in progress' ||
+      'inprogress' =>
+        TripStatus.inProgress, // Dart enum .name uses camelCase
       'completed' => TripStatus.completed,
       'cancelled' => TripStatus.cancelled,
       'delayed' => TripStatus.delayed,
