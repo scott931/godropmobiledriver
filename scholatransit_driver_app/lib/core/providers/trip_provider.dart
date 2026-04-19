@@ -649,19 +649,33 @@ class TripNotifier extends StateNotifier<TripState> {
   }
 
   Future<bool> endTrip({
+    /// Trip row the driver tapped (schedule / details). When null, uses [TripState.currentTrip].
+    Trip? trip,
     required String endLocation,
     double? latitude,
     double? longitude,
     String? notes,
   }) async {
-    if (state.currentTrip == null) {
+    final resolved = trip ?? state.currentTrip;
+    if (resolved == null) {
       state = state.copyWith(error: 'No active trip to end');
+      return false;
+    }
+    if (!resolved.isActive) {
+      state = state.copyWith(
+        error: 'Only trips in progress can be ended.',
+      );
+      return false;
+    }
+    final driverId = StorageService.getDriverId();
+    if (driverId != null && resolved.driverId != driverId) {
+      state = state.copyWith(error: 'You can only end your own trips.');
       return false;
     }
 
     // Backend-aligned guard: do not allow trip end while checked-in students
     // are still not checked out.
-    await loadTripStudents(state.currentTrip!.id);
+    await loadTripStudents(resolved.id, tripContext: resolved);
     final notCheckedOut = state.students.where(
       (s) =>
           s.status == StudentStatus.onBus || s.status == StudentStatus.pickedUp,
@@ -693,7 +707,7 @@ class TripNotifier extends StateNotifier<TripState> {
       final response = await ApiService.post<Map<String, dynamic>>(
         AppConfig.endTripEndpoint,
         data: {
-          'trip_id': state.currentTrip!.tripId,
+          'trip_id': resolved.tripId,
           'end_location': endLocation,
           'latitude': latitude,
           'longitude': longitude,
@@ -702,21 +716,26 @@ class TripNotifier extends StateNotifier<TripState> {
       );
 
       if (response.success && response.data != null) {
-        final trip = Trip.fromJson(response.data!);
-        final summary = _buildTripSummary(trip);
-        await StorageService.clearCurrentTrip();
+        final ended = Trip.fromJson(response.data!);
+        final summary = _buildTripSummary(ended);
+        final endedWasCurrent =
+            state.currentTrip != null &&
+            state.currentTrip!.tripId == ended.tripId;
+        if (endedWasCurrent) {
+          await StorageService.clearCurrentTrip();
+        }
 
         // Update the trips list to reflect the new status
         final updatedTrips = state.trips.map((t) {
-          if (t.tripId == trip.tripId) {
-            return trip;
+          if (t.tripId == ended.tripId) {
+            return ended;
           }
           return t;
         }).toList();
 
         state = state.copyWith(
           isLoading: false,
-          clearCurrentTrip: true,
+          clearCurrentTrip: endedWasCurrent,
           trips: updatedTrips,
           lastTripSummary: summary,
           error: null,
@@ -826,12 +845,17 @@ class TripNotifier extends StateNotifier<TripState> {
     );
   }
 
-  Future<void> loadTripStudents(int tripId) async {
+  Future<void> loadTripStudents(int tripId, {Trip? tripContext}) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Find the trip to get its routeId
-      final trip = state.trips.firstWhere((t) => t.id == tripId);
+      // Prefer explicit trip (e.g. end-trip from schedule) so we do not require a prior firstWhere match.
+      final Trip trip;
+      if (tripContext != null && tripContext.id == tripId) {
+        trip = tripContext;
+      } else {
+        trip = state.trips.firstWhere((t) => t.id == tripId);
+      }
 
       if (trip.routeId == null) {
         print('❌ DEBUG: Trip ${trip.tripId} has no route ID');

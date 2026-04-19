@@ -78,6 +78,7 @@ class TripActionHandler {
 
     final position = ref.read(locationProvider).currentPosition!;
     final success = await ref.read(tripProvider.notifier).endTrip(
+          trip: trip,
           endLocation: trip.endLocation ?? 'Unknown Location',
           latitude: position.latitude,
           longitude: position.longitude,
