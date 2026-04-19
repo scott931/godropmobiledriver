@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/models/trip_model.dart';
+import '../../../core/models/student_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../utils/trip_action_handler.dart';
 
@@ -666,7 +667,15 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     );
   }
 
-  Widget _buildStudentRow(dynamic student) {
+  String _studentListInitial(Student student) {
+    for (final part in [student.firstName, student.lastName]) {
+      final t = part.trim();
+      if (t.isNotEmpty) return t[0].toUpperCase();
+    }
+    return '?';
+  }
+
+  Widget _buildStudentRow(Student student) {
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -689,7 +698,7 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
             ),
             child: Center(
               child: Text(
-                student.firstName[0].toUpperCase(),
+                _studentListInitial(student),
                 style: GoogleFonts.poppins(
                   color: _getStudentStatusColor(student.status),
                   fontWeight: FontWeight.bold,
@@ -831,37 +840,33 @@ class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
     return '${mins}m';
   }
 
-  Color _getStudentStatusColor(dynamic status) {
-    switch (status.toString().toLowerCase()) {
-      case 'waiting':
+  Color _getStudentStatusColor(StudentStatus status) {
+    switch (status) {
+      case StudentStatus.waiting:
         return AppTheme.warningColor;
-      case 'on_bus':
+      case StudentStatus.onBus:
         return AppTheme.primaryColor;
-      case 'picked_up':
+      case StudentStatus.pickedUp:
         return AppTheme.successColor;
-      case 'dropped_off':
+      case StudentStatus.droppedOff:
         return AppTheme.infoColor;
-      case 'absent':
+      case StudentStatus.absent:
         return AppTheme.errorColor;
-      default:
-        return AppTheme.textTertiary;
     }
   }
 
-  String _getStudentStatusText(dynamic status) {
-    switch (status.toString().toLowerCase()) {
-      case 'waiting':
+  String _getStudentStatusText(StudentStatus status) {
+    switch (status) {
+      case StudentStatus.waiting:
         return 'Waiting';
-      case 'on_bus':
+      case StudentStatus.onBus:
         return 'On Bus';
-      case 'picked_up':
+      case StudentStatus.pickedUp:
         return 'Picked Up';
-      case 'dropped_off':
+      case StudentStatus.droppedOff:
         return 'Dropped Off';
-      case 'absent':
+      case StudentStatus.absent:
         return 'Absent';
-      default:
-        return 'Unknown';
     }
   }
 

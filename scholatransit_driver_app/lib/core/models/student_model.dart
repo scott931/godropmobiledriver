@@ -46,6 +46,31 @@ class Student {
   String get fullName => '$firstName $lastName';
 
   factory Student.fromJson(Map<String, dynamic> json) {
+    DateTime? tryParseDate(dynamic v) {
+      if (v == null) return null;
+      try {
+        return DateTime.parse(v.toString());
+      } catch (_) {
+        return null;
+      }
+    }
+
+    String firstName = json['first_name']?.toString() ?? '';
+    String lastName = json['last_name']?.toString() ?? '';
+    if (firstName.isEmpty &&
+        lastName.isEmpty &&
+        json['name'] != null &&
+        json['name'].toString().trim().isNotEmpty) {
+      final parts = json['name'].toString().trim().split(RegExp(r'\s+'));
+      firstName = parts.first;
+      if (parts.length > 1) {
+        lastName = parts.sublist(1).join(' ');
+      }
+    }
+
+    final createdAt = tryParseDate(json['created_at']) ?? DateTime.now();
+    final updatedAt = tryParseDate(json['updated_at']) ?? createdAt;
+
     // Parse parent IDs from various possible formats
     List<int> parseParentIds(Map<String, dynamic> json) {
       // Try parent_ids array first
@@ -89,27 +114,29 @@ class Student {
     }
 
     return Student(
-      id: json['id'] ?? 0,
-      studentId: json['student_id'] ?? '',
-      firstName: json['first_name'] ?? '',
-      lastName: json['last_name'] ?? '',
+      id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
+      studentId: json['student_id']?.toString() ?? '',
+      firstName: firstName,
+      lastName: lastName,
       profileImage: json['profile_image'],
-      grade: json['grade'],
-      school: json['school'],
+      grade: json['grade']?.toString(),
+      school: json['school'] is Map
+          ? (json['school'] as Map)['name']?.toString()
+          : json['school']?.toString(),
       parentName: json['parent_name'],
       parentPhone: json['parent_phone'],
       parentEmail: json['parent_email'],
       parentIds: parseParentIds(json),
       address: json['address'],
-      latitude: json['latitude']?.toDouble(),
-      longitude: json['longitude']?.toDouble(),
-      assignedRoute: json['assigned_route'],
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      assignedRoute: json['assigned_route'] is int
+          ? json['assigned_route'] as int
+          : int.tryParse('${json['assigned_route'] ?? ''}'),
       status: _parseStudentStatus(json['status']),
-      lastSeen: json['last_seen'] != null
-          ? DateTime.parse(json['last_seen'])
-          : null,
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      lastSeen: tryParseDate(json['last_seen']),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 
@@ -140,6 +167,10 @@ class Student {
   static StudentStatus _parseStudentStatus(String? status) {
     switch (status?.toLowerCase()) {
       case 'waiting':
+        return StudentStatus.waiting;
+      case 'assigned':
+      case 'enrolled':
+        // Trip passengers / roster payloads use non-transit labels
         return StudentStatus.waiting;
       case 'on_bus':
       case 'onbus':
