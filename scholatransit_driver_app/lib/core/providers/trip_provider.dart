@@ -243,6 +243,15 @@ class TripNotifier extends StateNotifier<TripState> {
     return filteredTrips;
   }
 
+  /// True when the server asked the client to back off (avoid chaining a second heavy request).
+  bool _responseThrottled(ApiResponse<dynamic> response) {
+    if (response.statusCode == 429) return true;
+    final msg = response.error?.toLowerCase() ?? '';
+    return msg.contains('throttl') ||
+        msg.contains('too many requests') ||
+        msg.contains('rate limit');
+  }
+
   Future<void> loadTrips() async {
     print('🚀 DEBUG: Starting to load trips...');
     state = state.copyWith(isLoading: true, error: null);
@@ -871,87 +880,111 @@ class TripNotifier extends StateNotifier<TripState> {
         '🔍 DEBUG: Loading students for trip ${trip.tripId} (route: ${trip.routeId})',
       );
 
-      // Try multiple endpoints in order of preference
       List<Student> studentsList = [];
       String? lastError;
 
-      // 1. Try trip-specific passengers endpoint (supported by backend)
+      // 1. Trip passengers roster — single lightweight call. Trust empty `results`;
+      //    do not follow with /students/?limit=500 (doubles traffic and triggers 429 throttles).
       try {
         print('🚀 DEBUG: Trying trip passengers endpoint...');
         final tripResponse = await ApiService.get<Map<String, dynamic>>(
           '${AppConfig.tripDetailsEndpoint}${trip.tripId}/passengers/',
         );
 
+        if (_responseThrottled(tripResponse)) {
+          print('❌ DEBUG: Trip passengers throttled');
+          state = state.copyWith(
+            isLoading: false,
+            error: tripResponse.error ??
+                'Too many requests. Please wait a minute and tap Retry.',
+          );
+          return;
+        }
+
         if (tripResponse.success && tripResponse.data != null) {
           final data = tripResponse.data!;
-          studentsList =
-              (data['results'] as List?)
-                  ?.map((student) => Student.fromJson(student))
-                  .toList() ??
-              [];
-          print(
-            '✅ DEBUG: Trip passengers endpoint successful: ${studentsList.length} students',
-          );
-        } else {
-          lastError = tripResponse.error;
-          print('❌ DEBUG: Trip passengers failed: $lastError');
+          if (data.containsKey('results')) {
+            studentsList =
+                (data['results'] as List?)
+                    ?.map(
+                      (e) => Student.fromJson(
+                        Map<String, dynamic>.from(e as Map),
+                      ),
+                    )
+                    .toList() ??
+                [];
+            print(
+              '✅ DEBUG: Trip passengers roster: ${studentsList.length} students',
+            );
+            state = state.copyWith(
+              isLoading: false,
+              students: studentsList,
+              error: null,
+            );
+            return;
+          }
         }
+        lastError = tripResponse.error;
+        print('❌ DEBUG: Trip passengers failed or unexpected shape: $lastError');
       } catch (e) {
         lastError = e.toString();
         print('❌ DEBUG: Trip passengers exception: $e');
       }
 
-      // 2. Try general students endpoint with filtering (may have permission issues)
-      if (studentsList.isEmpty) {
-        try {
-          print('🚀 DEBUG: Trying general students endpoint...');
-          final studentsResponse = await ApiService.get<Map<String, dynamic>>(
-            '${AppConfig.studentsEndpoint}students/?limit=500',
+      // 2. Legacy fallback only when passengers did not return a normal roster payload
+      try {
+        print('🚀 DEBUG: Trying general students endpoint (fallback)...');
+        final studentsResponse = await ApiService.get<Map<String, dynamic>>(
+          '${AppConfig.studentsEndpoint}students/?limit=500',
+        );
+
+        if (_responseThrottled(studentsResponse)) {
+          state = state.copyWith(
+            isLoading: false,
+            students: const [],
+            error: studentsResponse.error ??
+                lastError ??
+                'Too many requests. Please wait and try again.',
           );
-
-          if (studentsResponse.success && studentsResponse.data != null) {
-            final data = studentsResponse.data!;
-            print('🔍 DEBUG: API Response structure: ${data.keys.toList()}');
-
-            // Get all students from results array
-            if (data['results'] != null) {
-              print('🔍 DEBUG: Found students in results array');
-              final allStudents =
-                  (data['results'] as List?)
-                      ?.map((student) => Student.fromJson(student))
-                      .toList() ??
-                  [];
-
-              print('🔍 DEBUG: Total students found: ${allStudents.length}');
-              if (allStudents.isNotEmpty) {
-                print(
-                  '🔍 DEBUG: First student structure: ${allStudents.first.toJson()}',
-                );
-              }
-
-              // Filter students by route ID
-              studentsList = allStudents.where((student) {
-                return student.assignedRoute == trip.routeId;
-              }).toList();
-
-              print(
-                '🔍 DEBUG: Students filtered for route ${trip.routeId}: ${studentsList.length}',
-              );
-            }
-            print(
-              '✅ DEBUG: General students endpoint successful: ${studentsList.length} students',
-            );
-          } else {
-            lastError = studentsResponse.error;
-            print('❌ DEBUG: General students failed: $lastError');
-          }
-        } catch (e) {
-          lastError = e.toString();
-          print('❌ DEBUG: General students exception: $e');
+          return;
         }
+
+        if (studentsResponse.success && studentsResponse.data != null) {
+          final data = studentsResponse.data!;
+          print('🔍 DEBUG: API Response structure: ${data.keys.toList()}');
+
+          if (data['results'] != null) {
+            print('🔍 DEBUG: Found students in results array');
+            final allStudents =
+                (data['results'] as List?)
+                    ?.map(
+                      (e) => Student.fromJson(
+                        Map<String, dynamic>.from(e as Map),
+                      ),
+                    )
+                    .toList() ??
+                [];
+
+            studentsList = allStudents.where((student) {
+              return student.assignedRoute == trip.routeId;
+            }).toList();
+
+            print(
+              '🔍 DEBUG: Students filtered for route ${trip.routeId}: ${studentsList.length}',
+            );
+          }
+          print(
+            '✅ DEBUG: General students endpoint successful: ${studentsList.length} students',
+          );
+        } else {
+          lastError = studentsResponse.error;
+          print('❌ DEBUG: General students failed: $lastError');
+        }
+      } catch (e) {
+        lastError = e.toString();
+        print('❌ DEBUG: General students exception: $e');
       }
 
-      // Update state based on results
       if (studentsList.isNotEmpty) {
         print(
           '✅ DEBUG: Successfully loaded ${studentsList.length} students for trip ${trip.tripId}',
@@ -1071,82 +1104,81 @@ class TripNotifier extends StateNotifier<TripState> {
         '🔍 DEBUG: Getting student count for trip ${trip.tripId} (route: ${trip.routeId})',
       );
 
-      // Try multiple endpoints in order of preference
       List<Student> studentsList = [];
 
-      // 1. Try trip-specific passengers endpoint (supported by backend)
       try {
         print('🚀 DEBUG: Trying trip passengers endpoint for count...');
         final tripResponse = await ApiService.get<Map<String, dynamic>>(
           '${AppConfig.tripDetailsEndpoint}${trip.tripId}/passengers/',
         );
 
+        if (_responseThrottled(tripResponse)) {
+          print('❌ DEBUG: Trip passengers throttled (count)');
+          return 0;
+        }
+
         if (tripResponse.success && tripResponse.data != null) {
           final data = tripResponse.data!;
-          studentsList =
-              (data['results'] as List?)
-                  ?.map((student) => Student.fromJson(student))
-                  .toList() ??
-              [];
-          print(
-            '✅ DEBUG: Trip passengers endpoint successful for count: ${studentsList.length} students',
-          );
-        } else {
-          print(
-            '❌ DEBUG: Trip passengers failed for count: ${tripResponse.error}',
-          );
+          if (data.containsKey('results')) {
+            studentsList =
+                (data['results'] as List?)
+                    ?.map(
+                      (e) => Student.fromJson(
+                        Map<String, dynamic>.from(e as Map),
+                      ),
+                    )
+                    .toList() ??
+                [];
+            print(
+              '✅ DEBUG: Trip passengers count: ${studentsList.length} students',
+            );
+            return studentsList.length;
+          }
         }
+        print(
+          '❌ DEBUG: Trip passengers failed for count: ${tripResponse.error}',
+        );
       } catch (e) {
         print('❌ DEBUG: Trip passengers exception for count: $e');
       }
 
-      // 2. Try general students endpoint with filtering (may have permission issues)
-      if (studentsList.isEmpty) {
-        try {
-          print('🚀 DEBUG: Trying general students endpoint for count...');
-          final studentsResponse = await ApiService.get<Map<String, dynamic>>(
-            '${AppConfig.studentsEndpoint}students/?limit=500',
-          );
+      try {
+        print('🚀 DEBUG: Trying general students endpoint for count (fallback)...');
+        final studentsResponse = await ApiService.get<Map<String, dynamic>>(
+          '${AppConfig.studentsEndpoint}students/?limit=500',
+        );
 
-          if (studentsResponse.success && studentsResponse.data != null) {
-            final data = studentsResponse.data!;
+        if (_responseThrottled(studentsResponse)) {
+          print('❌ DEBUG: General students throttled (count)');
+          return 0;
+        }
+
+        if (studentsResponse.success && studentsResponse.data != null) {
+          final data = studentsResponse.data!;
+          if (data['results'] != null) {
+            final allStudents =
+                (data['results'] as List?)
+                    ?.map(
+                      (e) => Student.fromJson(
+                        Map<String, dynamic>.from(e as Map),
+                      ),
+                    )
+                    .toList() ??
+                [];
+            studentsList = allStudents.where((student) {
+              return student.assignedRoute == trip.routeId;
+            }).toList();
             print(
-              '🔍 DEBUG: Student count API Response structure: ${data.keys.toList()}',
-            );
-
-            // Get all students from results array
-            if (data['results'] != null) {
-              print('🔍 DEBUG: Found students in results array for count');
-              final allStudents =
-                  (data['results'] as List?)
-                      ?.map((student) => Student.fromJson(student))
-                      .toList() ??
-                  [];
-
-              print(
-                '🔍 DEBUG: Total students found for count: ${allStudents.length}',
-              );
-
-              // Filter students by route ID
-              studentsList = allStudents.where((student) {
-                return student.assignedRoute == trip.routeId;
-              }).toList();
-
-              print(
-                '🔍 DEBUG: Students filtered for route ${trip.routeId}: ${studentsList.length}',
-              );
-            }
-            print(
-              '✅ DEBUG: General students endpoint successful for count: ${studentsList.length} students',
-            );
-          } else {
-            print(
-              '❌ DEBUG: General students failed for count: ${studentsResponse.error}',
+              '✅ DEBUG: General students count for route ${trip.routeId}: ${studentsList.length}',
             );
           }
-        } catch (e) {
-          print('❌ DEBUG: General students exception for count: $e');
+        } else {
+          print(
+            '❌ DEBUG: General students failed for count: ${studentsResponse.error}',
+          );
         }
+      } catch (e) {
+        print('❌ DEBUG: General students exception for count: $e');
       }
 
       print(
