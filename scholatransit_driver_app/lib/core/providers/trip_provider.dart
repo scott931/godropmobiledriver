@@ -243,6 +243,60 @@ class TripNotifier extends StateNotifier<TripState> {
     return filteredTrips;
   }
 
+  /// When the trips payload has no active row (pagination, filter, or parse mismatch), reuse the
+  /// trip persisted at start so the dashboard can still show and end the run.
+  Trip? _currentTripFromStorageIfStillRunnable() {
+    final raw = StorageService.getCurrentTrip();
+    if (raw == null) return null;
+    try {
+      final stored = Trip.fromJson(Map<String, dynamic>.from(raw));
+      if (stored.actualEnd != null || stored.isCompleted || stored.isCancelled) {
+        return null;
+      }
+      if (!stored.isActive) return null;
+      final driverId = StorageService.getDriverId();
+      if (driverId != null && stored.driverId != driverId) return null;
+      for (final t in state.trips) {
+        if (t.tripId == stored.tripId &&
+            (t.isCompleted || t.isCancelled || t.actualEnd != null)) {
+          return null;
+        }
+      }
+      return stored;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _syncCurrentTripAfterDriverTripsLoaded() async {
+    final activeTrips = state.trips.where((trip) => trip.isActive).toList();
+    if (activeTrips.isNotEmpty) {
+      state = state.copyWith(currentTrip: activeTrips.first);
+      _syncLiveLocationTimer();
+      return;
+    }
+
+    final restored = _currentTripFromStorageIfStillRunnable();
+    if (restored != null) {
+      final trips = List<Trip>.from(state.trips);
+      final i = trips.indexWhere((t) => t.tripId == restored.tripId);
+      if (i >= 0) {
+        if (!trips[i].isActive && restored.isActive) {
+          trips[i] = restored;
+        }
+      } else {
+        trips.add(restored);
+      }
+      state = state.copyWith(currentTrip: restored, trips: trips);
+      _syncLiveLocationTimer();
+      return;
+    }
+
+    state = state.copyWith(clearCurrentTrip: true);
+    await StorageService.clearCurrentTrip();
+    _syncLiveLocationTimer();
+  }
+
   /// True when the server asked the client to back off (avoid chaining a second heavy request).
   bool _responseThrottled(ApiResponse<dynamic> response) {
     if (response.statusCode == 429) return true;
@@ -312,14 +366,7 @@ class TripNotifier extends StateNotifier<TripState> {
     if (driverId != null) {
       // Use driver-specific endpoint - returns trips with vehicle data per trip
       await loadDriverTrips(driverId);
-      // Set current trip from active trips
-      final activeTrips = state.trips.where((trip) => trip.isActive).toList();
-      if (activeTrips.isNotEmpty) {
-        state = state.copyWith(currentTrip: activeTrips.first);
-      } else {
-        state = state.copyWith(clearCurrentTrip: true);
-      }
-      _syncLiveLocationTimer();
+      await _syncCurrentTripAfterDriverTripsLoaded();
       return;
     }
 
@@ -372,13 +419,7 @@ class TripNotifier extends StateNotifier<TripState> {
     final driverId = StorageService.getDriverId();
     if (driverId != null) {
       await loadDriverTrips(driverId);
-      final activeTrips = state.trips.where((trip) => trip.isActive).toList();
-      if (activeTrips.isNotEmpty) {
-        state = state.copyWith(currentTrip: activeTrips.first);
-      } else {
-        state = state.copyWith(clearCurrentTrip: true);
-      }
-      _syncLiveLocationTimer();
+      await _syncCurrentTripAfterDriverTripsLoaded();
       return;
     }
     await loadActiveTrips();

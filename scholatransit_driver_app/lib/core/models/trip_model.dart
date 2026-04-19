@@ -81,7 +81,10 @@ class Trip {
     this.etaLastUpdated,
   });
 
-  bool get isActive => status == TripStatus.inProgress;
+  /// True while the driver may be running this trip (including delayed runs that already started).
+  bool get isActive =>
+      status == TripStatus.inProgress ||
+      (status == TripStatus.delayed && actualStart != null);
   bool get isCompleted => status == TripStatus.completed;
   bool get isCancelled => status == TripStatus.cancelled;
   bool get isDelayed => status == TripStatus.delayed;
