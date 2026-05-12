@@ -1,7 +1,6 @@
 class AppConfig {
   // API Configuration
-  static const String baseUrl =
-      'https://schooltransit-backend-1008598403919.us-central1.run.app';
+  static const String baseUrl = 'http://148.230.122.207:3001/';
       
       
   static const String apiVersion = '/api/v1';
