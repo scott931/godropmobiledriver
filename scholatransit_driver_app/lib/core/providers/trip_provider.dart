@@ -12,6 +12,7 @@ import '../services/eta_notification_service.dart';
 import '../services/notification_service.dart';
 import '../services/parent_notification_service.dart';
 import '../services/location_service.dart';
+import '../services/location_service_resolver.dart';
 import '../services/truck_h3_service.dart';
 import '../config/app_config.dart';
 
@@ -102,6 +103,9 @@ class TripState {
 class TripNotifier extends StateNotifier<TripState> {
   Timer? _refreshTimer;
   Timer? _liveLocationTimer;
+  StreamSubscription<Position>? _livePositionSubscription;
+  DateTime? _lastLiveLocationPostAt;
+  Position? _lastPostedLivePosition;
 
   TripNotifier() : super(const TripState()) {
     _loadCurrentTrip();
@@ -849,20 +853,68 @@ class TripNotifier extends StateNotifier<TripState> {
     }
   }
 
-  /// Starts/stops periodic POSTs to [AppConfig.updateLocationEndpoint] while [TripState.currentTrip] is active.
+  /// Starts/stops live GPS posts to [AppConfig.updateLocationEndpoint] while [TripState.currentTrip] is active.
   void _syncLiveLocationTimer() {
     _liveLocationTimer?.cancel();
     _liveLocationTimer = null;
+    _livePositionSubscription?.cancel();
+    _livePositionSubscription = null;
+    _lastLiveLocationPostAt = null;
+    _lastPostedLivePosition = null;
+
     final trip = state.currentTrip;
     if (trip == null || !trip.isActive) {
       return;
     }
 
+    // Stream-driven updates from the same GPS pipeline as the map puck.
+    _livePositionSubscription =
+        LocationServiceResolver.subscribeToPositionUpdates((position) {
+      unawaited(_postLiveLocationFromPosition(position));
+    });
+
+    // Fallback poll when the stream is quiet (permissions, tunnel, emulator).
     final interval = Duration(seconds: AppConfig.locationUpdateInterval);
     _liveLocationTimer = Timer.periodic(interval, (_) {
       unawaited(_postLiveLocationTick());
     });
     unawaited(_postLiveLocationTick());
+  }
+
+  Future<void> _postLiveLocationFromPosition(Position pos) async {
+    if (AppConfig.useSimulatedVehicleMotion) {
+      return;
+    }
+    final trip = state.currentTrip;
+    if (trip == null || !trip.isActive) {
+      _syncLiveLocationTimer();
+      return;
+    }
+
+    final now = DateTime.now();
+    final minInterval = Duration(seconds: AppConfig.locationUpdateInterval);
+    if (_lastLiveLocationPostAt != null &&
+        now.difference(_lastLiveLocationPostAt!) < minInterval) {
+      if (_lastPostedLivePosition != null) {
+        final moved = Geolocator.distanceBetween(
+          _lastPostedLivePosition!.latitude,
+          _lastPostedLivePosition!.longitude,
+          pos.latitude,
+          pos.longitude,
+        );
+        if (moved < 3.0) {
+          return;
+        }
+      } else {
+        return;
+      }
+    }
+
+    final posted = await _sendLiveLocation(pos);
+    if (posted) {
+      _lastLiveLocationPostAt = now;
+      _lastPostedLivePosition = pos;
+    }
   }
 
   Future<void> _postLiveLocationTick() async {
@@ -874,9 +926,17 @@ class TripNotifier extends StateNotifier<TripState> {
       _syncLiveLocationTimer();
       return;
     }
-    final pos = await LocationService.getCurrentPosition();
+    final pos = await LocationServiceResolver.getCurrentPosition();
     if (pos == null) return;
 
+    final posted = await _sendLiveLocation(pos);
+    if (posted) {
+      _lastLiveLocationPostAt = DateTime.now();
+      _lastPostedLivePosition = pos;
+    }
+  }
+
+  Future<bool> _sendLiveLocation(Position pos) async {
     double? speedKmh;
     if (pos.speed >= 0) {
       speedKmh = pos.speed * 3.6;
@@ -886,7 +946,7 @@ class TripNotifier extends StateNotifier<TripState> {
       heading = null;
     }
 
-    await updateLocation(
+    return updateLocation(
       latitude: pos.latitude,
       longitude: pos.longitude,
       speed: speedKmh,
@@ -2040,6 +2100,7 @@ class TripNotifier extends StateNotifier<TripState> {
   void dispose() {
     _refreshTimer?.cancel();
     _liveLocationTimer?.cancel();
+    _livePositionSubscription?.cancel();
     super.dispose();
   }
 }

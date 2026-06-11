@@ -16,7 +16,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/providers/location_provider.dart';
 import '../../../core/models/trip_model.dart';
+import '../../../core/models/student_model.dart';
 import '../../../core/services/routing_service.dart';
+import '../../../core/services/route_mapping_service.dart';
 import '../../../core/services/realtime_distance_tracker.dart';
 import '../../../core/services/location_service_resolver.dart';
 import '../../../core/services/truck_h3_service.dart';
@@ -34,8 +36,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Point? _currentLocation;
   PointAnnotationManager? _pointAnnotationManager;
   PointAnnotation? _currentLocationAnnotation;
+  PointAnnotation? _vehiclePinAnnotation;
+  PointAnnotation? _vehiclePinShadowAnnotation;
   PointAnnotation? _startLocationAnnotation;
   PointAnnotation? _endLocationAnnotation;
+  final List<PointAnnotation> _pickupStopAnnotations = [];
+  int _tripRouteLoadGeneration = 0;
+  RouteMap? _activeRouteMap;
+  String? _nextPickupStopName;
   PolylineAnnotationManager? _polylineAnnotationManager;
   PolylineAnnotation? _routePolyline;
 
@@ -76,6 +84,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   DateTime? _lastCameraUpdateAt;
   DateTime? _lastMotionTickAt;
   Uint8List? _vehicleMarkerImageBytes;
+  Uint8List? _cachedPinImageBytes;
+  Uint8List? _cachedPinShadowBytes;
+  bool _mapStyleReady = false;
   Point? _filteredGpsPoint;
   double _lastSegmentDistanceMeters = 0.0;
   double _lastAnimationProgress = 0.0;
@@ -94,6 +105,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Avoid rebuilding [MapWidget] every 16ms; puck/camera update via Mapbox style APIs only.
   static const Duration _motionUiSetStateMinInterval = Duration(milliseconds: 250);
   DateTime? _lastMotionUiSetStateAt;
+
+  /// Map consumes GPS directly during an active trip (avoids provider + stream double-delivery).
+  bool _mapGpsListenerActive = false;
+  geolocator.Position? _lastAcceptedGpsFix;
+  DateTime? _lastAcceptedGpsAt;
+  int _puckUpdateGeneration = 0;
+  static const double _minGpsMovementMeters = 1.0;
+  static const Duration _minGpsAcceptInterval = Duration(milliseconds: 350);
 
   @override
   void initState() {
@@ -119,6 +138,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _vehicleMotionTimer?.cancel();
     _stationaryPulseTimer?.cancel();
     _vehicleMarkerImageBytes = null;
+    _cachedPinImageBytes = null;
+    _cachedPinShadowBytes = null;
+    unawaited(_removeVehiclePinAnnotations());
     _stopDistanceTracking();
     super.dispose();
   }
@@ -126,9 +148,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _handleTripStateChange(TripState? previous, TripState next) {
     if (!mounted) return;
 
-    if (_mapboxMap != null && next.currentTrip != null) {
+    if (_mapboxMap != null &&
+        next.currentTrip != null &&
+        next.currentTrip!.isActive) {
       _loadTripRoute();
-      _addTripMarkers();
 
       // Avoid restarting tracking for the same trip on every state emission.
       final currentTripId = next.currentTrip!.tripId;
@@ -136,8 +159,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _trackedTripId = currentTripId;
         _startDistanceTracking(next.currentTrip!);
       }
-    } else if (_mapboxMap != null && next.currentTrip == null) {
+    } else if (_mapboxMap != null &&
+        (next.currentTrip == null || !next.currentTrip!.isActive)) {
       _trackedTripId = null;
+      unawaited(_clearTripMarkers());
       _clearRoutePolyline();
       _stopDistanceTracking();
     }
@@ -148,16 +173,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     LocationState next,
   ) {
     if (!mounted) return;
+    // During live trip tracking the map owns the GPS stream; skip provider fan-out.
+    if (_mapGpsListenerActive) return;
+
     final p = next.currentPosition;
     if (p == null) return;
 
-    // Ignore repeated identical fixes from resolver/provider fan-out.
-    if (previous?.currentPosition != null) {
-      final prev = previous!.currentPosition!;
-      if (prev.latitude == p.latitude && prev.longitude == p.longitude) {
-        return;
-      }
-    }
     _onMapGpsPosition(p);
   }
 
@@ -219,6 +240,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     zoom: 15.0,
                   ),
                   styleUri: MapboxStyles.MAPBOX_STREETS,
+                  onStyleLoadedListener: (_) {
+                    _mapStyleReady = true;
+                    unawaited(_initializeVehiclePinMarker());
+                  },
                   onMapCreated: (MapboxMap mapboxMap) async {
                     print('🗺️ DEBUG: Map created successfully');
                     _mapboxMap = mapboxMap;
@@ -230,18 +255,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     print('🗺️ DEBUG: Polyline annotation manager created');
 
                     _addTestMarker();
-                    await _setupVehiclePuckLayers();
+                    if (_mapStyleReady) {
+                      await _initializeVehiclePinMarker();
+                    }
                     _addCurrentLocationMarker();
 
                     // Force load active trips and then add markers
                     print('🗺️ DEBUG: Loading active trips...');
                     await ref.read(tripProvider.notifier).loadActiveTrips();
 
-                    print('🗺️ DEBUG: Calling _loadTripRoute()...');
-                    _loadTripRoute();
-
-                    print('🗺️ DEBUG: Calling _addTripMarkers()...');
-                    _addTripMarkers();
                     _handleTripStateChange(null, ref.read(tripProvider));
 
                     // H3 layer (additive - only when enabled)
@@ -266,6 +288,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               remainingTime: _remainingTime,
               currentStreetName: _currentStreetName,
               destinationStreetName: _destinationStreetName,
+              nextPickupStopName: _nextPickupStopName,
+              pendingPickupCount: _activeRouteMap?.stops.length,
             ),
           ),
           if (AppConfig.showVehicleTrackingDebugOverlay)
@@ -450,88 +474,134 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  /// Vehicle puck uses dedicated [GeoJsonSource] ids ([_vehicleSourceId], layers above).
-  /// Trip route uses [PolylineAnnotationManager] (annotation stack), not the same source.
-  Future<void> _setupVehiclePuckLayers() async {
+  /// Removes legacy style-layer puck (blue halo) and mounts a teardrop [PointAnnotation].
+  Future<void> _initializeVehiclePinMarker() async {
+    if (_mapboxMap == null || _pointAnnotationManager == null) return;
+    await _removeLegacyVehicleStyleLayers();
+    await _removeVehiclePinAnnotations();
+    await _ensureVehiclePinMarkerVisible();
+  }
+
+  Future<void> _removeLegacyVehicleStyleLayers() async {
     if (_mapboxMap == null) return;
     final style = _mapboxMap!.style;
     try {
-      if (!await style.styleSourceExists(_vehicleSourceId)) {
-        await style.addSource(
-          GeoJsonSource(
-            id: _vehicleSourceId,
-            data: _vehicleFeatureCollectionJson(
-              _currentLocation ??
-                  Point(
-                    coordinates: Position(
-                      AppConfig.defaultLongitude,
-                      AppConfig.defaultLatitude,
-                    ),
-                  ),
-              _vehicleBearing,
-              _computeIconSizeForZoom(15.0),
-            ),
-          ),
-        );
+      for (final layerId in [
+        _vehicleLayerId,
+        _vehicleShadowLayerId,
+        _vehicleHaloLayerId,
+      ]) {
+        if (await style.styleLayerExists(layerId)) {
+          await style.removeStyleLayer(layerId);
+        }
       }
-
-      await _ensureVehiclePuckImages();
-
-      if (!await style.styleLayerExists(_vehicleHaloLayerId)) {
-        await style.addLayer(
-          CircleLayer(
-            id: _vehicleHaloLayerId,
-            sourceId: _vehicleSourceId,
-            circleColor: Colors.blueAccent.value,
-            circleOpacity: 0.18,
-            circleRadius: _pulseRadius,
-            circlePitchAlignment: CirclePitchAlignment.MAP,
-            circlePitchScale: CirclePitchScale.MAP,
-          ),
-        );
+      for (final imageId in [_vehicleIconImageId, _vehicleShadowImageId]) {
+        if (await style.hasStyleImage(imageId)) {
+          await style.removeStyleImage(imageId);
+        }
       }
-
-      if (!await style.styleLayerExists(_vehicleShadowLayerId)) {
-        await style.addLayer(
-          SymbolLayer(
-            id: _vehicleShadowLayerId,
-            sourceId: _vehicleSourceId,
-            iconImage: _vehicleShadowImageId,
-            iconAllowOverlap: true,
-            iconIgnorePlacement: true,
-            iconOpacity: 0.30,
-            iconOffset: [0.9, 1.2],
-            iconPitchAlignment: IconPitchAlignment.MAP,
-            iconRotationAlignment: IconRotationAlignment.MAP,
-            iconRotateExpression: ['get', 'bearing'],
-            iconSizeExpression: ['get', 'iconSize'],
-          ),
-        );
+      if (await style.styleSourceExists(_vehicleSourceId)) {
+        await style.removeStyleSource(_vehicleSourceId);
       }
-
-      if (!await style.styleLayerExists(_vehicleLayerId)) {
-        await style.addLayer(
-          SymbolLayer(
-            id: _vehicleLayerId,
-            sourceId: _vehicleSourceId,
-            iconImage: _vehicleIconImageId,
-            iconAllowOverlap: true,
-            iconIgnorePlacement: true,
-            iconPitchAlignment: IconPitchAlignment.MAP,
-            iconRotationAlignment: IconRotationAlignment.MAP,
-            iconRotateExpression: ['get', 'bearing'],
-            iconSizeExpression: ['get', 'iconSize'],
-          ),
-        );
-      }
-      _startStationaryPulseTicker();
     } catch (e) {
-      print('❌ Error setting up vehicle puck layers: $e');
+      print('⚠️ Could not remove legacy vehicle style layers: $e');
     }
   }
 
-  void _loadTripRoute() async {
+  Future<void> _removeVehiclePinAnnotations() async {
+    if (_pointAnnotationManager == null) return;
+    try {
+      if (_vehiclePinShadowAnnotation != null) {
+        await _pointAnnotationManager!.delete(_vehiclePinShadowAnnotation!);
+        _vehiclePinShadowAnnotation = null;
+      }
+      if (_vehiclePinAnnotation != null) {
+        await _pointAnnotationManager!.delete(_vehiclePinAnnotation!);
+        _vehiclePinAnnotation = null;
+      }
+    } catch (e) {
+      print('⚠️ Could not remove vehicle pin annotations: $e');
+    }
+  }
+
+  Future<void> _ensureVehiclePinMarkerVisible() async {
+    if (_mapboxMap == null ||
+        _pointAnnotationManager == null ||
+        _currentLocation == null) {
+      return;
+    }
+
+    try {
+      final pinBytes = await _vehiclePinImageBytes();
+      final shadowBytes = await _vehiclePinShadowBytes();
+
+      if (_vehiclePinShadowAnnotation == null) {
+        _vehiclePinShadowAnnotation = await _pointAnnotationManager!.create(
+          PointAnnotationOptions(
+            geometry: _currentLocation!,
+            image: shadowBytes,
+            iconAnchor: IconAnchor.BOTTOM,
+            iconSize: 1.0,
+            iconOffset: [0.0, 4.0],
+            iconOpacity: 0.45,
+            symbolSortKey: 9998,
+          ),
+        );
+      }
+
+      if (_vehiclePinAnnotation == null) {
+        _vehiclePinAnnotation = await _pointAnnotationManager!.create(
+          PointAnnotationOptions(
+            geometry: _currentLocation!,
+            image: pinBytes,
+            iconAnchor: IconAnchor.BOTTOM,
+            iconSize: 1.3,
+            symbolSortKey: 9999,
+          ),
+        );
+        print('✅ Vehicle map pin annotation created');
+      }
+    } catch (e) {
+      print('❌ Error creating vehicle pin annotation: $e');
+    }
+  }
+
+  Future<Uint8List> _vehiclePinImageBytes() async {
+    _cachedPinImageBytes ??= await _loadVehiclePinImage();
+    return _cachedPinImageBytes!;
+  }
+
+  Future<Uint8List> _vehiclePinShadowBytes() async {
+    _cachedPinShadowBytes ??= await _createPinGroundShadowImage();
+    return _cachedPinShadowBytes!;
+  }
+
+  Future<void> _clearTripMarkers() async {
+    if (_pointAnnotationManager == null) return;
+
+    try {
+      if (_startLocationAnnotation != null) {
+        await _pointAnnotationManager!.delete(_startLocationAnnotation!);
+        _startLocationAnnotation = null;
+      }
+      if (_endLocationAnnotation != null) {
+        await _pointAnnotationManager!.delete(_endLocationAnnotation!);
+        _endLocationAnnotation = null;
+      }
+      for (final annotation in _pickupStopAnnotations) {
+        await _pointAnnotationManager!.delete(annotation);
+      }
+      _pickupStopAnnotations.clear();
+      _activeRouteMap = null;
+      _nextPickupStopName = null;
+    } catch (e) {
+      print('❌ Error clearing trip markers: $e');
+    }
+  }
+
+  Future<void> _loadTripRoute() async {
     if (!mounted) return;
+    final generation = ++_tripRouteLoadGeneration;
 
     print('🚀 DEBUG: _loadTripRoute() called');
 
@@ -565,7 +635,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
 
     try {
-      // Remove existing trip markers
+      if (!mounted || generation != _tripRouteLoadGeneration) return;
+
+      // Clear previous markers before re-adding.
+      for (final annotation in _pickupStopAnnotations) {
+        await _pointAnnotationManager!.delete(annotation);
+      }
+      _pickupStopAnnotations.clear();
       if (_startLocationAnnotation != null) {
         await _pointAnnotationManager!.delete(_startLocationAnnotation!);
         _startLocationAnnotation = null;
@@ -574,74 +650,205 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         await _pointAnnotationManager!.delete(_endLocationAnnotation!);
         _endLocationAnnotation = null;
       }
+      if (!mounted || generation != _tripRouteLoadGeneration) return;
 
-      // Add start location marker
+      var students = tripState.students;
+      if (students.isEmpty) {
+        await ref
+            .read(tripProvider.notifier)
+            .loadTripStudents(currentTrip.id, tripContext: currentTrip);
+        students = ref.read(tripProvider).students;
+      }
+
+      final currentPosition =
+          await LocationServiceResolver.getCurrentPosition();
+      final currentLat = currentPosition?.latitude ??
+          _currentLocation?.coordinates.lat.toDouble();
+      final currentLng = currentPosition?.longitude ??
+          _currentLocation?.coordinates.lng.toDouble();
+
+      final routeMap = await RouteMappingService.calculateLiveNavigationRoute(
+        trip: currentTrip,
+        students: students,
+        currentLat: currentLat,
+        currentLng: currentLng,
+      );
+
+      if (routeMap != null && routeMap.routePath.isNotEmpty) {
+        if (!mounted || generation != _tripRouteLoadGeneration) return;
+
+        _activeRouteMap = routeMap;
+        _nextPickupStopName = routeMap.stops.isNotEmpty
+            ? routeMap.stops.first.name
+            : routeMap.schoolStop?.name;
+
+        await _syncPickupStopMarkers(routeMap, students, generation);
+        if (!mounted || generation != _tripRouteLoadGeneration) return;
+
+        if (currentTrip.endLatitude != null &&
+            currentTrip.endLongitude != null) {
+          final endMarker = PointAnnotationOptions(
+            geometry: Point(
+              coordinates: Position(
+                currentTrip.endLongitude!,
+                currentTrip.endLatitude!,
+              ),
+            ),
+            image: await _createMarkerImage(Colors.red, '🏁', size: 45),
+          );
+          _endLocationAnnotation =
+              await _pointAnnotationManager!.create(endMarker);
+        }
+
+        await _drawRouteFromPath(routeMap.routePath);
+        await RealtimeDistanceTracker.applyRoutePath(
+          coordinates: routeMap.routePath,
+          totalDistanceMeters: routeMap.totalDistance,
+        );
+
+        if (mounted) {
+          setState(() {
+            _remainingDistance = routeMap.totalDistance;
+            _totalTripDistance = routeMap.totalDistance;
+            _remainingTime = routeMap.totalDuration;
+            _distanceTraveled = 0.0;
+            _progressPercentage = 0.0;
+          });
+        }
+
+        if (currentTrip.endLatitude != null &&
+            currentTrip.startLatitude != null) {
+          _zoomToTripRoute(currentTrip);
+        }
+
+        print(
+          '✅ Live pickup route loaded: ${routeMap.stops.length} pending stops',
+        );
+        return;
+      }
+
+      // Fallback: simple start → end route when no student pickup coordinates.
+      print('ℹ️ Falling back to direct route (no pickup coordinates)');
+
       if (currentTrip.startLatitude != null &&
           currentTrip.startLongitude != null) {
-        print('🟢 DEBUG: Creating GREEN start marker...');
-        print(
-          '🟢 DEBUG: Start location: ${_getLocationName(currentTrip.startLatitude, currentTrip.startLongitude, currentTrip.startLocation)}',
-        );
-
-        final startPoint = Point(
-          coordinates: Position(
-            currentTrip.startLongitude!,
-            currentTrip.startLatitude!,
-          ),
-        );
-
         final startMarker = PointAnnotationOptions(
-          geometry: startPoint,
+          geometry: Point(
+            coordinates: Position(
+              currentTrip.startLongitude!,
+              currentTrip.startLatitude!,
+            ),
+          ),
           image: await _createMarkerImage(Colors.green, '🚀'),
         );
-
-        _startLocationAnnotation = await _pointAnnotationManager!.create(
-          startMarker,
-        );
-        print(
-          '✅ GREEN Start location marker added: ${_getLocationName(currentTrip.startLatitude, currentTrip.startLongitude, currentTrip.startLocation)}',
-        );
-
-        // Auto-zoom to trip route (shows both start and end)
+        _startLocationAnnotation =
+            await _pointAnnotationManager!.create(startMarker);
         _zoomToTripRoute(currentTrip);
-      } else {
-        print('❌ DEBUG: Cannot create start marker - missing coordinates');
-        print('❌ DEBUG: startLatitude: ${currentTrip.startLatitude}');
-        print('❌ DEBUG: startLongitude: ${currentTrip.startLongitude}');
       }
+      if (!mounted || generation != _tripRouteLoadGeneration) return;
 
-      // Add end location marker
       if (currentTrip.endLatitude != null && currentTrip.endLongitude != null) {
-        final endPoint = Point(
-          coordinates: Position(
-            currentTrip.endLongitude!,
-            currentTrip.endLatitude!,
-          ),
-        );
-
         final endMarker = PointAnnotationOptions(
-          geometry: endPoint,
-          image: await _createMarkerImage(Colors.red, '🏁'),
+          geometry: Point(
+            coordinates: Position(
+              currentTrip.endLongitude!,
+              currentTrip.endLatitude!,
+            ),
+          ),
+          image: await _createMarkerImage(Colors.red, '🏁', size: 45),
         );
-
-        _endLocationAnnotation = await _pointAnnotationManager!.create(
-          endMarker,
-        );
-        print(
-          '✅ End location marker added: ${_getLocationName(currentTrip.endLatitude, currentTrip.endLongitude, currentTrip.endLocation)}',
-        );
+        _endLocationAnnotation =
+            await _pointAnnotationManager!.create(endMarker);
       }
+      if (!mounted || generation != _tripRouteLoadGeneration) return;
 
-      // Draw route polyline from current location to destination
-      print('🗺️ DEBUG: Drawing route from current location to destination...');
+      _activeRouteMap = null;
+      _nextPickupStopName = null;
       await _drawRouteFromCurrentLocation(currentTrip);
-      print('🗺️ DEBUG: Route from current location drawing completed');
+      if (!mounted || generation != _tripRouteLoadGeneration) return;
 
       print(
         '✅ Trip route markers added to map for trip: ${currentTrip.tripId}',
       );
     } catch (e) {
       print('❌ Error adding trip route markers: $e');
+    }
+  }
+
+  Future<void> _syncPickupStopMarkers(
+    RouteMap routeMap,
+    List<Student> students,
+    int generation,
+  ) async {
+    if (_pointAnnotationManager == null) return;
+
+    var order = 1;
+    for (final stop in routeMap.stops) {
+      if (!mounted || generation != _tripRouteLoadGeneration) return;
+
+      final annotation = await _pointAnnotationManager!.create(
+        PointAnnotationOptions(
+          geometry: Point(
+            coordinates: Position(stop.longitude, stop.latitude),
+          ),
+          image: await _createNumberedStopMarkerImage(
+            '$order',
+            color: const Color(0xFF1E3A8A),
+          ),
+        ),
+      );
+      _pickupStopAnnotations.add(annotation);
+      order++;
+    }
+
+    for (final student in students) {
+      if (!RouteMappingService.isStudentPickupComplete(student)) continue;
+      if (student.latitude == null || student.longitude == null) continue;
+      if (!mounted || generation != _tripRouteLoadGeneration) return;
+
+      final annotation = await _pointAnnotationManager!.create(
+        PointAnnotationOptions(
+          geometry: Point(
+            coordinates: Position(student.longitude!, student.latitude!),
+          ),
+          image: await _createNumberedStopMarkerImage(
+            '✓',
+            color: const Color(0xFF059669),
+          ),
+        ),
+      );
+      _pickupStopAnnotations.add(annotation);
+    }
+  }
+
+  Future<void> _drawRouteFromPath(List<Map<String, double>> path) async {
+    if (_polylineAnnotationManager == null || path.isEmpty) return;
+
+    try {
+      if (_routePolyline != null) {
+        await _polylineAnnotationManager!.delete(_routePolyline!);
+        _routePolyline = null;
+      }
+
+      final routePositions = path
+          .map((coord) => Position(coord['longitude']!, coord['latitude']!))
+          .toList();
+
+      final colorString = AppConfig.routeColorPrimary.replaceFirst('#', '');
+      final routeColor = int.parse('FF$colorString', radix: 16);
+
+      _routePolyline = await _polylineAnnotationManager!.create(
+        PolylineAnnotationOptions(
+          geometry: LineString(coordinates: routePositions),
+          lineColor: routeColor,
+          lineWidth: 4.0,
+          lineOpacity: 0.85,
+        ),
+      );
+
+      print('✅ Multi-stop route drawn (${routePositions.length} points)');
+    } catch (e) {
+      print('❌ Error drawing multi-stop route: $e');
     }
   }
 
@@ -876,71 +1083,49 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  void _addTripMarkers() async {
-    if (!mounted) return;
-
-    if (_mapboxMap == null || _pointAnnotationManager == null) {
-      print('❌ Map or annotation manager not ready');
-      return;
-    }
-
-    final tripState = ref.read(tripProvider);
-    print('🔍 DEBUG: Total trips loaded: ${tripState.trips.length}');
-    print(
-      '🔍 DEBUG: Trip states: ${tripState.trips.map((t) => '${t.tripId}: ${t.status.name}').join(', ')}',
-    );
-
-    final activeTrips = tripState.trips.where((trip) => trip.isActive).toList();
-    print('🔍 DEBUG: Active trips found: ${activeTrips.length}');
-
-    if (activeTrips.isEmpty) {
-      print('ℹ️ No active trips to display markers for');
-      return;
-    }
-
-    try {
-      print('🚌 Adding markers for ${activeTrips.length} active trips:');
-      for (final trip in activeTrips) {
-        print(
-          '🔍 DEBUG: Trip ${trip.tripId} - Start: ${_getLocationName(trip.startLatitude, trip.startLongitude, trip.startLocation)}',
-        );
-        print(
-          '🔍 DEBUG: Trip ${trip.tripId} - End: ${_getLocationName(trip.endLatitude, trip.endLongitude, trip.endLocation)}',
-        );
-        print('🔍 DEBUG: Trip ${trip.tripId} - Status: ${trip.status.name}');
-
-        if (trip.startLatitude != null && trip.startLongitude != null) {
-          final tripPoint = Point(
-            coordinates: Position(trip.startLongitude!, trip.startLatitude!),
-          );
-
-          final tripMarker = PointAnnotationOptions(
-            geometry: tripPoint,
-            image: await _createMarkerImage(Colors.orange, '🚌'),
-          );
-
-          await _pointAnnotationManager!.create(tripMarker);
-          print(
-            '  ✅ Trip ${trip.tripId} marker added at: ${_getLocationName(trip.startLatitude, trip.startLongitude, trip.startLocation)}',
-          );
-        } else {
-          print('  ❌ Trip ${trip.tripId} has no valid coordinates');
-        }
-      }
-      print('✅ All trip markers added to map');
-    } catch (e) {
-      print('❌ Error adding trip markers: $e');
-    }
-  }
-
   void _onMapGpsPosition(geolocator.Position position) {
     if (!mounted) return;
+    if (!_shouldAcceptGpsFix(position)) return;
+
+    _lastAcceptedGpsFix = position;
+    _lastAcceptedGpsAt = DateTime.now();
+
     _handleIncomingVehicleLocation(position);
     RealtimeDistanceTracker.forceDistanceUpdate();
     _updateRouteLineForProgress();
     if (AppConfig.enableH3Tracking) {
       _updateH3FromPosition(position);
     }
+  }
+
+  /// Drops duplicate / stale fixes so only one motion segment runs at a time.
+  bool _shouldAcceptGpsFix(geolocator.Position position) {
+    final last = _lastAcceptedGpsFix;
+    if (last == null) return true;
+
+    if (position.timestamp.isBefore(last.timestamp)) {
+      return false;
+    }
+
+    final moved = geolocator.Geolocator.distanceBetween(
+      last.latitude,
+      last.longitude,
+      position.latitude,
+      position.longitude,
+    );
+
+    if (moved < 0.05) {
+      return false;
+    }
+
+    final acceptedAt = _lastAcceptedGpsAt;
+    if (acceptedAt != null &&
+        moved < _minGpsMovementMeters &&
+        DateTime.now().difference(acceptedAt) < _minGpsAcceptInterval) {
+      return false;
+    }
+
+    return true;
   }
 
   /// Start real-time distance tracking for a trip
@@ -950,6 +1135,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
       await _mapPositionSubscription?.cancel();
       _mapPositionSubscription = null;
+      _mapGpsListenerActive = false;
 
       final alreadyTracking =
           LocationServiceResolver.getServiceStatus()['is_tracking'] == true;
@@ -984,6 +1170,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           print('❌ Failed to start location service');
           return;
         }
+        _mapGpsListenerActive = true;
       } else {
         print(
           '📏 GPS stream already active — subscribing map to position updates (adb / emulator)',
@@ -996,7 +1183,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           print(
             '❌ Could not subscribe to GPS stream; try opening map after granting location permission',
           );
+          return;
         }
+        _mapGpsListenerActive = true;
       }
 
       print('📏 Setting up distance tracking callbacks...');
@@ -1030,6 +1219,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _stopDistanceTracking() {
     try {
       print('📏 Stopping distance tracking...');
+      _mapGpsListenerActive = false;
+      _lastAcceptedGpsFix = null;
+      _lastAcceptedGpsAt = null;
       _mapPositionSubscription?.cancel();
       _mapPositionSubscription = null;
       RealtimeDistanceTracker.stopDistanceTracking();
@@ -1543,7 +1735,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final nextPoint = _applyGpsJitterFilter(rawPoint);
     final now = DateTime.now();
     final previousGpsAt = _lastGpsUpdateAt;
-    final previousPoint = _motionTargetPoint ?? _currentLocation;
+    // Animate from the puck's current rendered position, not the prior segment target.
+    final previousPoint = _currentLocation;
+
+    if (previousPoint != null) {
+      final segmentM = _distanceMeters(previousPoint, nextPoint);
+      if (segmentM < _minGpsMovementMeters &&
+          previousGpsAt != null &&
+          now.difference(previousGpsAt) < _minGpsAcceptInterval) {
+        return;
+      }
+    }
 
     _lastKnownSpeedMps = _extractSpeedMps(position);
     if (_lastKnownSpeedMps <= 0.5 &&
@@ -1736,108 +1938,151 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _ensureVehiclePuckImages() async {
-    if (_mapboxMap == null) return;
-    final style = _mapboxMap!.style;
-    try {
-      final hasCar = await style.hasStyleImage(_vehicleIconImageId);
-      if (!hasCar) {
-        final carBytes = await _loadVehiclePuckPngOrFallback();
-        final carImage = await _decodePngToMbxImage(carBytes);
-        await style.addStyleImage(
-          _vehicleIconImageId,
-          1.0,
-          carImage,
-          false,
-          [],
-          [],
-          null,
-        );
-      }
-
-      final hasShadow = await style.hasStyleImage(_vehicleShadowImageId);
-      if (!hasShadow) {
-        final shadowBytes = await _createVehicleShadowImage();
-        final shadowImage = await _decodePngToMbxImage(shadowBytes);
-        await style.addStyleImage(
-          _vehicleShadowImageId,
-          1.0,
-          shadowImage,
-          false,
-          [],
-          [],
-          null,
-        );
-      }
-    } catch (e) {
-      print('❌ Error ensuring puck images: $e');
-    }
+    // Style-layer images are no longer used; pin is a PointAnnotation.
+    await _vehiclePinImageBytes();
+    await _vehiclePinShadowBytes();
   }
 
-  Future<Uint8List> _loadVehiclePuckPngOrFallback() async {
+  Color _vehiclePinColor() => _colorFromHex(AppConfig.vehicleLocationPinColor);
+
+  Color _colorFromHex(String hex) {
+    final cleaned = hex.replaceFirst('#', '');
+    return Color(int.parse('FF$cleaned', radix: 16));
+  }
+
+  Future<Uint8List> _loadVehiclePinImage() async {
     const candidates = [
-      'assets/images/car_top_view.png',
-      'assets/images/vehicle_top_view.png',
-      'assets/images/car_puck.png',
+      'assets/images/map_pin.png',
+      'assets/images/location_pin.png',
+      'assets/images/google_maps_pin.png',
     ];
     for (final asset in candidates) {
       try {
         final data = await rootBundle.load(asset);
-        print('✅ Loaded vehicle puck asset: $asset');
+        print('✅ Loaded map pin asset: $asset');
         return data.buffer.asUint8List();
       } catch (_) {
         // Try next candidate.
       }
     }
-    print('⚠️ No car asset found, using generated fallback puck');
-    return _createCarPuckFallbackImage();
+    print('ℹ️ Using generated Google Maps-style pin');
+    return _createGoogleMapsPinImage(_vehiclePinColor());
   }
 
-  Future<Uint8List> _createCarPuckFallbackImage() async {
+  /// Teardrop pin with tip at bottom-center (anchor [0.5, 1.0]).
+  Future<Uint8List> _createGoogleMapsPinImage(Color pinColor) async {
+    const width = 96.0;
+    const height = 128.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    const size = 128.0;
+    final pinPath = _buildTeardropPinPath(width, height);
 
-    final bodyPaint = Paint()..color = Colors.white;
-    final strokePaint = Paint()
-      ..color = const Color(0xFF111827)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
-    final windowPaint = Paint()..color = const Color(0xFF334155);
+    // Soft cast shadow on the pin body.
+    final bodyShadow = Paint()
+      ..color = Colors.black.withValues(alpha: 0.28)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.save();
+    canvas.translate(1.5, 2.5);
+    canvas.drawPath(pinPath, bodyShadow);
+    canvas.restore();
 
-    final body = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(28, 10, 72, 108),
-      const Radius.circular(24),
+    // Pin fill + subtle rim.
+    canvas.drawPath(
+      pinPath,
+      Paint()
+        ..color = pinColor
+        ..style = PaintingStyle.fill,
     );
-    canvas.drawRRect(body, bodyPaint);
-    canvas.drawRRect(body, strokePaint);
-
-    final roof = RRect.fromRectAndRadius(
-      const Rect.fromLTWH(40, 28, 48, 58),
-      const Radius.circular(12),
+    canvas.drawPath(
+      pinPath,
+      Paint()
+        ..color = _darkenColor(pinColor, 0.12)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.25,
     );
-    canvas.drawRRect(roof, windowPaint);
 
-    final lightPaint = Paint()..color = const Color(0xFF60A5FA);
-    canvas.drawCircle(const Offset(64, 16), 4, lightPaint);
-    canvas.drawCircle(const Offset(64, 112), 4, lightPaint);
+    // Inner white disc (classic Google Maps look).
+    final headCenter = Offset(width / 2, height * 0.31);
+    canvas.drawCircle(headCenter, width * 0.19, Paint()..color = Colors.white);
+    canvas.drawCircle(
+      headCenter,
+      width * 0.19,
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.08)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
 
     final picture = recorder.endRecording();
-    final image = await picture.toImage(size.toInt(), size.toInt());
+    final image = await picture.toImage(width.toInt(), height.toInt());
     final png = await image.toByteData(format: ui.ImageByteFormat.png);
     return png!.buffer.asUint8List();
   }
 
-  Future<Uint8List> _createVehicleShadowImage() async {
+  Path _buildTeardropPinPath(double width, double height) {
+    final cx = width / 2;
+    final headRadius = width * 0.36;
+    final headCenterY = headRadius + 8;
+    final tipY = height - 1;
+
+    final path = Path();
+    path.moveTo(cx, tipY);
+    path.cubicTo(
+      cx - headRadius * 0.22,
+      height * 0.62,
+      cx - headRadius * 1.05,
+      headCenterY + headRadius * 0.35,
+      cx - headRadius,
+      headCenterY,
+    );
+    path.arcToPoint(
+      Offset(cx + headRadius, headCenterY),
+      radius: Radius.circular(headRadius),
+      clockwise: true,
+    );
+    path.cubicTo(
+      cx + headRadius * 1.05,
+      headCenterY + headRadius * 0.35,
+      cx + headRadius * 0.22,
+      height * 0.62,
+      cx,
+      tipY,
+    );
+    path.close();
+    return path;
+  }
+
+  Color _darkenColor(Color color, double amount) {
+    return Color.fromARGB(
+      (color.a * 255).round().clamp(0, 255),
+      ((color.r * 255) * (1 - amount)).round().clamp(0, 255),
+      ((color.g * 255) * (1 - amount)).round().clamp(0, 255),
+      ((color.b * 255) * (1 - amount)).round().clamp(0, 255),
+    );
+  }
+
+  /// Elliptical ground shadow placed under the pin tip.
+  Future<Uint8List> _createPinGroundShadowImage() async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    const size = 128.0;
-    final shadowPaint = Paint()..color = Colors.black.withOpacity(0.55);
+    const width = 96.0;
+    const height = 48.0;
+
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+
     canvas.drawOval(
-      const Rect.fromLTWH(24, 36, 80, 56),
+      Rect.fromCenter(
+        center: Offset(width / 2, height * 0.72),
+        width: width * 0.52,
+        height: height * 0.38,
+      ),
       shadowPaint,
     );
+
     final picture = recorder.endRecording();
-    final image = await picture.toImage(size.toInt(), size.toInt());
+    final image = await picture.toImage(width.toInt(), height.toInt());
     final png = await image.toByteData(format: ui.ImageByteFormat.png);
     return png!.buffer.asUint8List();
   }
@@ -1855,18 +2100,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _updateVehiclePuckSource(Point point, double bearing) async {
-    if (_mapboxMap == null) return;
+    if (_mapboxMap == null || _pointAnnotationManager == null) return;
+    final generation = ++_puckUpdateGeneration;
     try {
-      final source = await _mapboxMap!.style.getSource(_vehicleSourceId);
-      final cameraState = await _mapboxMap!.getCameraState();
-      final iconSize = _computeIconSizeForZoom(cameraState.zoom);
-      final geoJson = _vehicleFeatureCollectionJson(point, bearing, iconSize);
-      if (source != null && source is GeoJsonSource) {
-        await source.updateGeoJSON(geoJson);
+      if (_vehiclePinAnnotation == null || _vehiclePinShadowAnnotation == null) {
+        _currentLocation = point;
+        await _ensureVehiclePinMarkerVisible();
       }
-      _updateStationaryPulseVisibility();
+      if (generation != _puckUpdateGeneration) return;
+
+      if (_vehiclePinShadowAnnotation != null) {
+        _vehiclePinShadowAnnotation!.geometry = point;
+        await _pointAnnotationManager!.update(_vehiclePinShadowAnnotation!);
+      }
+      if (generation != _puckUpdateGeneration) return;
+
+      if (_vehiclePinAnnotation != null) {
+        _vehiclePinAnnotation!.geometry = point;
+        await _pointAnnotationManager!.update(_vehiclePinAnnotation!);
+      }
     } catch (e) {
-      print('❌ Error updating vehicle puck source: $e');
+      if (generation == _puckUpdateGeneration) {
+        print('❌ Error updating vehicle pin annotation: $e');
+      }
     }
   }
 
@@ -1894,38 +2150,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   double _computeIconSizeForZoom(double zoom) {
-    final normalized = ((zoom - 12.0) / 10.0).clamp(0.0, 1.0);
-    return 0.65 + (normalized * 0.75);
-  }
-
-  void _startStationaryPulseTicker() {
-    _stationaryPulseTimer?.cancel();
-    _stationaryPulseTimer = Timer.periodic(const Duration(milliseconds: 90), (_) async {
-      if (_mapboxMap == null || !mounted) return;
-      final isStationary = _lastKnownSpeedMps < 0.5;
-      if (!isStationary) return;
-      _pulseRadius += _pulseGrowing ? 0.8 : -0.8;
-      if (_pulseRadius >= 16) _pulseGrowing = false;
-      if (_pulseRadius <= 8) _pulseGrowing = true;
-      try {
-        await _mapboxMap!.style.setStyleLayerProperty(
-          _vehicleHaloLayerId,
-          'circle-radius',
-          _pulseRadius,
-        );
-      } catch (_) {}
-    });
-  }
-
-  Future<void> _updateStationaryPulseVisibility() async {
-    if (_mapboxMap == null) return;
-    try {
-      await _mapboxMap!.style.setStyleLayerProperty(
-        _vehicleHaloLayerId,
-        'circle-opacity',
-        _lastKnownSpeedMps < 0.5 ? 0.18 : 0.0,
-      );
-    } catch (_) {}
+    final normalized = ((zoom - 11.0) / 11.0).clamp(0.0, 1.0);
+    return 0.85 + (normalized * 0.55);
   }
 
   Duration _computeAdaptiveDuration(
@@ -2130,8 +2356,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // Update map with new data
     if (_mapboxMap != null) {
       _addCurrentLocationMarker();
-      _loadTripRoute();
-      _addTripMarkers();
+      _handleTripStateChange(null, ref.read(tripProvider));
     }
   }
 
@@ -2176,12 +2401,62 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  Future<Uint8List> _createMarkerImage(Color color, String emoji) async {
+  Future<Uint8List> _createNumberedStopMarkerImage(
+    String label, {
+    required Color color,
+    double size = 44.0,
+  }) async {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    final center = Offset(size / 2, size / 2);
+    final radius = size * 0.38;
+
+    canvas.drawCircle(center, radius + 2, Paint()..color = Colors.white);
+    canvas.drawCircle(center, radius, Paint()..color = color);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.25)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          fontSize: label.length > 1 ? size * 0.34 : size * 0.42,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(
+        (size - textPainter.width) / 2,
+        (size - textPainter.height) / 2,
+      ),
+    );
+
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<Uint8List> _createMarkerImage(
+    Color color,
+    String emoji, {
+    double size = 60.0,
+  }) async {
     print('🎨 DEBUG: Creating marker image - Color: $color, Emoji: $emoji');
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    final size = 60.0; // Increased from 40.0 for better visibility
 
     // Draw pin shape background
     final paint = Paint()
@@ -2269,6 +2544,8 @@ class _TripDetailsCard extends StatefulWidget {
   final Duration? remainingTime;
   final String? currentStreetName;
   final String? destinationStreetName;
+  final String? nextPickupStopName;
+  final int? pendingPickupCount;
 
   const _TripDetailsCard({
     required this.tripState,
@@ -2280,6 +2557,8 @@ class _TripDetailsCard extends StatefulWidget {
     this.remainingTime,
     this.currentStreetName,
     this.destinationStreetName,
+    this.nextPickupStopName,
+    this.pendingPickupCount,
   });
 
   @override
@@ -2388,6 +2667,71 @@ class _TripDetailsCardState extends State<_TripDetailsCard> {
 
                 if (currentTrip != null) ...[
                   SizedBox(height: 16.h),
+
+                  if (widget.nextPickupStopName != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12.w,
+                        vertical: 10.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E3A8A).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(
+                          color: const Color(0xFF1E3A8A).withOpacity(0.15),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.pin_drop,
+                            size: 16.w,
+                            color: const Color(0xFF1E3A8A),
+                          ),
+                          SizedBox(width: 8.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  widget.pendingPickupCount != null &&
+                                          widget.pendingPickupCount! > 0
+                                      ? 'Next pickup'
+                                      : 'Heading to school',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 10.sp,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                Text(
+                                  widget.nextPickupStopName!,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1E3A8A),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (widget.pendingPickupCount != null &&
+                              widget.pendingPickupCount! > 0)
+                            Text(
+                              '${widget.pendingPickupCount} left',
+                              style: GoogleFonts.poppins(
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E3A8A),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                  ],
 
                   // Trip Status
                   Row(

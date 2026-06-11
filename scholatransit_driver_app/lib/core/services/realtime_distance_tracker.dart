@@ -33,9 +33,12 @@ class RealtimeDistanceTracker {
     Function(double)? onProgressUpdate,
   }) async {
     try {
-      if (_isTracking) {
-        print('⚠️ Distance tracking already active');
+      if (_isTracking && _currentTrip?.tripId == trip.tripId) {
+        print('⚠️ Distance tracking already active for ${trip.tripId}');
         return true;
+      }
+      if (_isTracking) {
+        stopDistanceTracking();
       }
 
       print(
@@ -237,13 +240,7 @@ class RealtimeDistanceTracker {
 
       print('📏 Updating distance calculation...');
 
-      // Calculate remaining distance to destination
-      final newRemainingDistance = Geolocator.distanceBetween(
-        currentPosition.latitude,
-        currentPosition.longitude,
-        _currentTrip!.endLatitude!,
-        _currentTrip!.endLongitude!,
-      );
+      final newRemainingDistance = _remainingDistanceMeters(currentPosition);
 
       // Calculate distance traveled
       final newDistanceTraveled = _totalTripDistance != null
@@ -425,6 +422,106 @@ class RealtimeDistanceTracker {
 
   /// Get route coordinates for map display
   static List<Map<String, double>>? get routeCoordinates => _routeCoordinates;
+
+  /// Replace the active route polyline (e.g. multi-stop pickup path from map).
+  static Future<void> applyRoutePath({
+    required List<Map<String, double>> coordinates,
+    required double totalDistanceMeters,
+  }) async {
+    if (coordinates.isEmpty) return;
+
+    _routeCoordinates = coordinates;
+    _totalTripDistance = totalDistanceMeters;
+
+    final currentPosition = await LocationServiceResolver.getCurrentPosition();
+    if (currentPosition == null) {
+      _remainingDistance = totalDistanceMeters;
+      _distanceTraveled = 0.0;
+    } else {
+      _remainingDistance = _remainingDistanceMeters(currentPosition);
+      _distanceTraveled =
+          (totalDistanceMeters - _remainingDistance!).clamp(0.0, totalDistanceMeters);
+    }
+
+    _lastDistanceUpdate = DateTime.now();
+
+    if (_remainingDistance != null &&
+        _distanceTraveled != null &&
+        _totalTripDistance != null) {
+      final progress = _totalTripDistance! > 0
+          ? (_distanceTraveled! / _totalTripDistance! * 100).clamp(0.0, 100.0)
+          : 0.0;
+      _onDistanceUpdate?.call(
+        _remainingDistance!,
+        _distanceTraveled!,
+        _totalTripDistance!,
+      );
+      _onProgressUpdate?.call(progress);
+    }
+
+    print(
+      '✅ RealtimeDistanceTracker: Applied route path '
+      '(${coordinates.length} pts, ${(totalDistanceMeters / 1000).toStringAsFixed(2)} km)',
+    );
+  }
+
+  static double _remainingDistanceMeters(Position currentPosition) {
+    if (_routeCoordinates != null && _routeCoordinates!.length >= 2) {
+      return _remainingDistanceAlongPath(
+        currentPosition.latitude,
+        currentPosition.longitude,
+      );
+    }
+
+    if (_currentTrip?.endLatitude == null || _currentTrip?.endLongitude == null) {
+      return 0.0;
+    }
+
+    return Geolocator.distanceBetween(
+      currentPosition.latitude,
+      currentPosition.longitude,
+      _currentTrip!.endLatitude!,
+      _currentTrip!.endLongitude!,
+    );
+  }
+
+  static double _remainingDistanceAlongPath(double lat, double lng) {
+    final route = _routeCoordinates!;
+    var closestIndex = 0;
+    var minDistance = double.infinity;
+
+    for (var i = 0; i < route.length; i++) {
+      final point = route[i];
+      final distance = Geolocator.distanceBetween(
+        lat,
+        lng,
+        point['latitude']!,
+        point['longitude']!,
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIndex = i;
+      }
+    }
+
+    var remaining = Geolocator.distanceBetween(
+      lat,
+      lng,
+      route[closestIndex]['latitude']!,
+      route[closestIndex]['longitude']!,
+    );
+
+    for (var i = closestIndex; i < route.length - 1; i++) {
+      remaining += Geolocator.distanceBetween(
+        route[i]['latitude']!,
+        route[i]['longitude']!,
+        route[i + 1]['latitude']!,
+        route[i + 1]['longitude']!,
+      );
+    }
+
+    return remaining;
+  }
 
   /// Get remaining route coordinates based on current progress
   static Future<List<Map<String, double>>?>

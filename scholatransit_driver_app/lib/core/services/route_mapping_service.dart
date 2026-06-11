@@ -506,4 +506,180 @@ class RouteMappingService {
       return null;
     }
   }
+
+  static bool isStudentPickupComplete(Student student) {
+    return student.status == StudentStatus.pickedUp ||
+        student.status == StudentStatus.onBus ||
+        student.status == StudentStatus.droppedOff;
+  }
+
+  /// Live driver navigation: route from current position through remaining
+  /// pickup stops, then to school. Completed pickups are excluded from the path.
+  static Future<RouteMap?> calculateLiveNavigationRoute({
+    required Trip trip,
+    required List<Student> students,
+    double? currentLat,
+    double? currentLng,
+  }) async {
+    try {
+      final currentPosition = currentLat != null && currentLng != null
+          ? {'latitude': currentLat, 'longitude': currentLng}
+          : LocationService.currentPosition != null
+              ? {
+                  'latitude': LocationService.currentPosition!.latitude,
+                  'longitude': LocationService.currentPosition!.longitude,
+                }
+              : null;
+
+      if (currentPosition == null) {
+        print('❌ Live nav: No current location available');
+        return null;
+      }
+
+      if (trip.endLatitude == null || trip.endLongitude == null) {
+        print('❌ Live nav: No school location available');
+        return null;
+      }
+
+      final schoolLocation = {
+        'latitude': trip.endLatitude!,
+        'longitude': trip.endLongitude!,
+      };
+
+      final allStops = <RouteStop>[];
+      for (final student in students) {
+        if (student.latitude == null || student.longitude == null) continue;
+        allStops.add(
+          RouteStop(
+            id: 'student_${student.id}',
+            name: student.parentName ?? student.fullName,
+            address: student.address ?? 'Pickup location',
+            latitude: student.latitude!,
+            longitude: student.longitude!,
+            type: StopType.pickup,
+            studentNames: [student.fullName],
+            scheduledTime: trip.scheduledStart,
+            isCompleted: isStudentPickupComplete(student),
+          ),
+        );
+      }
+
+      if (allStops.isEmpty) {
+        print('⚠️ Live nav: No student pickup coordinates');
+        return null;
+      }
+
+      final pendingStops =
+          allStops.where((stop) => !stop.isCompleted).toList();
+      final orderedPending = _calculateOptimalRouteOrder(
+        startLocation: currentPosition,
+        stops: pendingStops,
+        endLocation: schoolLocation,
+      );
+
+      final routePath = <Map<String, double>>[];
+      double totalDistance = 0;
+      Duration totalDuration = Duration.zero;
+      double? lastLat = currentPosition['latitude'];
+      double? lastLng = currentPosition['longitude'];
+      final stopsWithETA = <RouteStop>[];
+
+      for (final stop in orderedPending) {
+        if (lastLat == null || lastLng == null) break;
+
+        final routeInfo = await RoutingService.getRouteInfo(
+          startLat: lastLat,
+          startLng: lastLng,
+          endLat: stop.latitude,
+          endLng: stop.longitude,
+        );
+
+        if (routeInfo != null) {
+          routePath.addAll(routeInfo.coordinates);
+          totalDistance += routeInfo.distance;
+          totalDuration += Duration(seconds: routeInfo.duration.round());
+
+          final etaResult = await ETAService.calculateETA(
+            currentLat: lastLat,
+            currentLng: lastLng,
+            destinationLat: stop.latitude,
+            destinationLng: stop.longitude,
+            trip: trip,
+          );
+
+          stopsWithETA.add(
+            RouteStop(
+              id: stop.id,
+              name: stop.name,
+              address: stop.address,
+              latitude: stop.latitude,
+              longitude: stop.longitude,
+              type: stop.type,
+              studentNames: stop.studentNames,
+              scheduledTime: stop.scheduledTime,
+              eta: etaResult.success ? etaResult.etaInfo.timeToArrival : null,
+              distance: routeInfo.distance,
+            ),
+          );
+
+          lastLat = stop.latitude;
+          lastLng = stop.longitude;
+        }
+      }
+
+      Duration? etaToSchool;
+      if (lastLat != null && lastLng != null) {
+        final routeToSchool = await RoutingService.getRouteInfo(
+          startLat: lastLat,
+          startLng: lastLng,
+          endLat: schoolLocation['latitude']!,
+          endLng: schoolLocation['longitude']!,
+        );
+
+        if (routeToSchool != null) {
+          routePath.addAll(routeToSchool.coordinates);
+          totalDistance += routeToSchool.distance;
+          totalDuration += Duration(seconds: routeToSchool.duration.round());
+
+          final etaResult = await ETAService.calculateETA(
+            currentLat: lastLat,
+            currentLng: lastLng,
+            destinationLat: schoolLocation['latitude']!,
+            destinationLng: schoolLocation['longitude']!,
+            trip: trip,
+          );
+
+          etaToSchool = etaResult.success ? etaResult.etaInfo.timeToArrival : null;
+        }
+      }
+
+      final schoolStop = RouteStop(
+        id: 'school',
+        name: trip.endLocation ?? 'School',
+        address: trip.endLocation ?? 'School',
+        latitude: schoolLocation['latitude']!,
+        longitude: schoolLocation['longitude']!,
+        type: StopType.school,
+        eta: etaToSchool,
+      );
+
+      print(
+        '✅ Live nav: ${stopsWithETA.length} pending pickups, '
+        '${allStops.where((s) => s.isCompleted).length} completed, '
+        '${(totalDistance / 1000).toStringAsFixed(2)} km total',
+      );
+
+      return RouteMap(
+        stops: stopsWithETA,
+        routePath: routePath,
+        totalDistance: totalDistance,
+        totalDuration: totalDuration,
+        schoolStop: schoolStop,
+        etaToSchool: etaToSchool,
+      );
+    } catch (e) {
+      print('❌ Live nav: Error calculating route: $e');
+      return null;
+    }
+  }
 }

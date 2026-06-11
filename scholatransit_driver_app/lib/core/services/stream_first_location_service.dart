@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
+import '../config/app_config.dart';
 import 'location_error_handler.dart';
 
 /// Stream-first location service with quality scoring and hysteresis
@@ -98,7 +99,7 @@ class StreamFirstLocationService {
 
     final settings = LocationSettings(
       accuracy: LocationAccuracy.low, // Start with low for immediate response
-      distanceFilter: 10, // Update every 10 meters
+      distanceFilter: AppConfig.locationStreamDistanceFilterMeters,
       timeLimit: _warmupTimeout,
     );
 
@@ -227,9 +228,16 @@ class StreamFirstLocationService {
         position.latitude,
         position.longitude,
       );
-      if (moved >= 5.0) {
+      if (moved >= 2.0) {
         return true;
       }
+    }
+
+    // Emit at least every few seconds even when nearly stationary (keeps live map/API fresh).
+    if (_lastSuccessfulUpdate != null &&
+        DateTime.now().difference(_lastSuccessfulUpdate!) >
+            const Duration(seconds: 4)) {
+      return true;
     }
 
     // Always accept if score is above accept threshold
@@ -293,7 +301,7 @@ class StreamFirstLocationService {
 
     final settings = LocationSettings(
       accuracy: LocationAccuracy.medium, // Upgraded from low
-      distanceFilter: 5, // More sensitive
+      distanceFilter: AppConfig.locationStreamDistanceFilterMeters,
       timeLimit: Duration(seconds: 20),
     );
 

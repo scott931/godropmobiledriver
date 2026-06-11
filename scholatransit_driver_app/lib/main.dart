@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -24,6 +25,7 @@ import 'core/services/navigation_service.dart';
 import 'core/services/truck_h3_service.dart';
 import 'core/services/vehicle_movement_simulator.dart';
 import 'core/services/background_location_service.dart';
+import 'core/services/location_service_resolver.dart';
 import 'core/widgets/system_back_button_handler.dart';
 
 void main() async {
@@ -178,6 +180,21 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
       if (tripState.currentTrip != null) {
         unawaited(
           BackgroundLocationService.startBackgroundTracking(
+            onLocationUpdate: (Position position) {
+              final activeTrip = ref.read(tripProvider).currentTrip;
+              if (activeTrip?.isActive == true) {
+                unawaited(
+                  ref.read(tripProvider.notifier).updateLocation(
+                    latitude: position.latitude,
+                    longitude: position.longitude,
+                    speed: position.speed >= 0 ? position.speed * 3.6 : null,
+                    heading: position.heading >= 0 ? position.heading : null,
+                    accuracy: position.accuracy,
+                  ),
+                );
+              }
+              unawaited(LocationServiceResolver.injectSimulatedGps(position));
+            },
             onLocationError:
                 (error) => print('❌ Background location lifecycle error: $error'),
           ),

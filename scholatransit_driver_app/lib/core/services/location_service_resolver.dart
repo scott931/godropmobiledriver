@@ -119,6 +119,14 @@ class LocationServiceResolver {
 
     print('🔧 LocationServiceResolver: Starting location tracking...');
 
+    // Keep the active GPS stream when already running (avoids dropping map/provider listeners).
+    if (_streamFirstService != null && _streamFirstService!.isTracking) {
+      if (onLocationUpdate != null) {
+        _streamFirstService!.positionStream.listen(onLocationUpdate);
+      }
+      return true;
+    }
+
     // Stop any existing tracking to prevent conflicts
     await _stopAllLocationServices();
 

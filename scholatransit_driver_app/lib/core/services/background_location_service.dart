@@ -12,7 +12,7 @@ class BackgroundLocationService {
 
   // Background location configuration
   static const Duration _backgroundUpdateInterval = Duration(minutes: 2);
-  static const double _backgroundDistanceFilter = 200.0; // 200 meters
+  static const double _backgroundDistanceFilter = 15.0; // meters during active trips
   static const LocationAccuracy _backgroundAccuracy = LocationAccuracy.high;
 
   /// Initialize background location service

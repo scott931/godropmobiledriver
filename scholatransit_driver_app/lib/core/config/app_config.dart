@@ -1,6 +1,6 @@
 class AppConfig {
   // API Configuration
-  static const String baseUrl = 'http://148.230.122.207:3001/';
+  static const String baseUrl = 'http://148.230.122.207:8001/';
       
       
   static const String apiVersion = '/api/v1';
@@ -122,6 +122,8 @@ class AppConfig {
   static const double defaultLatitude = -1.286389;
   static const double defaultLongitude = 36.817223;
   static const double locationAccuracyThreshold = 10.0; // meters
+  /// GPS stream emits when the device moves at least this many meters (0 = time-based).
+  static const int locationStreamDistanceFilterMeters = 0;
   /// How often to POST live GPS to the backend while a trip is in progress (seconds).
   static const int locationUpdateInterval = 5;
   /// Enables smooth marker interpolation between GPS updates.
@@ -263,6 +265,8 @@ class AppConfig {
 
   // Map UI Color Configuration
   // Vehicle/Current Location Marker Colors
+  /// Teardrop live-location pin fill (Google Maps classic red by default).
+  static const String vehicleLocationPinColor = '#EA4335';
   static const String vehicleMarkerColor =
       '#4285F4'; // Vibrant Blue - primary choice
   static const String vehicleMarkerColorAlt =
