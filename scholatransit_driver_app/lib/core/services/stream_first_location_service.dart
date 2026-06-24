@@ -15,10 +15,10 @@ class StreamFirstLocationService {
   Timer? _healthCheckTimer;
 
   // Configuration
-  static const Duration _warmupTimeout = Duration(seconds: 30);
   static const Duration _upgradeInterval = Duration(seconds: 15);
   static const Duration _healthCheckInterval = Duration(seconds: 30);
   static const Duration _maxStaleAge = Duration(minutes: 2);
+  static const Duration _maxLiveFixAge = Duration(seconds: 10);
 
   // Quality scoring weights
   static const double _accuracyWeight = 0.4;
@@ -100,7 +100,6 @@ class StreamFirstLocationService {
     final settings = LocationSettings(
       accuracy: LocationAccuracy.low, // Start with low for immediate response
       distanceFilter: AppConfig.locationStreamDistanceFilterMeters,
-      timeLimit: _warmupTimeout,
     );
 
     debugPrint('📡 Starting position stream (warmup mode)');
@@ -112,6 +111,7 @@ class StreamFirstLocationService {
             await LocationErrorHandler.handleLocationError(error);
             _handleStreamError(error);
           },
+          onDone: _handleStreamDone,
           cancelOnError: false,
         );
   }
@@ -302,13 +302,13 @@ class StreamFirstLocationService {
     final settings = LocationSettings(
       accuracy: LocationAccuracy.medium, // Upgraded from low
       distanceFilter: AppConfig.locationStreamDistanceFilterMeters,
-      timeLimit: Duration(seconds: 20),
     );
 
     _positionStreamSubscription =
         Geolocator.getPositionStream(locationSettings: settings).listen(
           _handlePositionUpdate,
           onError: _handleStreamError,
+          onDone: _handleStreamDone,
           cancelOnError: false,
         );
   }
@@ -327,7 +327,28 @@ class StreamFirstLocationService {
   /// Handle stream errors
   void _handleStreamError(dynamic error) {
     debugPrint('❌ Position stream error: $error');
-    // Don't call _handleError here to avoid breaking the stream
+    _restartPositionStreamSoon();
+  }
+
+  void _handleStreamDone() {
+    debugPrint('⚠️ Position stream closed');
+    _positionStreamSubscription = null;
+    _restartPositionStreamSoon();
+  }
+
+  void _restartPositionStreamSoon() {
+    if (_positionController.isClosed) return;
+    Future.delayed(const Duration(seconds: 1), () async {
+      if (_positionController.isClosed || _positionStreamSubscription != null) {
+        return;
+      }
+      try {
+        debugPrint('🔄 Restarting position stream...');
+        await _startPositionStream();
+      } catch (e) {
+        debugPrint('❌ Failed to restart position stream: $e');
+      }
+    });
   }
 
   /// Handle errors
@@ -352,8 +373,8 @@ class StreamFirstLocationService {
       debugPrint('   Recent position: $hasRecentPosition');
 
       if (isTracking && !hasRecentPosition) {
-        debugPrint('⚠️ No recent position - trying cached location');
-        _tryGetCachedPosition();
+        debugPrint('⚠️ No recent position - refreshing live location');
+        getFreshPosition();
       }
     });
   }
@@ -396,6 +417,26 @@ class StreamFirstLocationService {
   void forceAcceptLocation(Position position) {
     debugPrint('🆘 Force accepting location: ${position.accuracy}m accuracy');
     _updatePosition(position);
+  }
+
+  Future<Position?> getFreshPosition({Duration maxAge = _maxLiveFixAge}) async {
+    final last = _lastPosition;
+    if (last != null && DateTime.now().difference(last.timestamp) <= maxAge) {
+      return last;
+    }
+
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 8),
+      );
+      _updatePosition(position);
+      return position;
+    } catch (e) {
+      debugPrint('⚠️ Fresh position request failed: $e');
+      await _tryGetCachedPosition();
+      return _lastPosition;
+    }
   }
 
   /// Get service status

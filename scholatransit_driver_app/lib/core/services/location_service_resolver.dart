@@ -164,7 +164,7 @@ class LocationServiceResolver {
     }
 
     if (_streamFirstService != null) {
-      return _streamFirstService!.lastKnownPosition;
+      return await _streamFirstService!.getFreshPosition();
     }
 
     // Fallback to SmartLocationManager
