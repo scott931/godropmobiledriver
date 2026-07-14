@@ -105,7 +105,10 @@ class TripNotifier extends StateNotifier<TripState> {
   Timer? _liveLocationTimer;
   StreamSubscription<Position>? _livePositionSubscription;
   DateTime? _lastLiveLocationPostAt;
+  DateTime? _lastLiveStreamUpdateAt;
+  DateTime? _locationRateLimitUntil;
   Position? _lastPostedLivePosition;
+  bool _foregroundLiveLocationPaused = false;
 
   TripNotifier() : super(const TripState()) {
     _loadCurrentTrip();
@@ -822,6 +825,12 @@ class TripNotifier extends StateNotifier<TripState> {
     double? heading,
     double? accuracy,
   }) async {
+    final now = DateTime.now();
+    if (_locationRateLimitUntil != null &&
+        now.isBefore(_locationRateLimitUntil!)) {
+      return false;
+    }
+
     try {
       final h3Index = (AppConfig.enableH3Tracking &&
               TruckH3Service.isInitialized)
@@ -847,10 +856,37 @@ class TripNotifier extends StateNotifier<TripState> {
         },
       );
 
+      if (_responseThrottled(response)) {
+        _locationRateLimitUntil = now.add(
+          Duration(seconds: AppConfig.locationRateLimitBackoffSeconds),
+        );
+        return false;
+      }
+
       return response.success;
     } catch (e) {
       return false;
     }
+  }
+
+  /// Throttled live location POST shared by foreground stream, fallback poll, and background tracking.
+  Future<void> postLiveLocationIfDue(Position pos) async {
+    await _handleLivePositionUpdate(pos);
+  }
+
+  /// Stop foreground live GPS posts while background tracking owns the stream.
+  void pauseForegroundLiveLocation() {
+    _foregroundLiveLocationPaused = true;
+    _liveLocationTimer?.cancel();
+    _liveLocationTimer = null;
+    _livePositionSubscription?.cancel();
+    _livePositionSubscription = null;
+  }
+
+  /// Resume foreground live GPS posts after returning to the foreground.
+  void resumeForegroundLiveLocation() {
+    _foregroundLiveLocationPaused = false;
+    _syncLiveLocationTimer();
   }
 
   /// Starts/stops live GPS posts to [AppConfig.updateLocationEndpoint] while [TripState.currentTrip] is active.
@@ -859,29 +895,84 @@ class TripNotifier extends StateNotifier<TripState> {
     _liveLocationTimer = null;
     _livePositionSubscription?.cancel();
     _livePositionSubscription = null;
-    _lastLiveLocationPostAt = null;
-    _lastPostedLivePosition = null;
 
     final trip = state.currentTrip;
     if (trip == null || !trip.isActive) {
+      _lastLiveLocationPostAt = null;
+      _lastLiveStreamUpdateAt = null;
+      _lastPostedLivePosition = null;
       return;
     }
 
-    // Stream-driven updates from the same GPS pipeline as the map puck.
+    if (_foregroundLiveLocationPaused) {
+      return;
+    }
+
+    // Primary path: GPS stream with throttle (interval + movement).
     _livePositionSubscription =
         LocationServiceResolver.subscribeToPositionUpdates((position) {
-      unawaited(_postLiveLocationFromPosition(position));
+      _lastLiveStreamUpdateAt = DateTime.now();
+      unawaited(_handleLivePositionUpdate(position));
     });
 
-    // Fallback poll when the stream is quiet (permissions, tunnel, emulator).
+    // Fallback poll only when the stream has been quiet (tunnel, permissions, emulator).
     final interval = Duration(seconds: AppConfig.locationUpdateInterval);
     _liveLocationTimer = Timer.periodic(interval, (_) {
-      unawaited(_postLiveLocationTick());
+      unawaited(_postLiveLocationFallbackTick());
     });
-    unawaited(_postLiveLocationTick());
+    unawaited(_postLiveLocationFallbackTick());
   }
 
-  Future<void> _postLiveLocationFromPosition(Position pos) async {
+  bool _shouldPostLiveLocation(Position pos) {
+    final now = DateTime.now();
+    if (_locationRateLimitUntil != null &&
+        now.isBefore(_locationRateLimitUntil!)) {
+      return false;
+    }
+
+    if (_lastLiveLocationPostAt == null) {
+      return true;
+    }
+
+    final minInterval = Duration(seconds: AppConfig.locationUpdateInterval);
+    if (now.difference(_lastLiveLocationPostAt!) >= minInterval) {
+      return true;
+    }
+
+    if (_lastPostedLivePosition == null) {
+      return false;
+    }
+
+    final moved = Geolocator.distanceBetween(
+      _lastPostedLivePosition!.latitude,
+      _lastPostedLivePosition!.longitude,
+      pos.latitude,
+      pos.longitude,
+    );
+    return moved >= AppConfig.locationMinMovementMeters;
+  }
+
+  Future<void> _handleLivePositionUpdate(Position pos) async {
+    if (AppConfig.useSimulatedVehicleMotion) {
+      return;
+    }
+    final trip = state.currentTrip;
+    if (trip == null || !trip.isActive) {
+      _syncLiveLocationTimer();
+      return;
+    }
+    if (!_shouldPostLiveLocation(pos)) {
+      return;
+    }
+
+    final posted = await _sendLiveLocation(pos);
+    if (posted) {
+      _lastLiveLocationPostAt = DateTime.now();
+      _lastPostedLivePosition = pos;
+    }
+  }
+
+  Future<void> _postLiveLocationFallbackTick() async {
     if (AppConfig.useSimulatedVehicleMotion) {
       return;
     }
@@ -892,48 +983,17 @@ class TripNotifier extends StateNotifier<TripState> {
     }
 
     final now = DateTime.now();
-    final minInterval = Duration(seconds: AppConfig.locationUpdateInterval);
-    if (_lastLiveLocationPostAt != null &&
-        now.difference(_lastLiveLocationPostAt!) < minInterval) {
-      if (_lastPostedLivePosition != null) {
-        final moved = Geolocator.distanceBetween(
-          _lastPostedLivePosition!.latitude,
-          _lastPostedLivePosition!.longitude,
-          pos.latitude,
-          pos.longitude,
-        );
-        if (moved < 3.0) {
-          return;
-        }
-      } else {
-        return;
-      }
-    }
-
-    final posted = await _sendLiveLocation(pos);
-    if (posted) {
-      _lastLiveLocationPostAt = now;
-      _lastPostedLivePosition = pos;
-    }
-  }
-
-  Future<void> _postLiveLocationTick() async {
-    if (AppConfig.useSimulatedVehicleMotion) {
+    final quietThreshold = Duration(seconds: AppConfig.locationUpdateInterval);
+    final streamIsQuiet = _lastLiveStreamUpdateAt == null ||
+        now.difference(_lastLiveStreamUpdateAt!) >= quietThreshold;
+    if (!streamIsQuiet) {
       return;
     }
-    final trip = state.currentTrip;
-    if (trip == null || !trip.isActive) {
-      _syncLiveLocationTimer();
-      return;
-    }
+
     final pos = await LocationServiceResolver.getCurrentPosition();
     if (pos == null) return;
 
-    final posted = await _sendLiveLocation(pos);
-    if (posted) {
-      _lastLiveLocationPostAt = DateTime.now();
-      _lastPostedLivePosition = pos;
-    }
+    await _handleLivePositionUpdate(pos);
   }
 
   Future<bool> _sendLiveLocation(Position pos) async {

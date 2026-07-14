@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:location/location.dart' as location_package;
 import 'package:flutter/services.dart';
+import '../config/app_config.dart';
 
 class BackgroundLocationService {
   static const MethodChannel _foregroundChannel = MethodChannel(
@@ -10,9 +11,11 @@ class BackgroundLocationService {
   static bool _isBackgroundModeEnabled = false;
   static StreamSubscription<Position>? _backgroundSubscription;
 
-  // Background location configuration
-  static const Duration _backgroundUpdateInterval = Duration(minutes: 2);
-  static const double _backgroundDistanceFilter = 15.0; // meters during active trips
+  // Background location configuration (aligned with foreground throttle settings).
+  static Duration get _backgroundUpdateInterval =>
+      Duration(seconds: AppConfig.locationUpdateInterval);
+  static int get _backgroundDistanceFilter =>
+      AppConfig.locationStreamDistanceFilterMeters;
   static const LocationAccuracy _backgroundAccuracy = LocationAccuracy.high;
 
   /// Initialize background location service
@@ -60,7 +63,7 @@ class BackgroundLocationService {
       await location.changeSettings(
         accuracy: location_package.LocationAccuracy.high,
         interval: _backgroundUpdateInterval.inMilliseconds,
-        distanceFilter: _backgroundDistanceFilter,
+        distanceFilter: _backgroundDistanceFilter.toDouble(),
       );
 
       // Configure for battery optimization
@@ -107,7 +110,7 @@ class BackgroundLocationService {
           Geolocator.getPositionStream(
             locationSettings: LocationSettings(
               accuracy: _backgroundAccuracy,
-              distanceFilter: _backgroundDistanceFilter.toInt(),
+              distanceFilter: _backgroundDistanceFilter,
             ),
           ).listen(
             (position) {
@@ -165,7 +168,7 @@ class BackgroundLocationService {
   static Map<String, dynamic> getBackgroundStats() {
     return {
       'is_background_tracking': _isBackgroundModeEnabled,
-      'update_interval_minutes': _backgroundUpdateInterval.inMinutes,
+      'update_interval_seconds': _backgroundUpdateInterval.inSeconds,
       'distance_filter_meters': _backgroundDistanceFilter,
       'accuracy': _backgroundAccuracy.toString(),
     };

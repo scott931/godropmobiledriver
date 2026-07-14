@@ -170,6 +170,7 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
       final tripState = ref.read(tripProvider);
       if (tripState.currentTrip != null) {
         unawaited(BackgroundLocationService.stopBackgroundTracking());
+        ref.read(tripProvider.notifier).resumeForegroundLiveLocation();
       }
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
@@ -178,18 +179,15 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
       _statusCheckTimer = null;
       final tripState = ref.read(tripProvider);
       if (tripState.currentTrip != null) {
+        ref.read(tripProvider.notifier).pauseForegroundLiveLocation();
         unawaited(
           BackgroundLocationService.startBackgroundTracking(
             onLocationUpdate: (Position position) {
               final activeTrip = ref.read(tripProvider).currentTrip;
               if (activeTrip?.isActive == true) {
                 unawaited(
-                  ref.read(tripProvider.notifier).updateLocation(
-                    latitude: position.latitude,
-                    longitude: position.longitude,
-                    speed: position.speed >= 0 ? position.speed * 3.6 : null,
-                    heading: position.heading >= 0 ? position.heading : null,
-                    accuracy: position.accuracy,
+                  ref.read(tripProvider.notifier).postLiveLocationIfDue(
+                    position,
                   ),
                 );
               }

@@ -123,9 +123,13 @@ class AppConfig {
   static const double defaultLongitude = 36.817223;
   static const double locationAccuracyThreshold = 10.0; // meters
   /// GPS stream emits when the device moves at least this many meters (0 = time-based).
-  static const int locationStreamDistanceFilterMeters = 0;
-  /// How often to POST live GPS to the backend while a trip is in progress (seconds).
-  static const int locationUpdateInterval = 5;
+  static const int locationStreamDistanceFilterMeters = 15;
+  /// Minimum seconds between live location POSTs while a trip is in progress.
+  static const int locationUpdateInterval = 12;
+  /// POST early when the device moves at least this many meters since the last POST.
+  static const int locationMinMovementMeters = 15;
+  /// After a 429/rate-limit response, wait this many seconds before retrying.
+  static const int locationRateLimitBackoffSeconds = 60;
   /// Enables smooth marker interpolation between GPS updates.
   static const bool enableVehicleInterpolation = bool.fromEnvironment(
     'ENABLE_VEHICLE_INTERPOLATION',
