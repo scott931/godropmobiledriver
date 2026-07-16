@@ -1,4 +1,5 @@
 import 'trip_model.dart';
+import 'student_model.dart';
 import '../config/app_config.dart';
 
 /// Dev-only synthetic trips for [AppConfig.seedTestActiveTrip].
@@ -53,6 +54,45 @@ class TestTripFactory {
       trafficMultiplier: 1.05,
       etaLastUpdated: now,
     );
+  }
+
+  /// Synthetic roster so map/students UI work without a backend passengers API.
+  static List<Student> studentsForTrip(Trip trip) {
+    final now = DateTime.now();
+    final startLat = trip.startLatitude ?? AppConfig.defaultLatitude;
+    final startLng = trip.startLongitude ?? AppConfig.defaultLongitude;
+    return [
+      Student(
+        id: 900101,
+        studentId: 'TEST_STU_1',
+        firstName: 'Amina',
+        lastName: 'Test',
+        grade: 'Grade 4',
+        school: 'Test School',
+        address: 'Pickup stop A',
+        latitude: startLat + 0.005,
+        longitude: startLng + 0.003,
+        assignedRoute: trip.routeId,
+        status: StudentStatus.waiting,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      Student(
+        id: 900102,
+        studentId: 'TEST_STU_2',
+        firstName: 'Brian',
+        lastName: 'Test',
+        grade: 'Grade 5',
+        school: 'Test School',
+        address: 'Pickup stop B',
+        latitude: startLat + 0.012,
+        longitude: startLng + 0.008,
+        assignedRoute: trip.routeId,
+        status: StudentStatus.waiting,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ];
   }
 
   /// Scheduled trip not yet started — for testing start-trip and list UI.

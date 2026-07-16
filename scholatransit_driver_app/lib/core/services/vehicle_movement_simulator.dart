@@ -278,14 +278,9 @@ class VehicleMovementSimulator {
       '🧪 SIM vehicle (road) → ${lat.toStringAsFixed(6)}, ${lng.toStringAsFixed(6)} '
       'along ${_alongMeters.toStringAsFixed(0)}m / ${_totalMeters.toStringAsFixed(0)}m',
     );
+    // Same throttled path as real GPS / background posts (interval, 15m, 429 backoff).
     unawaited(
-      ref.read(tripProvider.notifier).updateLocation(
-            latitude: lat,
-            longitude: lng,
-            speed: _speedKmh,
-            heading: heading,
-            accuracy: 10.0,
-          ),
+      ref.read(tripProvider.notifier).postLiveLocationIfDue(synthetic),
     );
   }
 }

@@ -13,6 +13,7 @@ import '../services/notification_service.dart';
 import '../services/parent_notification_service.dart';
 import '../services/location_service.dart';
 import '../services/location_service_resolver.dart';
+import '../services/live_location_throttle.dart';
 import '../services/truck_h3_service.dart';
 import '../config/app_config.dart';
 
@@ -104,11 +105,13 @@ class TripNotifier extends StateNotifier<TripState> {
   Timer? _refreshTimer;
   Timer? _liveLocationTimer;
   StreamSubscription<Position>? _livePositionSubscription;
-  DateTime? _lastLiveLocationPostAt;
-  DateTime? _lastLiveStreamUpdateAt;
-  DateTime? _locationRateLimitUntil;
-  Position? _lastPostedLivePosition;
   bool _foregroundLiveLocationPaused = false;
+  bool _loadingTripStudents = false;
+  String? _studentsLoadedForTripId;
+  final LiveLocationThrottle _liveLocationThrottle = LiveLocationThrottle(
+    minIntervalSeconds: AppConfig.locationUpdateInterval,
+    minMovementMeters: AppConfig.locationMinMovementMeters,
+  );
 
   TripNotifier() : super(const TripState()) {
     _loadCurrentTrip();
@@ -119,8 +122,47 @@ class TripNotifier extends StateNotifier<TripState> {
   Future<void> _loadCurrentTrip() async {
     final currentTrip = StorageService.getCurrentTrip();
     if (currentTrip != null) {
-      state = state.copyWith(currentTrip: Trip.fromJson(currentTrip));
+      final trip = Trip.fromJson(currentTrip);
+      // Drop leftover synthetic trips unless explicitly re-enabled via dart-define.
+      if (trip.tripId.startsWith('TEST_') && !AppConfig.seedTestActiveTrip) {
+        await clearMockTestData();
+        return;
+      }
+      state = state.copyWith(currentTrip: trip);
     }
+    _syncLiveLocationTimer();
+  }
+
+  /// Removes persisted/in-memory TEST_* trips and seeded mock students.
+  Future<void> clearMockTestData() async {
+    final stored = StorageService.getCurrentTrip();
+    final storedIsTest = stored != null &&
+        (stored['trip_id']?.toString().startsWith('TEST_') == true ||
+            stored['tripId']?.toString().startsWith('TEST_') == true);
+    if (storedIsTest) {
+      await StorageService.clearCurrentTrip();
+    }
+
+    final currentIsTest = state.currentTrip?.tripId.startsWith('TEST_') == true;
+    final hadTestInList =
+        state.trips.any((t) => t.tripId.startsWith('TEST_'));
+    final hadTestStudents =
+        state.students.any((s) => s.studentId.startsWith('TEST_'));
+
+    if (!storedIsTest && !currentIsTest && !hadTestInList && !hadTestStudents) {
+      _syncLiveLocationTimer();
+      return;
+    }
+
+    _studentsLoadedForTripId = null;
+    state = state.copyWith(
+      clearCurrentTrip: currentIsTest || storedIsTest,
+      trips: state.trips.where((t) => !t.tripId.startsWith('TEST_')).toList(),
+      students: state.students
+          .where((s) => !s.studentId.startsWith('TEST_'))
+          .toList(),
+      error: null,
+    );
     _syncLiveLocationTimer();
   }
 
@@ -221,9 +263,14 @@ class TripNotifier extends StateNotifier<TripState> {
 
     final withoutTest =
         state.trips.where((t) => t.tripId != trip.tripId).toList();
+    final seededStudents = trip.tripId.startsWith('TEST_')
+        ? TestTripFactory.studentsForTrip(trip)
+        : state.students;
+    _studentsLoadedForTripId = trip.tripId;
     state = state.copyWith(
       currentTrip: trip,
       trips: [...withoutTest, trip],
+      students: seededStudents,
       error: null,
     );
     _syncLiveLocationTimer();
@@ -780,6 +827,7 @@ class TripNotifier extends StateNotifier<TripState> {
             state.currentTrip!.tripId == ended.tripId;
         if (endedWasCurrent) {
           await StorageService.clearCurrentTrip();
+          _studentsLoadedForTripId = null;
         }
 
         // Update the trips list to reflect the new status
@@ -794,6 +842,7 @@ class TripNotifier extends StateNotifier<TripState> {
           isLoading: false,
           clearCurrentTrip: endedWasCurrent,
           trips: updatedTrips,
+          students: endedWasCurrent ? const [] : state.students,
           lastTripSummary: summary,
           error: null,
         );
@@ -825,9 +874,7 @@ class TripNotifier extends StateNotifier<TripState> {
     double? heading,
     double? accuracy,
   }) async {
-    final now = DateTime.now();
-    if (_locationRateLimitUntil != null &&
-        now.isBefore(_locationRateLimitUntil!)) {
+    if (_liveLocationThrottle.isRateLimited) {
       return false;
     }
 
@@ -857,7 +904,7 @@ class TripNotifier extends StateNotifier<TripState> {
       );
 
       if (_responseThrottled(response)) {
-        _locationRateLimitUntil = now.add(
+        _liveLocationThrottle.noteRateLimited(
           Duration(seconds: AppConfig.locationRateLimitBackoffSeconds),
         );
         return false;
@@ -898,9 +945,6 @@ class TripNotifier extends StateNotifier<TripState> {
 
     final trip = state.currentTrip;
     if (trip == null || !trip.isActive) {
-      _lastLiveLocationPostAt = null;
-      _lastLiveStreamUpdateAt = null;
-      _lastPostedLivePosition = null;
       return;
     }
 
@@ -911,7 +955,7 @@ class TripNotifier extends StateNotifier<TripState> {
     // Primary path: GPS stream with throttle (interval + movement).
     _livePositionSubscription =
         LocationServiceResolver.subscribeToPositionUpdates((position) {
-      _lastLiveStreamUpdateAt = DateTime.now();
+      _liveLocationThrottle.noteStreamUpdate();
       unawaited(_handleLivePositionUpdate(position));
     });
 
@@ -923,56 +967,28 @@ class TripNotifier extends StateNotifier<TripState> {
     unawaited(_postLiveLocationFallbackTick());
   }
 
-  bool _shouldPostLiveLocation(Position pos) {
-    final now = DateTime.now();
-    if (_locationRateLimitUntil != null &&
-        now.isBefore(_locationRateLimitUntil!)) {
-      return false;
-    }
-
-    if (_lastLiveLocationPostAt == null) {
-      return true;
-    }
-
-    final minInterval = Duration(seconds: AppConfig.locationUpdateInterval);
-    if (now.difference(_lastLiveLocationPostAt!) >= minInterval) {
-      return true;
-    }
-
-    if (_lastPostedLivePosition == null) {
-      return false;
-    }
-
-    final moved = Geolocator.distanceBetween(
-      _lastPostedLivePosition!.latitude,
-      _lastPostedLivePosition!.longitude,
-      pos.latitude,
-      pos.longitude,
-    );
-    return moved >= AppConfig.locationMinMovementMeters;
-  }
-
   Future<void> _handleLivePositionUpdate(Position pos) async {
-    if (AppConfig.useSimulatedVehicleMotion) {
-      return;
-    }
     final trip = state.currentTrip;
     if (trip == null || !trip.isActive) {
       _syncLiveLocationTimer();
       return;
     }
-    if (!_shouldPostLiveLocation(pos)) {
+    if (!_liveLocationThrottle.shouldPostPosition(pos)) {
       return;
     }
 
     final posted = await _sendLiveLocation(pos);
     if (posted) {
-      _lastLiveLocationPostAt = DateTime.now();
-      _lastPostedLivePosition = pos;
+      _liveLocationThrottle.notePosted(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+      );
     }
   }
 
   Future<void> _postLiveLocationFallbackTick() async {
+    // While the vehicle simulator is driving ticks, skip fallback polls so we
+    // don't double-fire alongside injected GPS.
     if (AppConfig.useSimulatedVehicleMotion) {
       return;
     }
@@ -982,11 +998,7 @@ class TripNotifier extends StateNotifier<TripState> {
       return;
     }
 
-    final now = DateTime.now();
-    final quietThreshold = Duration(seconds: AppConfig.locationUpdateInterval);
-    final streamIsQuiet = _lastLiveStreamUpdateAt == null ||
-        now.difference(_lastLiveStreamUpdateAt!) >= quietThreshold;
-    if (!streamIsQuiet) {
+    if (!_liveLocationThrottle.streamIsQuiet()) {
       return;
     }
 
@@ -1015,20 +1027,62 @@ class TripNotifier extends StateNotifier<TripState> {
     );
   }
 
-  Future<void> loadTripStudents(int tripId, {Trip? tripContext}) async {
+  Future<void> loadTripStudents(
+    int tripId, {
+    Trip? tripContext,
+    bool force = false,
+  }) async {
+    // Prefer explicit trip (e.g. end-trip from schedule) so we do not require a prior firstWhere match.
+    Trip? trip;
+    if (tripContext != null && tripContext.id == tripId) {
+      trip = tripContext;
+    } else {
+      try {
+        trip = state.trips.firstWhere((t) => t.id == tripId);
+      } catch (_) {
+        final current = state.currentTrip;
+        if (current != null && current.id == tripId) {
+          trip = current;
+        }
+      }
+    }
+    if (trip == null) {
+      state = state.copyWith(
+        isLoading: false,
+        error: 'Trip not found',
+      );
+      return;
+    }
+    final resolvedTrip = trip;
+
+    // Prevent rebuild loops: map watches trip state and re-calls this on every
+    // isLoading flip when students stay empty (esp. TEST_* synthetic trips).
+    if (_loadingTripStudents) {
+      return;
+    }
+    if (!force && _studentsLoadedForTripId == resolvedTrip.tripId) {
+      return;
+    }
+
+    // Dev synthetic trips have no backend passengers roster.
+    if (resolvedTrip.tripId.startsWith('TEST_')) {
+      final seeded = TestTripFactory.studentsForTrip(resolvedTrip);
+      _studentsLoadedForTripId = resolvedTrip.tripId;
+      state = state.copyWith(
+        isLoading: false,
+        students: seeded,
+        error: null,
+      );
+      return;
+    }
+
+    _loadingTripStudents = true;
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Prefer explicit trip (e.g. end-trip from schedule) so we do not require a prior firstWhere match.
-      final Trip trip;
-      if (tripContext != null && tripContext.id == tripId) {
-        trip = tripContext;
-      } else {
-        trip = state.trips.firstWhere((t) => t.id == tripId);
-      }
-
-      if (trip.routeId == null) {
-        print('❌ DEBUG: Trip ${trip.tripId} has no route ID');
+      if (resolvedTrip.routeId == null) {
+        print('❌ DEBUG: Trip ${resolvedTrip.tripId} has no route ID');
+        _studentsLoadedForTripId = resolvedTrip.tripId;
         state = state.copyWith(
           isLoading: false,
           students: [],
@@ -1038,7 +1092,7 @@ class TripNotifier extends StateNotifier<TripState> {
       }
 
       print(
-        '🔍 DEBUG: Loading students for trip ${trip.tripId} (route: ${trip.routeId})',
+        '🔍 DEBUG: Loading students for trip ${resolvedTrip.tripId} (route: ${resolvedTrip.routeId})',
       );
 
       List<Student> studentsList = [];
@@ -1049,7 +1103,7 @@ class TripNotifier extends StateNotifier<TripState> {
       try {
         print('🚀 DEBUG: Trying trip passengers endpoint...');
         final tripResponse = await ApiService.get<Map<String, dynamic>>(
-          '${AppConfig.tripDetailsEndpoint}${trip.tripId}/passengers/',
+          '${AppConfig.tripDetailsEndpoint}${resolvedTrip.tripId}/passengers/',
         );
 
         if (_responseThrottled(tripResponse)) {
@@ -1077,6 +1131,7 @@ class TripNotifier extends StateNotifier<TripState> {
             print(
               '✅ DEBUG: Trip passengers roster: ${studentsList.length} students',
             );
+            _studentsLoadedForTripId = resolvedTrip.tripId;
             state = state.copyWith(
               isLoading: false,
               students: studentsList,
@@ -1127,11 +1182,11 @@ class TripNotifier extends StateNotifier<TripState> {
                 [];
 
             studentsList = allStudents.where((student) {
-              return student.assignedRoute == trip.routeId;
+              return student.assignedRoute == resolvedTrip.routeId;
             }).toList();
 
             print(
-              '🔍 DEBUG: Students filtered for route ${trip.routeId}: ${studentsList.length}',
+              '🔍 DEBUG: Students filtered for route ${resolvedTrip.routeId}: ${studentsList.length}',
             );
           }
           print(
@@ -1148,8 +1203,9 @@ class TripNotifier extends StateNotifier<TripState> {
 
       if (studentsList.isNotEmpty) {
         print(
-          '✅ DEBUG: Successfully loaded ${studentsList.length} students for trip ${trip.tripId}',
+          '✅ DEBUG: Successfully loaded ${studentsList.length} students for trip ${resolvedTrip.tripId}',
         );
+        _studentsLoadedForTripId = resolvedTrip.tripId;
         state = state.copyWith(
           isLoading: false,
           students: studentsList,
@@ -1157,6 +1213,8 @@ class TripNotifier extends StateNotifier<TripState> {
         );
       } else {
         print('❌ DEBUG: All endpoints failed. Last error: $lastError');
+        // Still mark as loaded so map/listeners don't hammer the API in a loop.
+        _studentsLoadedForTripId = resolvedTrip.tripId;
         state = state.copyWith(
           isLoading: false,
           students: [],
@@ -1165,11 +1223,14 @@ class TripNotifier extends StateNotifier<TripState> {
       }
     } catch (e) {
       print('💥 DEBUG: Exception loading students: $e');
+      _studentsLoadedForTripId = resolvedTrip.tripId;
       state = state.copyWith(
         isLoading: false,
         students: [],
         error: 'Failed to load students: $e',
       );
+    } finally {
+      _loadingTripStudents = false;
     }
   }
 

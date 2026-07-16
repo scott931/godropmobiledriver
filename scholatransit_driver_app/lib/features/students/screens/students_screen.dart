@@ -86,7 +86,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
               if (currentTrip != null) {
                 ref
                     .read(tripProvider.notifier)
-                    .loadTripStudents(currentTrip.id);
+                    .loadTripStudents(currentTrip.id, force: true);
               }
             },
           ),
@@ -106,7 +106,7 @@ class _StudentsScreenState extends ConsumerState<StudentsScreen> {
                 if (currentTrip != null) {
                   await ref
                       .read(tripProvider.notifier)
-                      .loadTripStudents(currentTrip.id);
+                      .loadTripStudents(currentTrip.id, force: true);
                 }
               },
               child: ListView.builder(
@@ -235,7 +235,7 @@ class _ErrorState extends ConsumerWidget {
               if (tripState.currentTrip != null) {
                 ref
                     .read(tripProvider.notifier)
-                    .loadTripStudents(tripState.currentTrip!.id);
+                    .loadTripStudents(tripState.currentTrip!.id, force: true);
               }
             },
             child: const Text('Retry'),

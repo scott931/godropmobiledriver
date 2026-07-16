@@ -72,6 +72,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   ProviderSubscription<LocationState>? _locationSubscription;
   StreamSubscription<geolocator.Position>? _mapPositionSubscription;
   String? _trackedTripId;
+  String? _routeLoadedForTripId;
   Timer? _vehicleMotionTimer;
   DateTime? _motionSegmentStartAt;
   Duration _motionSegmentDuration = const Duration(milliseconds: 800);
@@ -151,10 +152,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (_mapboxMap != null &&
         next.currentTrip != null &&
         next.currentTrip!.isActive) {
-      _loadTripRoute();
+      final currentTripId = next.currentTrip!.tripId;
+      final tripChanged = previous?.currentTrip?.tripId != currentTripId;
+      final studentsArrived = (previous?.students.isEmpty ?? true) &&
+          next.students.isNotEmpty &&
+          previous?.currentTrip?.tripId == currentTripId;
+
+      // Only rebuild the route when the active trip changes or students first
+      // arrive — not on every isLoading / location-related trip state emission.
+      if (tripChanged || studentsArrived || _routeLoadedForTripId != currentTripId) {
+        _routeLoadedForTripId = currentTripId;
+        _loadTripRoute();
+      }
 
       // Avoid restarting tracking for the same trip on every state emission.
-      final currentTripId = next.currentTrip!.tripId;
       if (_trackedTripId != currentTripId) {
         _trackedTripId = currentTripId;
         _startDistanceTracking(next.currentTrip!);
@@ -162,6 +173,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     } else if (_mapboxMap != null &&
         (next.currentTrip == null || !next.currentTrip!.isActive)) {
       _trackedTripId = null;
+      _routeLoadedForTripId = null;
       unawaited(_clearTripMarkers());
       _clearRoutePolyline();
       _stopDistanceTracking();

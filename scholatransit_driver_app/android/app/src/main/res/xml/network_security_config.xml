@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Backend currently serves HTTP on this host; required for Android 9+ release builds. -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">148.230.122.207</domain>
+    </domain-config>
+</network-security-config>

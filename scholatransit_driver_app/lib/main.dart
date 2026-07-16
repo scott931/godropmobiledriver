@@ -216,11 +216,16 @@ class _GoDropAppState extends ConsumerState<GoDropApp>
         }
       } else if (next.isAuthenticated &&
           next.driver != null &&
-          AppConfig.seedTestActiveTrip &&
           previous?.isAuthenticated != true) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          unawaited(ref.read(tripProvider.notifier).seedTestActiveTripIfEnabled());
+          if (AppConfig.seedTestActiveTrip) {
+            unawaited(
+              ref.read(tripProvider.notifier).seedTestActiveTripIfEnabled(),
+            );
+          } else {
+            unawaited(ref.read(tripProvider.notifier).clearMockTestData());
+          }
         });
       }
     });
