@@ -8,6 +8,7 @@ import '../../../core/providers/notification_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/providers/location_provider.dart';
+import '../../../core/providers/route_provider.dart';
 
 class EmergencyScreen extends ConsumerStatefulWidget {
   const EmergencyScreen({super.key});
@@ -1280,6 +1281,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
       final authState = ref.read(authProvider);
       final tripState = ref.read(tripProvider);
       final locationState = ref.read(locationProvider);
+      final routeState = ref.read(routeProvider);
 
       if (authState.driver == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1291,6 +1293,24 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
         return;
       }
 
+      final trip = tripState.currentTrip;
+      final vehicleId = resolveEmergencyVehicleId(
+        tripVehicleId: trip?.vehicleId,
+        assignmentVehicleIds: routeState.assignments.map((a) => a.vehicleId),
+        listedVehicleIds: routeState.vehicles
+            .map((v) => v['id'])
+            .whereType<int>(),
+      );
+      final routeId = resolveEmergencyRouteId(
+        tripRouteId: trip?.routeId,
+        assignmentRouteIds: routeState.assignments.map((a) => a.routeId),
+        listedRouteIds: routeState.routes.map((r) => r.id),
+      );
+      final studentIds = tripState.students
+          .map((s) => s.id)
+          .where((id) => id > 0)
+          .toList();
+
       // Create emergency alert
       final success = await ref
           .read(emergencyProvider.notifier)
@@ -1299,8 +1319,9 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
             severity: 'high',
             title: '${_getEmergencyTypeDisplay(emergencyType)} Alert',
             description: 'Emergency alert triggered by driver',
-            vehicle: tripState.currentTrip?.vehicleId ?? 1,
-            route: tripState.currentTrip?.routeId ?? 1,
+            vehicle: vehicleId,
+            route: routeId,
+            studentIds: studentIds.isNotEmpty ? studentIds : null,
             location:
                 '${locationState.currentPosition?.latitude ?? 0.0},${locationState.currentPosition?.longitude ?? 0.0}',
             address: 'Current location',

@@ -216,8 +216,8 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
     required String severity,
     required String title,
     required String description,
-    required int vehicle,
-    required int route,
+    int? vehicle,
+    int? route,
     List<int>? studentIds,
     required String location,
     required String address,
@@ -235,14 +235,16 @@ class EmergencyNotifier extends StateNotifier<EmergencyState> {
       print('🚨 DEBUG: Vehicle: $vehicle, Route: $route');
       print('🚨 DEBUG: Location: $location, Address: $address');
 
+      final vehicleId = (vehicle != null && vehicle > 0) ? vehicle : null;
+      final routeId = (route != null && route > 0) ? route : null;
       final requestData = {
         'emergency_type': emergencyType,
         'severity': severity,
         'title': title,
         'description': description,
-        'vehicle': vehicle,
-        'route': route,
-        if (studentIds != null) 'student_ids': studentIds,
+        if (vehicleId != null) 'vehicle': vehicleId,
+        if (routeId != null) 'route': routeId,
+        if (studentIds != null && studentIds.isNotEmpty) 'student_ids': studentIds,
         'location': location,
         'address': address,
         if (estimatedResolution != null)
@@ -480,3 +482,41 @@ final emergencyProvider =
     StateNotifierProvider<EmergencyNotifier, EmergencyState>(
       (ref) => EmergencyNotifier(),
     );
+
+int? emergencyPositiveId(int? id) => (id != null && id > 0) ? id : null;
+
+int? resolveEmergencyVehicleId({
+  int? selected,
+  int? tripVehicleId,
+  Iterable<int> assignmentVehicleIds = const [],
+  Iterable<int> listedVehicleIds = const [],
+}) {
+  for (final id in [
+    selected,
+    tripVehicleId,
+    ...assignmentVehicleIds,
+    ...listedVehicleIds,
+  ]) {
+    final resolved = emergencyPositiveId(id);
+    if (resolved != null) return resolved;
+  }
+  return null;
+}
+
+int? resolveEmergencyRouteId({
+  int? selected,
+  int? tripRouteId,
+  Iterable<int> assignmentRouteIds = const [],
+  Iterable<int> listedRouteIds = const [],
+}) {
+  for (final id in [
+    selected,
+    tripRouteId,
+    ...assignmentRouteIds,
+    ...listedRouteIds,
+  ]) {
+    final resolved = emergencyPositiveId(id);
+    if (resolved != null) return resolved;
+  }
+  return null;
+}

@@ -8,6 +8,7 @@ import '../../../core/providers/notification_provider.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/trip_provider.dart';
 import '../../../core/providers/location_provider.dart';
+import '../../../core/providers/route_provider.dart';
 
 class CreateAlertScreen extends ConsumerStatefulWidget {
   const CreateAlertScreen({super.key});
@@ -900,6 +901,25 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
     try {
       final authState = ref.read(authProvider);
       final tripState = ref.read(tripProvider);
+      final routeState = ref.read(routeProvider);
+      final trip = tripState.currentTrip;
+      final vehicleId = resolveEmergencyVehicleId(
+        selected: _selectedVehicleId,
+        tripVehicleId: trip?.vehicleId,
+        assignmentVehicleIds: routeState.assignments.map((a) => a.vehicleId),
+        listedVehicleIds: routeState.vehicles
+            .map((v) => v['id'])
+            .whereType<int>(),
+      );
+      final routeId = resolveEmergencyRouteId(
+        selected: _selectedRouteId,
+        tripRouteId: trip?.routeId,
+        assignmentRouteIds: routeState.assignments.map((a) => a.routeId),
+        listedRouteIds: routeState.routes.map((r) => r.id),
+      );
+      final studentIds = _selectedStudentIds.isNotEmpty
+          ? _selectedStudentIds
+          : tripState.students.map((s) => s.id).where((id) => id > 0).toList();
 
       final success = await ref
           .read(emergencyProvider.notifier)
@@ -908,12 +928,9 @@ class _CreateAlertScreenState extends ConsumerState<CreateAlertScreen> {
             severity: _selectedSeverity,
             title: _titleController.text,
             description: _descriptionController.text,
-            vehicle:
-                _selectedVehicleId ?? tripState.currentTrip?.vehicleId ?? 1,
-            route: _selectedRouteId ?? tripState.currentTrip?.routeId ?? 1,
-            studentIds: _selectedStudentIds.isNotEmpty
-                ? _selectedStudentIds
-                : null,
+            vehicle: vehicleId,
+            route: routeId,
+            studentIds: studentIds.isNotEmpty ? studentIds : null,
             location: _locationController.text,
             address: _addressController.text,
             estimatedResolution: _estimatedResolutionController.text.isNotEmpty
